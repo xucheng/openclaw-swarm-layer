@@ -5,7 +5,96 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP/
 
 # OpenClaw Swarm Layer
 
-Unified skill for spec-driven workflow orchestration. Routes to the appropriate module based on user intent.
+Turn workflow specifications into executable task graphs. Dispatch tasks through manual, ACP (Codex/Claude Code), or subagent runners. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
+
+## What It Does
+
+- **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
+- **Multi-runner execution** — Manual (operator-driven), ACP (delegate to Codex/Claude Code/Gemini), Subagent (OpenClaw-native child agents)
+- **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
+- **Review gates** — Tasks require explicit approve/reject before marking done
+- **Automatic retry** — Configurable per-task retry policy with dead letter tracking for exhausted tasks
+- **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
+
+## What It Does NOT Do
+
+- Not a distributed multi-node orchestrator — single machine, single project
+- Not a CI/CD pipeline — no git push, PR creation, or deployment automation
+- Not an autonomous PR factory — operator stays in the loop for review decisions
+
+## Install
+
+Three installation paths:
+
+**ClawHub** (skill only):
+```bash
+clawhub install swarm-layer
+```
+
+**npm** (full plugin):
+```bash
+npm install openclaw-swarm-layer
+openclaw plugins install -l node_modules/openclaw-swarm-layer
+```
+
+**GitHub** (source):
+```bash
+git clone https://github.com/xucheng/openclaw-swarm-layer.git
+cd openclaw-swarm-layer && npm install && npm run build
+openclaw plugins install -l /path/to/openclaw-swarm-layer
+```
+
+After install, verify: `openclaw plugins info openclaw-swarm-layer` should show `Status: loaded`.
+
+## End-to-End Example
+
+```bash
+# 1. Initialize
+openclaw swarm init --project /tmp/my-project
+
+# 2. Write a spec
+cat > /tmp/my-project/SPEC.md << 'EOF'
+# Feature Build
+## Goals
+- Implement and test the new feature
+## Phases
+### Implement
+- Write the core logic
+### Test
+- Run unit tests
+EOF
+
+# 3. Plan
+openclaw swarm plan --project /tmp/my-project --spec /tmp/my-project/SPEC.md
+# → specId: feature-build, taskCount: 2
+
+# 4. Execute first task
+openclaw swarm run --project /tmp/my-project --runner acp
+# → action: dispatched, runId: implement-task-1-run-...
+
+# 5. Poll until complete
+openclaw swarm session status --project /tmp/my-project --run <runId>
+# → status: completed
+
+# 6. Approve
+openclaw swarm review --project /tmp/my-project --task <taskId> --approve
+# → status: done
+
+# 7. Execute next task, repeat steps 4-6
+
+# 8. View report
+openclaw swarm report --project /tmp/my-project
+```
+
+## Links
+
+- **GitHub**: https://github.com/xucheng/openclaw-swarm-layer
+- **npm**: https://www.npmjs.com/package/openclaw-swarm-layer
+- **Docs**: https://github.com/xucheng/openclaw-swarm-layer/tree/main/docs
+- **Issues**: https://github.com/xucheng/openclaw-swarm-layer/issues
+- **ClawHub**: https://clawhub.ai/skills/swarm-layer
+
+---
 
 ## Module Router
 

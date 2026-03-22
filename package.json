@@ -1,5 +1,5 @@
 {
-  "name": "@xucheng/openclaw-swarm-layer",
+  "name": "openclaw-swarm-layer",
   "version": "0.1.0",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "license": "MIT",
@@ -24,9 +24,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist",
-    "openclaw.plugin.json",
-    "skills"
+    "dist/src",
+    "scripts",
+    "skills",
+    "openclaw.plugin.json"
   ],
   "openclaw": {
     "extensions": [
@@ -38,7 +39,8 @@
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run test/unit",
     "test:e2e": "vitest run test/e2e",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build && npm run test:unit"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.41",
