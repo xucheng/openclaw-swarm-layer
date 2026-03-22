@@ -12,7 +12,14 @@
   "bugs": {
     "url": "https://github.com/xucheng/openclaw-swarm-layer/issues"
   },
-  "keywords": ["openclaw", "swarm", "orchestrator", "workflow", "acp", "plugin"],
+  "keywords": [
+    "openclaw",
+    "swarm",
+    "orchestrator",
+    "workflow",
+    "acp",
+    "plugin"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,6 +49,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
+    "@vitest/coverage-v8": "^2.1.9",
     "openclaw": "^2026.2.24",
     "typescript": "^5.8.2",
     "vitest": "^2.1.9"

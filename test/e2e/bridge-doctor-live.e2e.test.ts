@@ -19,7 +19,9 @@ function resolveOpenClawRoot(): string {
   }
 }
 
-describe("e2e: live bridge doctor diagnostics", () => {
+const skipInCI = process.env.CI ? describe.skip : describe;
+
+skipInCI("e2e: live bridge doctor diagnostics", () => {
   it("returns warning severity when bridge config is usable but unpinned", async () => {
     const result = await runSwarmDoctor(
       {},
