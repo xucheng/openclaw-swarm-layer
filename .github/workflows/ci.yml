@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit
       - run: npm run build
 
   test-unit:
@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit
       - run: mkdir -p reports
       - run: npx vitest run test/unit --reporter=junit --outputFile=reports/unit-results.xml --reporter=default
       - name: Upload unit test results
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit
       - run: mkdir -p reports
       - run: npx vitest run test/e2e --reporter=junit --outputFile=reports/e2e-results.xml --reporter=default
       - name: Upload e2e test results
@@ -70,7 +70,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm install --no-audit
       - run: npx vitest run test/unit --coverage
       - name: Upload coverage report
         if: always()

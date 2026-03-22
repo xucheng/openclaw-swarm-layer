@@ -18,7 +18,7 @@ default:
 install:
   stage: build
   script:
-    - npm ci
+    - npm install --no-audit
     - npm run build
   artifacts:
     paths:
