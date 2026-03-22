@@ -1,6 +1,25 @@
-# openclaw-swarm-layer
+<div align="center">
 
-Spec-driven workflow orchestrator plugin for [OpenClaw](https://openclaw.dev). Takes workflow specifications and breaks them into task graphs with dependency ordering, then executes tasks through pluggable runners (manual, ACP, subagent) with review gates, persistent sessions, and automatic retry.
+# OpenClaw Swarm Layer
+
+### Spec-Driven Workflow Orchestration for AI Agent Swarms
+
+**The Evolution of Agent Orchestration:** Spec &rarr; Plan &rarr; Execute &rarr; Review &rarr; Ship
+
+Turn workflow specifications into executable task graphs, dispatch through pluggable runners, and orchestrate multi-agent collaboration with persistent sessions.
+
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
+[![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.2-purple.svg)](https://openclaw.dev)
+[![Tests](https://img.shields.io/badge/Tests-187%20unit%20%7C%2022%20e2e-brightgreen.svg)](#development)
+
+[Quick Start](#quick-start) &bull; [Features](#features) &bull; [CLI Reference](#cli-commands) &bull; [Configuration](docs/configuration.md) &bull; [License](LICENSE)
+
+`TypeScript` `OpenClaw Plugin` `ACP Runner` `Subagent Runner` `Session Reuse` `Thread Binding` `Review Gates`
+
+</div>
+
+---
 
 ## Features
 
