@@ -146,7 +146,8 @@ npm run test:watch     # Watch mode
 
 ## Documentation
 
-- [Configuration Reference](docs/configuration.md)
+- [Skills Guide](docs/skills-guide.md) — full usage guide for all 5 skills with conversational patterns
+- [Configuration Reference](docs/configuration.md) — all plugin config options explained
 - [Operator Runbook](docs/operator-runbook.md) — install, smoke test, upgrade, rollback
 - [Roadmap](docs/roadmap.md) — milestone structure
 - [Milestones](docs/milestones.md) — definition of done
