@@ -22,13 +22,13 @@ export async function runSwarmReview(
 
   // Obsidian journal: review log
   const paths = resolveSwarmPaths(options.project, reportConfig);
-  await journalReviewEntry(paths, stateStore.config.obsidianJournal, options.task, decision, options.note);
+  await journalReviewEntry(paths, stateStore.config.journal, options.task, decision, options.note);
 
   // Obsidian journal: completion summary (when all tasks done)
   const allDone = result.workflow.tasks.every((t) => t.status === "done" || t.status === "dead_letter");
   if (allDone && result.workflow.tasks.length > 0) {
     const runs = await stateStore.loadRuns(options.project);
-    await journalCompletionSummary(paths, stateStore.config.obsidianJournal, result.workflow, runs);
+    await journalCompletionSummary(paths, stateStore.config.journal, result.workflow, runs);
   }
 
   return {

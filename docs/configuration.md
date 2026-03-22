@@ -44,16 +44,16 @@ Controls the bridge-backed execution path for ACP and subagent runners.
 | `openclawRoot` | string | - | Path to OpenClaw installation root. Use `$(npm root -g)/openclaw` |
 | `versionAllow` | string[] | `[]` | Allowed OpenClaw versions for bridge compatibility |
 
-## Obsidian Journal Configuration (`obsidianJournal`)
+## Journal Configuration (`journal`)
 
-Controls optional document journaling. All journals write to the **local project** first, then async-mirror to Obsidian if `obsidianRoot` is configured. Journals are append-only Markdown files.
+Controls document journaling. **All journals are enabled by default** and always write to the local project directory. When `obsidianRoot` is configured, journals are additionally async-mirrored to Obsidian.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enableRunLog` | boolean | `false` | Append a table row to `run-log.md` on every task execution |
-| `enableReviewLog` | boolean | `false` | Append a table row to `review-log.md` on every approve/reject |
-| `enableSpecArchive` | boolean | `false` | Copy the spec as Markdown to `specs/<specId>.md` on every plan |
-| `enableCompletionSummary` | boolean | `false` | Generate `completion-summary.md` when all tasks reach done/dead_letter |
+| `enableRunLog` | boolean | **`true`** | Append a table row to `run-log.md` on every task execution |
+| `enableReviewLog` | boolean | **`true`** | Append a table row to `review-log.md` on every approve/reject |
+| `enableSpecArchive` | boolean | **`true`** | Copy the spec as Markdown to `specs/<specId>.md` on every plan |
+| `enableCompletionSummary` | boolean | **`true`** | Generate `completion-summary.md` when all tasks reach done/dead_letter |
 
 ### Document Directory Structure
 
@@ -136,7 +136,7 @@ This enables CLI and tools with manual runner only.
             "allowThreadBinding": true,
             "defaultTimeoutSeconds": 600
           },
-          "obsidianJournal": {
+          "journal": {
             "enableRunLog": true,
             "enableReviewLog": true,
             "enableSpecArchive": true,

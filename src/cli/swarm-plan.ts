@@ -43,7 +43,7 @@ export async function runSwarmPlan(
 
   // Obsidian journal: spec archive
   const paths = resolveSwarmPaths(options.project, reportConfig);
-  await journalSpecArchive(paths, stateStore.config.obsidianJournal, spec);
+  await journalSpecArchive(paths, stateStore.config.journal, spec);
 
   return {
     ok: true,

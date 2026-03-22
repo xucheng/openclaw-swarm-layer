@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import type { ObsidianJournalConfig } from "../config.js";
+import type { JournalConfig } from "../config.js";
 import { ensureDir } from "../lib/json-file.js";
 import type { SwarmPaths } from "../lib/paths.js";
 import type { RunRecord, SpecDoc, WorkflowState } from "../types.js";
@@ -63,7 +63,7 @@ async function dualWriteFile(
 
 export async function journalRunEntry(
   paths: SwarmPaths,
-  journal: ObsidianJournalConfig,
+  journal: JournalConfig,
   runRecord: RunRecord,
 ): Promise<void> {
   if (!journal.enableRunLog) return;
@@ -81,7 +81,7 @@ export async function journalRunEntry(
 
 export async function journalReviewEntry(
   paths: SwarmPaths,
-  journal: ObsidianJournalConfig,
+  journal: JournalConfig,
   taskId: string,
   decision: "approve" | "reject",
   note?: string,
@@ -102,7 +102,7 @@ export async function journalReviewEntry(
 
 export async function journalSpecArchive(
   paths: SwarmPaths,
-  journal: ObsidianJournalConfig,
+  journal: JournalConfig,
   spec: SpecDoc,
 ): Promise<void> {
   if (!journal.enableSpecArchive) return;
@@ -134,7 +134,7 @@ export async function journalSpecArchive(
 
 export async function journalCompletionSummary(
   paths: SwarmPaths,
-  journal: ObsidianJournalConfig,
+  journal: JournalConfig,
   workflow: WorkflowState,
   runs: RunRecord[],
 ): Promise<void> {

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { journalCompletionSummary, journalReviewEntry, journalRunEntry, journalSpecArchive } from "../../../src/reporting/obsidian-journal.js";
 import type { SwarmPaths } from "../../../src/lib/paths.js";
-import type { ObsidianJournalConfig } from "../../../src/config.js";
+import type { JournalConfig } from "../../../src/config.js";
 import type { RunRecord, SpecDoc, WorkflowState } from "../../../src/types.js";
 
 async function makeTempDir(): Promise<string> {
@@ -37,14 +37,14 @@ function makePaths(base: string, obsidian?: string): SwarmPaths {
   };
 }
 
-const enabledJournal: ObsidianJournalConfig = {
+const enabledJournal: JournalConfig = {
   enableRunLog: true,
   enableReviewLog: true,
   enableSpecArchive: true,
   enableCompletionSummary: true,
 };
 
-const disabledJournal: ObsidianJournalConfig = {
+const disabledJournal: JournalConfig = {
   enableRunLog: false,
   enableReviewLog: false,
   enableSpecArchive: false,

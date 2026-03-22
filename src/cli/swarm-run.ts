@@ -32,7 +32,7 @@ export async function runSwarmRun(
       const runRecord = runs.find((r) => r.runId === result.runIds?.[0]);
       if (runRecord) {
         const paths = resolveSwarmPaths(options.project, reportConfig);
-        await journalRunEntry(paths, stateStore.config.obsidianJournal, runRecord);
+        await journalRunEntry(paths, stateStore.config.journal, runRecord);
       }
     }
 
