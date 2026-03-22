@@ -15,7 +15,13 @@ Turn workflow specifications into executable task graphs, dispatch through plugg
 
 [Quick Start](#quick-start) &bull; [Features](#features) &bull; [CLI Reference](#cli-commands) &bull; [Configuration](docs/configuration.md) &bull; [License](LICENSE)
 
-`TypeScript` `OpenClaw Plugin` `ACP Runner` `Subagent Runner` `Session Reuse` `Thread Binding` `Review Gates`
+![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?logo=typescript&logoColor=white)
+![OpenClaw Plugin](https://img.shields.io/badge/OpenClaw-Plugin-8B5CF6)
+![ACP Runner](https://img.shields.io/badge/Runner-ACP-FF6B35)
+![Subagent Runner](https://img.shields.io/badge/Runner-Subagent-0EA5E9)
+![Session Reuse](https://img.shields.io/badge/Session-Reuse-10B981)
+![Thread Binding](https://img.shields.io/badge/Thread-Binding-F59E0B)
+![Review Gates](https://img.shields.io/badge/Review-Gates-EF4444)
 
 </div>
 
