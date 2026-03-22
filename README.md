@@ -146,13 +146,19 @@ npm run test:watch     # Watch mode
 
 ## Documentation
 
-- [Skills Guide](docs/skills-guide.md) — full usage guide for all 5 skills with conversational patterns
-- [Configuration Reference](docs/configuration.md) — all plugin config options explained
+**User Guides:**
+- [User Manual](docs/user-manual.md) — complete usage guide from install to daily operations (Chinese)
+- [Skills Guide](docs/skills-guide.md) — 5 conversational skills for AI-driven workflows
+- [Configuration Reference](docs/configuration.md) — all config options, journal setup, directory structure
+
+**Operations:**
 - [Operator Runbook](docs/operator-runbook.md) — install, smoke test, upgrade, rollback
-- [Roadmap](docs/roadmap.md) — milestone structure
-- [Milestones](docs/milestones.md) — definition of done
-- [Current Plan](docs/current-plan.md) — status and future directions
 - [Migration Checklist](docs/migration-checklist.md) — bridge replacement strategy
+
+**Project History:**
+- [Roadmap](docs/roadmap.md) — M1-M3 milestone structure
+- [Milestones](docs/milestones.md) — definition of done per milestone
+- [Current Plan](docs/current-plan.md) — delivery status and future directions
 
 ## License
 

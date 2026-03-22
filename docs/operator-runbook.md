@@ -172,3 +172,31 @@ openclaw plugins uninstall openclaw-swarm-layer
 ```
 
 Do not delete project `.openclaw/swarm/` state automatically.
+
+## Document Journaling
+
+When `obsidianJournal` is enabled, the plugin writes structured logs alongside the status report.
+
+Local (always written to `<project>/.openclaw/swarm/reports/`):
+- `run-log.md` — append-only execution log
+- `review-log.md` — append-only review decision log
+- `specs/<specId>.md` — spec archive on plan
+- `completion-summary.md` — generated when all tasks complete
+
+Obsidian (mirrored to `<obsidianRoot>/<project-name>/` if configured):
+- Same files as above, async fire-and-forget
+
+Enable via config:
+
+```json
+{
+  "obsidianJournal": {
+    "enableRunLog": true,
+    "enableReviewLog": true,
+    "enableSpecArchive": true,
+    "enableCompletionSummary": true
+  }
+}
+```
+
+See [configuration.md](configuration.md) for full details.
