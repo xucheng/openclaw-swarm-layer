@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xucheng/openclaw-swarm-layer/schemas/workflow-state.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "projectRoot", "lifecycle", "tasks", "reviewQueue"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "activeSpecId": { "type": "string" },
+    "lifecycle": { "type": "string", "enum": ["idle", "planned", "running", "reviewing", "blocked", "completed", "failed"] },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "task.schema.json" }
+    },
+    "reviewQueue": { "type": "array", "items": { "type": "string" } },
+    "lastAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at", "type"],
+      "properties": {
+        "at": { "type": "string", "format": "date-time" },
+        "type": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "locks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "orchestrator": { "type": "boolean" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultRunner": { "type": "string", "enum": ["manual", "acp", "subagent"] },
+        "allowedRunners": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["manual", "acp", "subagent"] }
+        }
+      }
+    }
+  }
+}

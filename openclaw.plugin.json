@@ -1,0 +1,121 @@
+{
+  "id": "openclaw-swarm-layer",
+  "name": "OpenClaw Swarm Layer",
+  "version": "0.1.0",
+  "description": "Spec-driven workflow orchestrator for OpenClaw.",
+  "skills": [
+    "skills"
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "stateRoot": {
+        "type": "string",
+        "description": "Root path for swarm state files"
+      },
+      "defaultProjectRoot": {
+        "type": "string",
+        "description": "Default project root for workflow runs"
+      },
+      "obsidianRoot": {
+        "type": "string",
+        "description": "Obsidian vault subpath for reports"
+      },
+      "enableCli": {
+        "type": "boolean",
+        "default": true
+      },
+      "enableTools": {
+        "type": "boolean",
+        "default": true
+      },
+      "enableService": {
+        "type": "boolean",
+        "default": true
+      },
+      "enableChatCommand": {
+        "type": "boolean",
+        "default": false
+      },
+      "defaultWorkspaceMode": {
+        "type": "string",
+        "enum": ["shared", "isolated"],
+        "default": "shared"
+      },
+      "defaultRunner": {
+        "type": "string",
+        "enum": ["manual", "acp", "subagent"],
+        "default": "manual"
+      },
+      "maxParallelTasks": {
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "reviewRequiredByDefault": {
+        "type": "boolean",
+        "default": true
+      },
+      "acp": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "backendId": {
+            "type": "string"
+          },
+          "defaultAgentId": {
+            "type": "string"
+          },
+          "allowedAgents": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          },
+          "defaultMode": {
+            "type": "string",
+            "enum": ["run", "session"],
+            "default": "run"
+          },
+          "allowThreadBinding": {
+            "type": "boolean",
+            "default": false
+          },
+          "defaultTimeoutSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "experimentalControlPlaneAdapter": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "bridge": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "nodePath": {
+            "type": "string"
+          },
+          "openclawRoot": {
+            "type": "string"
+          },
+          "versionAllow": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          }
+        }
+      }
+    }
+  }
+}

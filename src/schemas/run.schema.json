@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xucheng/openclaw-swarm-layer/schemas/run.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runId", "taskId", "attempt", "status", "runner", "workspacePath", "startedAt", "artifacts"],
+  "properties": {
+    "runId": { "type": "string", "minLength": 1 },
+    "taskId": { "type": "string", "minLength": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "status": { "type": "string", "enum": ["planned", "accepted", "completed", "failed", "cancelled"] },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["manual", "acp", "subagent"] }
+      }
+    },
+    "workspacePath": { "type": "string", "minLength": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "endedAt": { "type": "string", "format": "date-time" },
+    "promptSummary": { "type": "string" },
+    "resultSummary": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } },
+    "sessionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runtime": { "type": "string", "enum": ["manual", "acp", "subagent"] },
+        "sessionKey": { "type": "string" },
+        "backend": { "type": "string" },
+        "backendSessionId": { "type": "string" },
+        "agentSessionId": { "type": "string" }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "type"],
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "type": { "type": "string" },
+          "detail": { "type": "object", "additionalProperties": true }
+        }
+      }
+    }
+  }
+}

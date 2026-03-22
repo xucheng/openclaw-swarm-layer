@@ -1,0 +1,95 @@
+import { ExperimentalRealOpenClawSessionAdapter, createSessionAdapter } from "../../../src/runtime/real-openclaw-session-adapter.js";
+
+describe("ExperimentalRealOpenClawSessionAdapter", () => {
+  const runtime = {
+    config: {
+      loadConfig() {
+        return { acp: { enabled: true } };
+      },
+    },
+  } as any;
+
+  const config = {
+    acp: {
+      enabled: true,
+      backendId: "acpx",
+      defaultAgentId: "codex",
+      allowedAgents: ["codex"],
+      defaultMode: "run" as const,
+      allowThreadBinding: false,
+      defaultTimeoutSeconds: 600,
+      experimentalControlPlaneAdapter: true,
+    },
+  };
+
+  it("returns null when experimental adapter is disabled or runtime is missing", () => {
+    expect(createSessionAdapter(undefined, config as any)).toBeNull();
+    expect(
+      createSessionAdapter(runtime, {
+        acp: { ...config.acp, experimentalControlPlaneAdapter: false },
+      } as any),
+    ).toBeNull();
+  });
+
+  it("fails clearly when runtime sdk lacks control-plane export", async () => {
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(runtime, config as any, async () => ({}));
+
+    await expect(
+      adapter.spawnAcpSession({
+        task: "Run tests",
+        runtime: "acp",
+        agentId: "codex",
+        mode: "run",
+        thread: false,
+      }),
+    ).rejects.toThrow("upstream public control-plane export");
+  });
+
+  it("spawns and queries ACP sessions through the manager", async () => {
+    const initializeSession = vi.fn(async ({ sessionKey }) => ({
+      handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1", agentSessionId: "agent-1" },
+    }));
+    const runTurn = vi.fn(async () => undefined);
+    const getSessionStatus = vi.fn(async ({ sessionKey }) => ({
+      sessionKey,
+      backend: "acpx",
+      state: "running" as const,
+      runtimeStatus: { backendSessionId: "backend-1", agentSessionId: "agent-1", summary: "running" },
+    }));
+    const cancelSession = vi.fn(async () => undefined);
+    const closeSession = vi.fn(async () => ({ runtimeClosed: true, runtimeNotice: "closed" }));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          runTurn,
+          getSessionStatus,
+          cancelSession,
+          closeSession,
+        }),
+      }),
+    );
+
+    const accepted = await adapter.spawnAcpSession({
+      task: "Run tests",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+      cwd: "/tmp/project",
+      runTimeoutSeconds: 60,
+    });
+    const status = await adapter.getAcpSessionStatus(accepted.sessionKey);
+    const cancelled = await adapter.cancelAcpSession(accepted.sessionKey, "stop");
+    const closed = await adapter.closeAcpSession(accepted.sessionKey, "done");
+
+    expect(accepted.backend).toBe("acpx");
+    expect(runTurn).toHaveBeenCalledTimes(1);
+    expect(status.state).toBe("running");
+    expect(cancelSession).toHaveBeenCalledTimes(1);
+    expect(cancelled.sessionKey).toBe(accepted.sessionKey);
+    expect(closed.message).toBe("closed");
+  });
+});

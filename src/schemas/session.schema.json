@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xucheng/openclaw-swarm-layer/schemas/session.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sessionId",
+    "runner",
+    "projectRoot",
+    "scope",
+    "mode",
+    "state",
+    "createdAt",
+    "updatedAt",
+    "providerRef"
+  ],
+  "properties": {
+    "sessionId": { "type": "string", "minLength": 1 },
+    "runner": { "type": "string", "enum": ["acp", "subagent"] },
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "specId": { "type": "string" },
+        "bindingKey": { "type": "string" },
+        "taskKind": { "type": "string" }
+      }
+    },
+    "mode": { "type": "string", "enum": ["oneshot", "persistent"] },
+    "state": { "type": "string", "enum": ["created", "active", "idle", "closed", "failed", "orphaned"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "lastRunId": { "type": "string" },
+    "lastTaskId": { "type": "string" },
+    "providerRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sessionKey": { "type": "string" },
+        "backend": { "type": "string" },
+        "backendSessionId": { "type": "string" },
+        "agentSessionId": { "type": "string" }
+      }
+    },
+    "summary": { "type": "string" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xucheng/openclaw-swarm-layer/schemas/spec.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specId", "title", "sourcePath", "projectRoot", "goals", "constraints", "acceptanceCriteria", "phases"],
+  "properties": {
+    "specId": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "sourcePath": { "type": "string", "minLength": 1 },
+    "projectRoot": { "type": "string", "minLength": 1 },
+    "goals": { "type": "array", "items": { "type": "string" } },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "acceptanceCriteria": { "type": "array", "items": { "type": "string" } },
+    "phases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phaseId", "title", "tasks"],
+        "properties": {
+          "phaseId": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "tasks": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

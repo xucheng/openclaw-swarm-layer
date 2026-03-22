@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/xucheng/openclaw-swarm-layer/schemas/task.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["taskId", "specId", "title", "description", "kind", "deps", "status", "workspace", "runner", "review"],
+  "properties": {
+    "taskId": { "type": "string", "minLength": 1 },
+    "specId": { "type": "string", "minLength": 1 },
+    "phaseId": { "type": "string" },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "kind": { "type": "string", "enum": ["coding", "review", "research", "ops", "docs"] },
+    "deps": { "type": "array", "items": { "type": "string" } },
+    "status": { "type": "string", "enum": ["planned", "ready", "running", "review_required", "blocked", "done", "failed"] },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["shared", "isolated"] }
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["manual", "acp", "subagent"] },
+        "agentId": { "type": "string" },
+        "cwd": { "type": "string" },
+        "mode": { "type": "string", "enum": ["run", "session"] },
+        "timeoutSeconds": { "type": "number" },
+        "threadRequested": { "type": "boolean" },
+        "persistentSession": { "type": "boolean" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      }
+    }
+  }
+}
