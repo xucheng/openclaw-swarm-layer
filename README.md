@@ -148,7 +148,7 @@ npm run test:watch     # Watch mode
 
 **User Guides:**
 - [User Manual](docs/user-manual.md) — complete usage guide from install to daily operations (Chinese)
-- [Skills Guide](docs/skills-guide.md) — 5 conversational skills for AI-driven workflows
+- [Skills Guide](docs/skills-guide.md) — unified skill with 5 modules (setup/operate/diagnose/report/tools)
 - [Configuration Reference](docs/configuration.md) — all config options, journal setup, directory structure
 
 **Operations:**

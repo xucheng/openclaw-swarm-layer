@@ -1,76 +1,269 @@
 ---
 name: swarm-layer
-description: Use the OpenClaw Swarm Layer orchestration tools for spec-driven workflow planning, execution, session management, and review.
+description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP/subagent execution, persistent sessions, review gates, and automatic retry. Covers setup, operation, diagnosis, and reporting."
 ---
 
-# Swarm Layer
+# OpenClaw Swarm Layer
 
-Orchestrate multi-step workflows from specs through planning, execution, review, and reporting.
+Unified skill for spec-driven workflow orchestration. Routes to the appropriate module based on user intent.
+
+## Module Router
+
+Determine which module to use based on what the user needs:
+
+| User Intent | Module | Key Commands |
+|------------|--------|-------------|
+| Install, configure, initialize | [Setup](#setup) | `plugins install`, `doctor`, `init` |
+| Plan, execute, review, session ops | [Operate](#operate) | `plan`, `run`, `review`, `session *` |
+| Something broken, stuck, or failing | [Diagnose](#diagnose) | `doctor`, `session status/cancel/cleanup` |
+| Check progress, read reports | [Report](#report) | `status`, `report`, `session list/inspect` |
+
+When unsure, start with `openclaw swarm status --project .` to assess the situation.
+
+---
+
+# Setup
 
 ## When to Use
+First-time install, bridge configuration, project initialization, or config troubleshooting.
 
-Use swarm tools when a task needs:
-- Structured spec-to-task-graph planning
-- Staged execution with dependency ordering
-- Review gates before completion
-- Session-based ACP or subagent execution
-- Operator-visible progress tracking
+## Flow
 
-## Tools
-
-### swarm_status
-Show current workflow status including task counts, review queue, attention items, and session inventory.
-- Parameters: `project` (string, required)
-
-### swarm_task_plan
-Import a spec and build a task graph with dependency ordering.
-- Parameters: `project` (string, required), `spec` (string, required — path to spec file)
-
-### swarm_run
-Dispatch the next runnable task. Supports dry-run preview and runner selection.
-- Parameters: `project` (string, required), `task` (string, optional — specific task ID), `dryRun` (boolean, optional)
-
-### swarm_review_gate
-Approve or reject a task that has completed execution and requires review.
-- Parameters: `project` (string, required), `task` (string, required), `approve` (boolean, optional), `reject` (boolean, optional), `note` (string, optional)
-
-### swarm_session_status
-Poll the latest session status for an ACP or subagent run. Updates workflow state if the session has reached a terminal state.
-- Parameters: `project` (string, required), `run` (string, required — run ID)
-
-### swarm_session_cancel
-Cancel an active ACP or subagent session. Marks the task as blocked.
-- Parameters: `project` (string, required), `run` (string, required), `reason` (string, optional)
-
-### swarm_session_close
-Close an ACP session gracefully.
-- Parameters: `project` (string, required), `run` (string, required), `reason` (string, optional)
-
-## Typical Workflow
-
-```
-1. swarm_task_plan  → import spec, generate tasks
-2. swarm_status     → check what's ready
-3. swarm_run        → dispatch next task (dry-run first if unsure)
-4. swarm_session_status → poll until complete (for ACP/subagent runs)
-5. swarm_review_gate → approve or reject the result
-6. swarm_status     → check for next task or completion
+### 1. Prerequisites
+```bash
+node --version     # >= 22
+openclaw --version # >= 2026.2.24
 ```
 
-Repeat steps 2-6 until all tasks are done.
+### 2. Install Plugin
+```bash
+openclaw plugins install -l /path/to/openclaw-swarm-layer
+openclaw plugins info openclaw-swarm-layer   # Should show Status: loaded
+```
 
-## Session Policies
+### 3. Configure Bridge (for ACP/subagent execution)
+```json
+{
+  "plugins": { "entries": { "openclaw-swarm-layer": { "config": {
+    "acp": {
+      "enabled": true,
+      "defaultAgentId": "codex",
+      "allowedAgents": ["codex"],
+      "defaultMode": "run"
+    },
+    "bridge": {
+      "enabled": true,
+      "nodePath": "$(which node)",
+      "openclawRoot": "$(npm root -g)/openclaw",
+      "versionAllow": ["CURRENT_VERSION"]
+    }
+  }}}}
+}
+```
 
-Tasks can declare session policies for persistent session reuse:
-- `none` — default, each run creates a new session
-- `create_persistent` — creates a persistent session that can be reused later
-- `reuse_if_available` — reuses an idle persistent session if one matches
-- `require_existing` — fails if no matching session exists
+### 4. Verify
+```bash
+openclaw swarm doctor --json
+# severity should be "healthy" or "warning", not "blocked"
+```
 
-## Notes
+### 5. Initialize Project
+```bash
+openclaw swarm init --project .
+```
 
-- Always check `swarm_status` before running to see what's ready
-- Use dry-run (`dryRun: true`) on `swarm_run` to preview without executing
-- After ACP runs, poll `swarm_session_status` to detect completion
-- The review gate is required by default — approve to mark tasks done
-- Reports are auto-generated on every run/review and synced to Obsidian if configured
+### 6. Optional: Obsidian Sync + Journal
+```json
+{
+  "obsidianRoot": "/path/to/vault/reports",
+  "obsidianJournal": {
+    "enableRunLog": true,
+    "enableReviewLog": true,
+    "enableSpecArchive": true,
+    "enableCompletionSummary": true
+  }
+}
+```
+
+### Setup Troubleshooting
+- **Plugin not loading** → `openclaw plugins info openclaw-swarm-layer`
+- **Bridge blocked** → `openclaw swarm doctor --json`, follow `remediation`
+- **Version mismatch** → update `bridge.versionAllow`
+
+---
+
+# Operate
+
+## When to Use
+Plan and execute workflows, manage sessions, complete review cycles.
+
+## Core Loop
+
+```
+Write Spec → Plan → Status → Run → Poll Session → Review → Repeat
+```
+
+### Write a Spec
+```markdown
+# My Workflow
+## Goals
+- What to achieve
+## Phases
+### Phase 1
+- Task A
+- Task B
+```
+
+### Plan → Run → Review
+```bash
+openclaw swarm plan --project . --spec SPEC.md      # Import and generate tasks
+openclaw swarm status --project .                     # See what's ready
+openclaw swarm run --project . --dry-run              # Preview
+openclaw swarm run --project . --runner acp           # Execute (acp/manual/subagent)
+openclaw swarm session status --project . --run <id>  # Poll until complete
+openclaw swarm review --project . --task <id> --approve
+```
+
+### Runner Selection
+| Runner | Use When |
+|--------|----------|
+| `manual` | Operator executes and records manually (default) |
+| `acp` | Delegate to external harness (Codex, Claude Code) |
+| `subagent` | OpenClaw-native child agent delegation |
+
+### Session Operations
+```bash
+session list --project .                                    # List all
+session inspect --project . --session <id>                  # Details
+session follow-up --project . --session <id> --task <desc>  # Inject task
+session steer --project . --session <id> --message <text>   # Redirect
+session cancel --project . --run <id>                       # Abort
+session cleanup --project . --stale-minutes 60              # Clean orphans
+```
+
+### Session Policies
+| Policy | Behavior |
+|--------|----------|
+| `none` | New session each run (default) |
+| `create_persistent` | Creates reusable persistent session |
+| `reuse_if_available` | Reuse idle persistent session if match found |
+| `require_existing` | Fail if no matching session exists |
+
+### Conversational Patterns
+| User Says | Do This |
+|-----------|---------|
+| "start a new workflow" | Help write spec → `plan` → `status` |
+| "run the next task" | `status` → dry-run → `run` |
+| "what's happening?" | `status` → `session status` for running tasks |
+| "approve everything" | List review queue → approve each |
+| "something is stuck" | → [Diagnose](#diagnose) module |
+
+---
+
+# Diagnose
+
+## When to Use
+Tasks stuck, bridge failures, sessions not updating, dead letters, orphans.
+
+## Diagnostic Flow
+
+```
+1. openclaw swarm doctor --json      → Check bridge health
+2. openclaw swarm status --project . → Find abnormal tasks/sessions
+3. Investigate specific issue (see below)
+```
+
+### Doctor Severity
+| Severity | Meaning | Action |
+|----------|---------|--------|
+| `healthy` | All good | None |
+| `warning` | Works but risky | Address warnings when convenient |
+| `blocked` | Cannot execute | Follow `remediation` immediately |
+
+### Issue Resolution
+
+**Bridge failure:**
+- `doctor --json` → check `blockers` → follow `remediation`
+- Common: update `bridge.versionAllow`, check `nodePath`/`openclawRoot`
+
+**Stuck running task:**
+```bash
+swarm session status --project . --run <runId>   # Check if session died
+swarm session cancel --project . --run <runId>   # Force cancel if hung
+```
+
+**Dead letter task** (retries exhausted):
+- `swarm status` → find `dead_letter` tasks
+- Fix root cause → manually reset task to `ready`
+
+**Orphaned sessions** (stale active):
+```bash
+swarm session cleanup --project . --stale-minutes 60
+```
+
+**Version drift** (after OpenClaw upgrade):
+```bash
+swarm doctor --json
+# Update bridge.versionAllow → rerun tests → verify doctor
+```
+
+---
+
+# Report
+
+## When to Use
+Check progress, generate reports, understand session inventory.
+
+## Quick Check
+```bash
+openclaw swarm status --project .  # Structured summary
+openclaw swarm report --project .  # Full Markdown report
+```
+
+## Report Sections
+| Section | Content |
+|---------|---------|
+| **Attention** | Items needing action: review / blocked / running / dead_letter |
+| **Tasks** | All tasks with current status |
+| **Review Queue** | Tasks awaiting approve/reject |
+| **Highlights** | Notable terminal events (completed/failed/cancelled) |
+| **Recommended Actions** | What to do next |
+| **Recent Runs** | Last 5 runs |
+| **Sessions** | Last 5 sessions with state |
+| **Session Reuse Candidates** | Which tasks can reuse which sessions |
+
+## Report Files
+| File | Trigger | Mode |
+|------|---------|------|
+| `swarm-report.md` | Every operation | Overwrite |
+| `run-log.md` | `swarm run` | Append |
+| `review-log.md` | `swarm review` | Append |
+| `specs/<specId>.md` | `swarm plan` | Create once |
+| `completion-summary.md` | All tasks done | Overwrite |
+
+Local: `<project>/.openclaw/swarm/reports/` (always)
+Obsidian: `<obsidianRoot>/<project>/` (optional async mirror)
+
+## Conversational Patterns
+| User Says | Do This |
+|-----------|---------|
+| "what's the status?" | `status` → summarize counts + attention |
+| "show me the report" | `report` → read and present key sections |
+| "what needs attention?" | `status` → focus on `attention` array |
+| "how are sessions?" | `status` → show session counts + recent |
+
+---
+
+# Tools Reference
+
+For AI tool calling. All tools accept `--json` for structured output.
+
+| Tool | Parameters | Purpose |
+|------|-----------|---------|
+| `swarm_status` | `project` | Workflow status with attention items |
+| `swarm_task_plan` | `project`, `spec` | Import spec, generate task graph |
+| `swarm_run` | `project`, `task?`, `dryRun?` | Dispatch next runnable task |
+| `swarm_review_gate` | `project`, `task`, `approve?`, `reject?`, `note?` | Approve/reject review |
+| `swarm_session_status` | `project`, `run` | Poll session status |
+| `swarm_session_cancel` | `project`, `run`, `reason?` | Cancel session |
+| `swarm_session_close` | `project`, `run`, `reason?` | Close session |

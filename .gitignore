@@ -17,5 +17,7 @@ coverage/
 CLAUDE.md
 .claude/settings.local.json
 
+AGENTS.md
+
 reports/
 public/
