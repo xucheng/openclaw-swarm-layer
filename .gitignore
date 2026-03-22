@@ -16,3 +16,6 @@ coverage/
 
 CLAUDE.md
 .claude/settings.local.json
+
+reports/
+public/

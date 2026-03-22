@@ -1,0 +1,78 @@
+stages:
+  - build
+  - test
+  - report
+
+variables:
+  NODE_VERSION: "22"
+
+default:
+  image: node:${NODE_VERSION}
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - node_modules/
+
+install:
+  stage: build
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+      - node_modules/
+    expire_in: 1 hour
+
+test:unit:
+  stage: test
+  needs: [install]
+  script:
+    - npx vitest run test/unit --reporter=junit --outputFile=reports/unit-results.xml --reporter=default
+  artifacts:
+    when: always
+    paths:
+      - reports/unit-results.xml
+    reports:
+      junit: reports/unit-results.xml
+    expire_in: 7 days
+
+test:e2e:
+  stage: test
+  needs: [install]
+  script:
+    - npx vitest run test/e2e --reporter=junit --outputFile=reports/e2e-results.xml --reporter=default
+  artifacts:
+    when: always
+    paths:
+      - reports/e2e-results.xml
+    reports:
+      junit: reports/e2e-results.xml
+    expire_in: 7 days
+
+test:coverage:
+  stage: test
+  needs: [install]
+  script:
+    - npx vitest run test/unit --coverage
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    expire_in: 7 days
+  coverage: '/All files\s*\|\s*(\d+\.?\d*)\s*\|/'
+
+pages:
+  stage: report
+  needs: [test:coverage]
+  script:
+    - mkdir -p public
+    - cp -r coverage/ public/coverage 2>/dev/null || echo "No coverage report"
+  artifacts:
+    paths:
+      - public/
+    expire_in: 30 days
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
