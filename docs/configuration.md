@@ -44,6 +44,63 @@ Controls the bridge-backed execution path for ACP and subagent runners.
 | `openclawRoot` | string | - | Path to OpenClaw installation root. Use `$(npm root -g)/openclaw` |
 | `versionAllow` | string[] | `[]` | Allowed OpenClaw versions for bridge compatibility |
 
+## Obsidian Journal Configuration (`obsidianJournal`)
+
+Controls optional document journaling. All journals write to the **local project** first, then async-mirror to Obsidian if `obsidianRoot` is configured. Journals are append-only Markdown files.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enableRunLog` | boolean | `false` | Append a table row to `run-log.md` on every task execution |
+| `enableReviewLog` | boolean | `false` | Append a table row to `review-log.md` on every approve/reject |
+| `enableSpecArchive` | boolean | `false` | Copy the spec as Markdown to `specs/<specId>.md` on every plan |
+| `enableCompletionSummary` | boolean | `false` | Generate `completion-summary.md` when all tasks reach done/dead_letter |
+
+### Document Directory Structure
+
+When journaling is enabled, the following files are generated:
+
+**Local** (always, under `<project>/.openclaw/swarm/reports/`):
+
+```
+<project>/.openclaw/swarm/reports/
+├── swarm-report.md              # Status snapshot (overwritten each time)
+├── run-log.md                   # Append-only execution log table
+├── review-log.md                # Append-only review decision table
+├── completion-summary.md        # One-time summary when workflow completes
+└── specs/
+    └── <specId>.md              # Archived spec from plan import
+```
+
+**Obsidian** (optional, under `<obsidianRoot>/<project-name>/`):
+
+```
+<obsidianRoot>/
+├── <project-name>-swarm-report.md   # Status snapshot (same as local)
+└── <project-name>/
+    ├── run-log.md                    # Mirror of local run log
+    ├── review-log.md                 # Mirror of local review log
+    ├── completion-summary.md         # Mirror of local completion summary
+    └── specs/
+        └── <specId>.md              # Mirror of local spec archive
+```
+
+### Write Order
+
+1. **Local write** — synchronous, always completes before CLI returns
+2. **Obsidian write** — asynchronous fire-and-forget, failures silently ignored
+
+This ensures local state is always consistent. Obsidian sync is best-effort.
+
+### Document Lifecycle
+
+| Document | Trigger | Write Mode | Content |
+|----------|---------|-----------|---------|
+| `swarm-report.md` | Every run/plan/review/session op | Overwrite | Current status snapshot |
+| `run-log.md` | `swarm run` (non-dry-run) | Append | Markdown table with runId, task, runner, status, summary |
+| `review-log.md` | `swarm review --approve\|--reject` | Append | Markdown table with task, decision, note |
+| `specs/<specId>.md` | `swarm plan` | Create once | Full spec with goals, phases, tasks |
+| `completion-summary.md` | Last task approved (all done) | Overwrite | Workflow stats, task list, run timeline |
+
 ## Minimal Configuration
 
 ```json
@@ -78,6 +135,12 @@ This enables CLI and tools with manual runner only.
             "defaultMode": "run",
             "allowThreadBinding": true,
             "defaultTimeoutSeconds": 600
+          },
+          "obsidianJournal": {
+            "enableRunLog": true,
+            "enableReviewLog": true,
+            "enableSpecArchive": true,
+            "enableCompletionSummary": true
           },
           "bridge": {
             "enabled": true,

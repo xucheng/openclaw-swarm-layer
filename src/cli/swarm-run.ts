@@ -1,3 +1,5 @@
+import { resolveSwarmPaths } from "../lib/paths.js";
+import { journalRunEntry } from "../reporting/obsidian-journal.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { createOrchestrator } from "../services/orchestrator.js";
 import { SessionStore } from "../session/session-store.js";
@@ -23,6 +25,17 @@ export async function runSwarmRun(
   if (!options.dryRun) {
     const workflow = await stateStore.loadWorkflow(options.project);
     const report = await writeWorkflowReport(options.project, workflow, reportConfig);
+
+    // Obsidian journal: run log
+    if (result.runIds?.[0]) {
+      const runs = await stateStore.loadRuns(options.project);
+      const runRecord = runs.find((r) => r.runId === result.runIds?.[0]);
+      if (runRecord) {
+        const paths = resolveSwarmPaths(options.project, reportConfig);
+        await journalRunEntry(paths, stateStore.config.obsidianJournal, runRecord);
+      }
+    }
+
     return {
       ...result,
       localReportPath: report.localReportPath,

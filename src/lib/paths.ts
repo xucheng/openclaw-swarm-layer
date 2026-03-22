@@ -12,7 +12,16 @@ export type SwarmPaths = {
   logsDir: string;
   reportsDir: string;
   localReportPath: string;
+  localRunLogPath: string;
+  localReviewLogPath: string;
+  localSpecsArchiveDir: string;
+  localCompletionPath: string;
   obsidianReportPath?: string;
+  obsidianProjectDir?: string;
+  obsidianRunLogPath?: string;
+  obsidianReviewLogPath?: string;
+  obsidianSpecsDir?: string;
+  obsidianCompletionPath?: string;
 };
 
 export function resolveProjectRoot(projectRoot: string, config?: Pick<SwarmPluginConfig, "defaultProjectRoot">): string {
@@ -30,7 +39,9 @@ export function resolveSwarmPaths(projectRoot: string, config?: Partial<SwarmPlu
     : path.join(resolvedProjectRoot, ".openclaw", "swarm");
   const obsidianReportsDir = config?.obsidianRoot ? path.resolve(config.obsidianRoot) : undefined;
   const localReportsDir = path.join(swarmRoot, "reports");
-  const reportFileName = `${path.basename(resolvedProjectRoot)}-swarm-report.md`;
+  const projectName = path.basename(resolvedProjectRoot);
+  const reportFileName = `${projectName}-swarm-report.md`;
+  const obsidianProjectDir = obsidianReportsDir ? path.join(obsidianReportsDir, projectName) : undefined;
 
   return {
     projectRoot: resolvedProjectRoot,
@@ -43,6 +54,15 @@ export function resolveSwarmPaths(projectRoot: string, config?: Partial<SwarmPlu
     logsDir: path.join(swarmRoot, "logs"),
     reportsDir: localReportsDir,
     localReportPath: path.join(localReportsDir, "swarm-report.md"),
+    localRunLogPath: path.join(localReportsDir, "run-log.md"),
+    localReviewLogPath: path.join(localReportsDir, "review-log.md"),
+    localSpecsArchiveDir: path.join(localReportsDir, "specs"),
+    localCompletionPath: path.join(localReportsDir, "completion-summary.md"),
     obsidianReportPath: obsidianReportsDir ? path.join(obsidianReportsDir, reportFileName) : undefined,
+    obsidianProjectDir,
+    obsidianRunLogPath: obsidianProjectDir ? path.join(obsidianProjectDir, "run-log.md") : undefined,
+    obsidianReviewLogPath: obsidianProjectDir ? path.join(obsidianProjectDir, "review-log.md") : undefined,
+    obsidianSpecsDir: obsidianProjectDir ? path.join(obsidianProjectDir, "specs") : undefined,
+    obsidianCompletionPath: obsidianProjectDir ? path.join(obsidianProjectDir, "completion-summary.md") : undefined,
   };
 }

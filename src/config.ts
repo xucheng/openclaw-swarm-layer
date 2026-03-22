@@ -22,10 +22,18 @@ export type SwarmAcpConfig = {
   experimentalControlPlaneAdapter: boolean;
 };
 
+export type ObsidianJournalConfig = {
+  enableRunLog: boolean;
+  enableReviewLog: boolean;
+  enableSpecArchive: boolean;
+  enableCompletionSummary: boolean;
+};
+
 export type SwarmPluginConfig = {
   stateRoot?: string;
   defaultProjectRoot?: string;
   obsidianRoot?: string;
+  obsidianJournal: ObsidianJournalConfig;
   enableCli: boolean;
   enableTools: boolean;
   enableService: boolean;
@@ -47,6 +55,12 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
   defaultRunner: "manual",
   maxParallelTasks: 1,
   reviewRequiredByDefault: true,
+  obsidianJournal: {
+    enableRunLog: false,
+    enableReviewLog: false,
+    enableSpecArchive: false,
+    enableCompletionSummary: false,
+  },
   acp: {
     enabled: false,
     backendId: undefined,
@@ -75,6 +89,7 @@ const allowedConfigKeys = new Set([
   "defaultRunner",
   "maxParallelTasks",
   "reviewRequiredByDefault",
+  "obsidianJournal",
   "acp",
   "bridge",
 ]);
@@ -284,6 +299,24 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
       typeof input.reviewRequiredByDefault === "boolean"
         ? input.reviewRequiredByDefault
         : defaultSwarmPluginConfig.reviewRequiredByDefault,
+    obsidianJournal: {
+      enableRunLog:
+        Boolean(input.obsidianJournal) && typeof (input.obsidianJournal as Record<string, unknown>).enableRunLog === "boolean"
+          ? ((input.obsidianJournal as Record<string, unknown>).enableRunLog as boolean)
+          : defaultSwarmPluginConfig.obsidianJournal.enableRunLog,
+      enableReviewLog:
+        Boolean(input.obsidianJournal) && typeof (input.obsidianJournal as Record<string, unknown>).enableReviewLog === "boolean"
+          ? ((input.obsidianJournal as Record<string, unknown>).enableReviewLog as boolean)
+          : defaultSwarmPluginConfig.obsidianJournal.enableReviewLog,
+      enableSpecArchive:
+        Boolean(input.obsidianJournal) && typeof (input.obsidianJournal as Record<string, unknown>).enableSpecArchive === "boolean"
+          ? ((input.obsidianJournal as Record<string, unknown>).enableSpecArchive as boolean)
+          : defaultSwarmPluginConfig.obsidianJournal.enableSpecArchive,
+      enableCompletionSummary:
+        Boolean(input.obsidianJournal) && typeof (input.obsidianJournal as Record<string, unknown>).enableCompletionSummary === "boolean"
+          ? ((input.obsidianJournal as Record<string, unknown>).enableCompletionSummary as boolean)
+          : defaultSwarmPluginConfig.obsidianJournal.enableCompletionSummary,
+    },
     acp: {
       enabled:
         Boolean(input.acp) && typeof (input.acp as Record<string, unknown>).enabled === "boolean"

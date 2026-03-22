@@ -1,4 +1,6 @@
+import { resolveSwarmPaths } from "../lib/paths.js";
 import { planTasksFromSpec } from "../planning/planner.js";
+import { journalSpecArchive } from "../reporting/obsidian-journal.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { importSpecFromMarkdown } from "../spec/spec-importer.js";
 import { resolveStateStore, type SwarmCliContext } from "./context.js";
@@ -38,6 +40,10 @@ export async function runSwarmPlan(
 
   await stateStore.saveWorkflow(options.project, nextWorkflow);
   const report = await writeWorkflowReport(options.project, nextWorkflow, reportConfig);
+
+  // Obsidian journal: spec archive
+  const paths = resolveSwarmPaths(options.project, reportConfig);
+  await journalSpecArchive(paths, stateStore.config.obsidianJournal, spec);
 
   return {
     ok: true,
