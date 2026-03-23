@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -15,6 +16,7 @@ import { buildMigrationChecklist, buildReplacementPlan, detectPublicApiAvailabil
 type BridgeCommand =
   | "doctor"
   | "acp-spawn"
+  | "acp-prompt"
   | "acp-status"
   | "acp-cancel"
   | "acp-close"
@@ -30,6 +32,8 @@ type BridgeInput = {
   };
   params?: Record<string, unknown>;
 };
+
+const BRIDGE_INPUT_ENV_VAR = "OPENCLAW_SWARM_BRIDGE_INPUT_B64";
 
 export type BridgeDoctorResult = {
   ok: boolean;
@@ -132,6 +136,62 @@ export function dedupeStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
+export function encodeBridgeInputForEnv(input: BridgeInput): string {
+  return Buffer.from(JSON.stringify(input), "utf8").toString("base64url");
+}
+
+export function decodeBridgeInputFromEnv(encoded: string): BridgeInput {
+  const raw = Buffer.from(encoded, "base64url").toString("utf8");
+  return JSON.parse(raw) as BridgeInput;
+}
+
+export async function readBridgeInput(
+  env: NodeJS.ProcessEnv = process.env,
+  stdinReader: () => Promise<string> = readStdin,
+): Promise<BridgeInput> {
+  const encoded = env[BRIDGE_INPUT_ENV_VAR]?.trim();
+  if (encoded) {
+    return decodeBridgeInputFromEnv(encoded);
+  }
+  const rawInput = await stdinReader();
+  return rawInput.trim().length > 0 ? (JSON.parse(rawInput) as BridgeInput) : {};
+}
+
+export function spawnDetachedBridgeWorker(
+  command: "acp-prompt",
+  input: BridgeInput,
+  options?: {
+    spawnImpl?: typeof spawn;
+    execPath?: string;
+    execArgv?: string[];
+    argv?: string[];
+    env?: NodeJS.ProcessEnv;
+    cwd?: string;
+  },
+): void {
+  const spawnImpl = options?.spawnImpl ?? spawn;
+  const execPath = options?.execPath ?? process.execPath;
+  const execArgv = options?.execArgv ?? process.execArgv;
+  const argv = options?.argv ?? process.argv;
+  const env = options?.env ?? process.env;
+  const cwd = options?.cwd ?? process.cwd();
+  const scriptPath = argv[1];
+  if (!scriptPath) {
+    throw new Error("Bridge worker spawn failed: current script path is unavailable.");
+  }
+
+  const child = spawnImpl(execPath, [...execArgv, scriptPath, command], {
+    cwd,
+    env: {
+      ...env,
+      [BRIDGE_INPUT_ENV_VAR]: encodeBridgeInputForEnv(input),
+    },
+    stdio: "ignore",
+    detached: true,
+  });
+  child.unref();
+}
+
 function getRequire() {
   return createRequire(import.meta.url);
 }
@@ -162,7 +222,7 @@ export function resolveOpenClawRootFromExecPath(execPath: string = process.execP
   return null;
 }
 
-function resolveOpenClawRoot(override?: string): string {
+export function resolveOpenClawRoot(override?: string): string {
   if (override) {
     return path.resolve(override);
   }
@@ -631,12 +691,15 @@ async function handleAcp(command: BridgeCommand, input: BridgeInput) {
       cwd: spawnParams.cwd,
       backendId: spawnParams.backendId,
     });
-    void manager.runTurn({
-      cfg,
-      sessionKey: spawnParams.sessionKey,
-      text: spawnParams.task,
-      mode: "prompt",
-      requestId: spawnParams.requestId,
+    // acp-spawn runs in a short-lived bridge process; the actual turn must continue in a detached
+    // worker or it will be interrupted as soon as this command exits.
+    spawnDetachedBridgeWorker("acp-prompt", {
+      bridge: input.bridge,
+      params: {
+        sessionKey: spawnParams.sessionKey,
+        task: spawnParams.task,
+        requestId: spawnParams.requestId,
+      },
     });
     return {
       ok: true,
@@ -647,6 +710,29 @@ async function handleAcp(command: BridgeCommand, input: BridgeInput) {
         backendSessionId: initialized.handle.backendSessionId,
         agentSessionId: initialized.handle.agentSessionId,
         acceptedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  if (command === "acp-prompt") {
+    const promptParams = params as {
+      sessionKey: string;
+      task: string;
+      requestId: string;
+    };
+    await manager.runTurn({
+      cfg,
+      sessionKey: promptParams.sessionKey,
+      text: promptParams.task,
+      mode: "prompt",
+      requestId: promptParams.requestId,
+    });
+    return {
+      ok: true,
+      version,
+      result: {
+        sessionKey: promptParams.sessionKey,
+        completedAt: new Date().toISOString(),
       },
     };
   }
@@ -724,8 +810,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   try {
-    const rawInput = await readStdin();
-    const parsed = rawInput.trim().length > 0 ? (JSON.parse(rawInput) as BridgeInput) : {};
+    const parsed = await readBridgeInput();
     const result = await runBridgeCommand(command, parsed);
     process.stdout.write(`${JSON.stringify(result)}\n`);
     return 0;
@@ -738,6 +823,13 @@ export async function main(argv: string[]): Promise<number> {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isMain) {
-  const code = await main(process.argv);
-  process.exitCode = code;
+  void main(process.argv).then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error) => {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+    },
+  );
 }

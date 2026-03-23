@@ -5,7 +5,7 @@ import { createBridgeSessionAdapter } from "../runtime/bridge-openclaw-session-a
 import { createBridgeSubagentAdapter } from "../runtime/bridge-openclaw-subagent-adapter.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
 import { UnsupportedOpenClawSubagentAdapter, type OpenClawSubagentAdapter } from "../runtime/openclaw-subagent-adapter.js";
-import { createSessionAdapter } from "../runtime/real-openclaw-session-adapter.js";
+import { createSessionAdapter, isPublicAcpRuntimeUnavailableError } from "../runtime/real-openclaw-session-adapter.js";
 import { SessionStore } from "../session/session-store.js";
 import { StateStore } from "../state/state-store.js";
 
@@ -26,6 +26,40 @@ export function resolveSessionStore(context?: SwarmCliContext): SessionStore {
   return context?.sessionStore ?? new SessionStore(context?.stateStore?.config ?? context?.config);
 }
 
+class FallbackSessionAdapter implements OpenClawSessionAdapter {
+  constructor(
+    private readonly primary: OpenClawSessionAdapter,
+    private readonly fallback: OpenClawSessionAdapter,
+  ) {}
+
+  private async preferPrimary<T>(operation: (adapter: OpenClawSessionAdapter) => Promise<T>): Promise<T> {
+    try {
+      return await operation(this.primary);
+    } catch (error) {
+      if (!isPublicAcpRuntimeUnavailableError(error)) {
+        throw error;
+      }
+      return await operation(this.fallback);
+    }
+  }
+
+  async spawnAcpSession(params: Parameters<OpenClawSessionAdapter["spawnAcpSession"]>[0]) {
+    return await this.preferPrimary((adapter) => adapter.spawnAcpSession(params));
+  }
+
+  async getAcpSessionStatus(sessionKey: string) {
+    return await this.preferPrimary((adapter) => adapter.getAcpSessionStatus(sessionKey));
+  }
+
+  async cancelAcpSession(sessionKey: string, reason?: string) {
+    return await this.preferPrimary((adapter) => adapter.cancelAcpSession(sessionKey, reason));
+  }
+
+  async closeAcpSession(sessionKey: string, reason?: string) {
+    return await this.preferPrimary((adapter) => adapter.closeAcpSession(sessionKey, reason));
+  }
+}
+
 export function resolveSessionAdapter(context?: SwarmCliContext): OpenClawSessionAdapter {
   if (context?.sessionAdapter) {
     return context.sessionAdapter;
@@ -43,10 +77,13 @@ export function resolveSessionAdapter(context?: SwarmCliContext): OpenClawSessio
         }
       : defaultSwarmPluginConfig;
   const runtimeAdapter = createSessionAdapter(context?.runtime, { acp: config.acp });
+  const bridgeAdapter = createBridgeSessionAdapter(context?.runtime, { acp: config.acp, bridge: config.bridge });
+  if (runtimeAdapter && bridgeAdapter) {
+    return new FallbackSessionAdapter(runtimeAdapter, bridgeAdapter);
+  }
   if (runtimeAdapter) {
     return runtimeAdapter;
   }
-  const bridgeAdapter = createBridgeSessionAdapter(context?.runtime, { acp: config.acp, bridge: config.bridge });
   return bridgeAdapter ?? new UnsupportedOpenClawSessionAdapter();
 }
 

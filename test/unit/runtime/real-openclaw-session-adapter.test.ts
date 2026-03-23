@@ -1,4 +1,12 @@
-import { ExperimentalRealOpenClawSessionAdapter, createSessionAdapter } from "../../../src/runtime/real-openclaw-session-adapter.js";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import {
+  ExperimentalRealOpenClawSessionAdapter,
+  createSessionAdapter,
+  loadCompatibleAcpSdk,
+} from "../../../src/runtime/real-openclaw-session-adapter.js";
 
 describe("ExperimentalRealOpenClawSessionAdapter", () => {
   const runtime = {
@@ -58,6 +66,60 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
         thread: false,
       }),
     ).rejects.toThrow("upstream public control-plane export");
+  });
+
+  it("falls back to the resolved OpenClaw root when bare sdk imports are unavailable", async () => {
+    const openclawRoot = mkdtempSync(path.join(tmpdir(), "swarm-layer-openclaw-root-"));
+    mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    writeFileSync(path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js"), "export {};\n", "utf8");
+
+    const importModule = vi.fn(async (specifier: string): Promise<any> => {
+      if (specifier.startsWith("openclaw/")) {
+        throw new Error(`missing:${specifier}`);
+      }
+      return {
+        getAcpSessionManager() {
+          return null;
+        },
+      };
+    });
+    try {
+      const sdk = await loadCompatibleAcpSdk("2026.3.22", {
+        importModule,
+        resolveOpenClawRoot: () => openclawRoot,
+      });
+
+      expect(sdk.getAcpSessionManager).toBeTypeOf("function");
+      expect(importModule).toHaveBeenNthCalledWith(1, "openclaw/plugin-sdk/acp-runtime");
+      expect(importModule).toHaveBeenNthCalledWith(2, "openclaw/plugin-sdk");
+      expect(importModule).toHaveBeenNthCalledWith(
+        3,
+        pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js")).href,
+      );
+    } finally {
+      rmSync(openclawRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the legacy plugin-sdk index fallback for pre-2026.3.22 runtimes", async () => {
+    const importModule = vi.fn(async (specifier: string): Promise<any> => {
+      if (specifier === "openclaw/plugin-sdk") {
+        throw new Error("missing:openclaw/plugin-sdk");
+      }
+      return {
+        getAcpSessionManager() {
+          return null;
+        },
+      };
+    });
+
+    await loadCompatibleAcpSdk("2026.3.13", {
+      importModule,
+      resolveOpenClawRoot: () => "/opt/openclaw",
+    });
+
+    expect(importModule).toHaveBeenNthCalledWith(1, "openclaw/plugin-sdk");
+    expect(importModule).toHaveBeenNthCalledWith(2, "file:///opt/openclaw/dist/plugin-sdk/index.js");
   });
 
   it("spawns and queries ACP sessions through the manager", async () => {

@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import type { SwarmPluginConfig } from "../config.js";
 import type { PluginRuntime } from "openclaw/plugin-sdk";
 import type { OpenClawSessionAdapter, AcpAcceptedSession, AcpSessionStatus } from "./openclaw-session-adapter.js";
 import type { AcpSpawnParams } from "./acp-mapping.js";
 import { supportsPublicAcpRuntime } from "./openclaw-version.js";
+import { resolveAcpRuntimeRegistryModulePath, resolveOpenClawRoot } from "./openclaw-exec-bridge.js";
 
 type AcpManager = {
   initializeSession(input: {
@@ -44,17 +47,68 @@ type SdkLike = {
   getAcpSessionManager?: () => AcpManager;
 };
 
-async function loadCompatibleAcpSdk(runtimeVersion?: string | null): Promise<SdkLike> {
-  if (supportsPublicAcpRuntime(runtimeVersion)) {
+type SdkImporter = (specifier: string) => Promise<SdkLike>;
+type CompatibleAcpSdkLoadOptions = {
+  importModule?: SdkImporter;
+  resolveOpenClawRoot?: () => string;
+};
+
+const PUBLIC_ACP_RUNTIME_UNAVAILABLE_PATTERNS = [
+  "getAcpSessionManager at runtime",
+  "Unable to load a compatible OpenClaw ACP SDK entry",
+  "Cannot find package 'openclaw'",
+];
+
+function defaultImportModule(specifier: string): Promise<SdkLike> {
+  return import(specifier) as Promise<SdkLike>;
+}
+
+function buildFallbackSdkImportSpecifiers(runtimeVersion?: string | null, rootResolver: () => string = resolveOpenClawRoot): string[] {
+  const openclawRoot = rootResolver();
+  const fallbackPaths = supportsPublicAcpRuntime(runtimeVersion)
+    ? [
+        resolveAcpRuntimeRegistryModulePath(openclawRoot),
+        path.join(openclawRoot, "dist", "plugin-sdk", "index.js"),
+      ]
+    : [path.join(openclawRoot, "dist", "plugin-sdk", "index.js")];
+  return fallbackPaths.map((entry) => pathToFileURL(entry).href);
+}
+
+export async function loadCompatibleAcpSdk(
+  runtimeVersion?: string | null,
+  options: CompatibleAcpSdkLoadOptions = {},
+): Promise<SdkLike> {
+  const importModule = options.importModule ?? defaultImportModule;
+  const rootResolver = options.resolveOpenClawRoot ?? resolveOpenClawRoot;
+  const primarySpecifiers = supportsPublicAcpRuntime(runtimeVersion)
+    ? ["openclaw/plugin-sdk/acp-runtime", "openclaw/plugin-sdk"]
+    : ["openclaw/plugin-sdk"];
+  let lastError: unknown;
+
+  for (const specifier of primarySpecifiers) {
     try {
-      const acpRuntimeEntry = "openclaw/plugin-sdk/acp-runtime";
-      return (await import(acpRuntimeEntry)) as SdkLike;
-    } catch {
-      // Fall back to the legacy root entry for older installs or test doubles.
+      return await importModule(specifier);
+    } catch (error) {
+      lastError = error;
     }
   }
-  const legacySdkEntry = "openclaw/plugin-sdk";
-  return (await import(legacySdkEntry)) as SdkLike;
+
+  for (const specifier of buildFallbackSdkImportSpecifiers(runtimeVersion, rootResolver)) {
+    try {
+      return await importModule(specifier);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Unable to load a compatible OpenClaw ACP SDK entry");
+}
+
+export function isPublicAcpRuntimeUnavailableError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return PUBLIC_ACP_RUNTIME_UNAVAILABLE_PATTERNS.some((pattern) => error.message.includes(pattern));
 }
 
 function shouldUsePublicSessionAdapter(
@@ -84,7 +138,7 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
   constructor(
     private readonly runtime: Pick<PluginRuntime, "config" | "version">,
     private readonly config: Pick<SwarmPluginConfig, "acp">,
-    private readonly sdkLoader: () => Promise<SdkLike> = async () => await loadCompatibleAcpSdk(runtime.version),
+    private readonly sdkLoader: () => Promise<SdkLike> = () => loadCompatibleAcpSdk(runtime.version),
   ) {}
 
   private async getManager(): Promise<{ manager: AcpManager; cfg: unknown }> {
