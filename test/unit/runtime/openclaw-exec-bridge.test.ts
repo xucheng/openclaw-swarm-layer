@@ -129,6 +129,17 @@ describe("openclaw exec bridge", () => {
     expect(resolveOpenClawRootFromExecPath(path.join(nodeBinDir, "node"))).toBe(openclawRoot);
   });
 
+  it("detects the host openclaw install root for self-contained installer layouts", () => {
+    const tmpPrefix = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-self-contained-"));
+    const nodeBinDir = path.join(tmpPrefix, "tools", "node", "bin");
+    const openclawRoot = path.join(tmpPrefix, "lib", "node_modules", "openclaw");
+    fs.mkdirSync(nodeBinDir, { recursive: true });
+    fs.mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.22" }));
+
+    expect(resolveOpenClawRootFromExecPath(path.join(nodeBinDir, "node"))).toBe(openclawRoot);
+  });
+
   it("derives remediation for version drift and backend failures", () => {
     const remediation = deriveDoctorRemediation({
       ok: false,

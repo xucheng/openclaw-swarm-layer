@@ -145,6 +145,7 @@ export function resolveOpenClawRootFromExecPath(execPath: string = process.execP
   const prefixes = dedupeStrings([
     path.resolve(execDir, ".."),
     path.resolve(execDir, "..", ".."),
+    path.resolve(execDir, "..", "..", ".."),
   ]);
 
   for (const prefix of prefixes) {
