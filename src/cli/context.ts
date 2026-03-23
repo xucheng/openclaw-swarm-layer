@@ -15,7 +15,7 @@ export type SwarmCliContext = {
   sessionStore?: SessionStore;
   sessionAdapter?: OpenClawSessionAdapter;
   subagentAdapter?: OpenClawSubagentAdapter;
-  runtime?: Pick<PluginRuntime, "config" | "system">;
+  runtime?: Pick<PluginRuntime, "config" | "system" | "version">;
 };
 
 export function resolveStateStore(context?: SwarmCliContext): StateStore {
@@ -42,12 +42,12 @@ export function resolveSessionAdapter(context?: SwarmCliContext): OpenClawSessio
           },
         }
       : defaultSwarmPluginConfig;
-  const bridgeAdapter = createBridgeSessionAdapter(context?.runtime, { acp: config.acp, bridge: config.bridge });
-  if (bridgeAdapter) {
-    return bridgeAdapter;
-  }
   const runtimeAdapter = createSessionAdapter(context?.runtime, { acp: config.acp });
-  return runtimeAdapter ?? new UnsupportedOpenClawSessionAdapter();
+  if (runtimeAdapter) {
+    return runtimeAdapter;
+  }
+  const bridgeAdapter = createBridgeSessionAdapter(context?.runtime, { acp: config.acp, bridge: config.bridge });
+  return bridgeAdapter ?? new UnsupportedOpenClawSessionAdapter();
 }
 
 export function resolveSubagentAdapter(context?: SwarmCliContext): OpenClawSubagentAdapter {

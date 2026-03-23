@@ -38,7 +38,7 @@ describe("swarm doctor cli", () => {
               available: false,
               status: "blocked",
               currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-              targetImplementation: "real-openclaw-session-adapter via top-level public plugin-sdk export",
+              targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-session-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -52,7 +52,7 @@ describe("swarm doctor cli", () => {
               available: false,
               status: "blocked",
               currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-              targetImplementation: "public subagent spawn helper from top-level plugin-sdk export",
+              targetImplementation: "public subagent spawn helper from plugin-sdk export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-subagent-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -190,7 +190,7 @@ describe("swarm doctor cli", () => {
               available: false,
               status: "blocked",
               currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-              targetImplementation: "real-openclaw-session-adapter via top-level public plugin-sdk export",
+              targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-session-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -204,7 +204,7 @@ describe("swarm doctor cli", () => {
               available: false,
               status: "blocked",
               currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-              targetImplementation: "public subagent spawn helper from top-level plugin-sdk export",
+              targetImplementation: "public subagent spawn helper from plugin-sdk export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-subagent-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -282,7 +282,7 @@ describe("swarm doctor cli", () => {
               available: true,
               status: "ready",
               currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-              targetImplementation: "real-openclaw-session-adapter via top-level public plugin-sdk export",
+              targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-session-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -296,7 +296,7 @@ describe("swarm doctor cli", () => {
               available: false,
               status: "blocked",
               currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-              targetImplementation: "public subagent spawn helper from top-level plugin-sdk export",
+              targetImplementation: "public subagent spawn helper from plugin-sdk export",
               affectedModules: [
                 "src/runtime/bridge-openclaw-subagent-adapter.ts",
                 "src/runtime/openclaw-exec-bridge.ts",
@@ -306,7 +306,7 @@ describe("swarm doctor cli", () => {
           ],
           migrationChecklist: [
             "Run `openclaw swarm doctor --json` before changing bridge or public API integration code.",
-            "[acp] Replace bridge-openclaw-session-adapter -> openclaw-exec-bridge with real-openclaw-session-adapter via top-level public plugin-sdk export. Update modules: src/runtime/bridge-openclaw-session-adapter.ts, src/runtime/openclaw-exec-bridge.ts, src/runtime/real-openclaw-session-adapter.ts.",
+            "[acp] Replace bridge-openclaw-session-adapter -> openclaw-exec-bridge with real-openclaw-session-adapter via public acp-runtime export. Update modules: src/runtime/bridge-openclaw-session-adapter.ts, src/runtime/openclaw-exec-bridge.ts, src/runtime/real-openclaw-session-adapter.ts.",
             "[subagent] Keep the current bridge path until the public export spawnSubagentDirect is available.",
             "After any replacement, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
           ],
@@ -318,7 +318,7 @@ describe("swarm doctor cli", () => {
             subagentPatchable: true,
           },
           blockers: [],
-          warnings: ["Top-level public plugin SDK exposes getAcpSessionManager(); ACP bridge replacement is now technically possible."],
+          warnings: ["Public ACP runtime SDK exposes getAcpSessionManager(); ACP bridge replacement is now technically possible."],
           risks: ["bridge mode depends on internal aliases"],
           remediation: ["Address bridge warnings to reduce upgrade and compatibility risk before relying on bridge mode broadly."],
           nextAction: "Address bridge warnings to reduce upgrade and compatibility risk before relying on bridge mode broadly.",

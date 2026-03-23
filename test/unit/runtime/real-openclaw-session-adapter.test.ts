@@ -2,6 +2,7 @@ import { ExperimentalRealOpenClawSessionAdapter, createSessionAdapter } from "..
 
 describe("ExperimentalRealOpenClawSessionAdapter", () => {
   const runtime = {
+    version: "2026.3.22",
     config: {
       loadConfig() {
         return { acp: { enabled: true } };
@@ -22,13 +23,27 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     },
   };
 
-  it("returns null when experimental adapter is disabled or runtime is missing", () => {
+  it("returns null when runtime is missing or ACP is disabled", () => {
     expect(createSessionAdapter(undefined, config as any)).toBeNull();
     expect(
       createSessionAdapter(runtime, {
-        acp: { ...config.acp, experimentalControlPlaneAdapter: false },
+        acp: { ...config.acp, enabled: false, experimentalControlPlaneAdapter: false },
       } as any),
     ).toBeNull();
+  });
+
+  it("auto-enables the public adapter on OpenClaw 2026.3.22+", () => {
+    expect(
+      createSessionAdapter(
+        {
+          ...runtime,
+          version: "2026.3.22",
+        } as any,
+        {
+          acp: { ...config.acp, experimentalControlPlaneAdapter: false },
+        } as any,
+      ),
+    ).toBeInstanceOf(ExperimentalRealOpenClawSessionAdapter);
   });
 
   it("fails clearly when runtime sdk lacks control-plane export", async () => {

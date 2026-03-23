@@ -44,27 +44,56 @@ export function buildMigrationChecklist(plan: ReplacementPlanItem[]): string[] {
 }
 
 type SdkExports = Record<string, unknown>;
+type PublicApiLoader = () => Promise<SdkExports>;
+type PublicApiLoaderOptions = {
+  rootLoader?: PublicApiLoader;
+  acpRuntimeLoader?: PublicApiLoader;
+};
 
 export async function detectPublicApiAvailability(
-  sdkLoader: () => Promise<SdkExports> = async () => (await import("openclaw/plugin-sdk")) as SdkExports,
+  loaders: PublicApiLoader | PublicApiLoaderOptions = {},
 ): Promise<PublicApiAvailability> {
-  const sdk = await sdkLoader();
-  const acpControlPlaneExport = typeof sdk[ACP_PUBLIC_REPLACEMENT_EXPORT] === "function";
-  const subagentSpawnExport = typeof sdk[SUBAGENT_PUBLIC_REPLACEMENT_EXPORT] === "function";
+  const options =
+    typeof loaders === "function"
+      ? { rootLoader: loaders }
+      : loaders;
+
+  const rootLoader =
+    options.rootLoader ??
+    (async () => {
+      const sdkEntry = "openclaw/plugin-sdk";
+      return (await import(sdkEntry)) as SdkExports;
+    });
+  const acpRuntimeLoader =
+    options.acpRuntimeLoader ??
+    (async () => {
+      const acpRuntimeEntry = "openclaw/plugin-sdk/acp-runtime";
+      return (await import(acpRuntimeEntry)) as SdkExports;
+    });
+
+  const [rootSdk, acpRuntimeSdk] = await Promise.all([
+    rootLoader().catch(() => ({} as SdkExports)),
+    acpRuntimeLoader().catch(() => ({} as SdkExports)),
+  ]);
+
+  const acpControlPlaneExport =
+    typeof acpRuntimeSdk[ACP_PUBLIC_REPLACEMENT_EXPORT] === "function" ||
+    typeof rootSdk[ACP_PUBLIC_REPLACEMENT_EXPORT] === "function";
+  const subagentSpawnExport = typeof rootSdk[SUBAGENT_PUBLIC_REPLACEMENT_EXPORT] === "function";
   const readyReplacementPoints: string[] = [];
   const notes: string[] = [];
 
   if (!acpControlPlaneExport) {
-    notes.push(`Top-level public plugin SDK does not expose ${ACP_PUBLIC_REPLACEMENT_EXPORT}().`);
+    notes.push(`Public ACP runtime SDK does not expose ${ACP_PUBLIC_REPLACEMENT_EXPORT}().`);
   } else {
     readyReplacementPoints.push(`acp:${ACP_PUBLIC_REPLACEMENT_EXPORT}`);
-    notes.push(`Top-level public plugin SDK exposes ${ACP_PUBLIC_REPLACEMENT_EXPORT}(); ACP bridge replacement is now technically possible.`);
+    notes.push(`Public ACP runtime SDK exposes ${ACP_PUBLIC_REPLACEMENT_EXPORT}(); ACP bridge replacement is now technically possible.`);
   }
   if (!subagentSpawnExport) {
-    notes.push(`Top-level public plugin SDK does not expose ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}().`);
+    notes.push(`Public plugin SDK does not expose ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}().`);
   } else {
     readyReplacementPoints.push(`subagent:${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}`);
-    notes.push(`Top-level public plugin SDK exposes ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}(); subagent bridge replacement is now technically possible.`);
+    notes.push(`Public plugin SDK exposes ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}(); subagent bridge replacement is now technically possible.`);
   }
 
   return {
@@ -83,7 +112,7 @@ export function buildReplacementPlan(availability: PublicApiAvailability): Repla
       available: availability.acpControlPlaneExport,
       status: availability.acpControlPlaneExport ? "ready" : "blocked",
       currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-      targetImplementation: "real-openclaw-session-adapter via top-level public plugin-sdk export",
+      targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
       affectedModules: [
         "src/runtime/bridge-openclaw-session-adapter.ts",
         "src/runtime/openclaw-exec-bridge.ts",
@@ -99,7 +128,7 @@ export function buildReplacementPlan(availability: PublicApiAvailability): Repla
       available: availability.subagentSpawnExport,
       status: availability.subagentSpawnExport ? "ready" : "blocked",
       currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-      targetImplementation: "public subagent spawn helper from top-level plugin-sdk export",
+      targetImplementation: "public subagent spawn helper from plugin-sdk export",
       affectedModules: [
         "src/runtime/bridge-openclaw-subagent-adapter.ts",
         "src/runtime/openclaw-exec-bridge.ts",

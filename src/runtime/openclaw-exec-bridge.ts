@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
@@ -135,12 +136,52 @@ function getRequire() {
   return createRequire(import.meta.url);
 }
 
+function isOpenClawPackageRoot(candidate: string): boolean {
+  return existsSync(path.join(candidate, "package.json")) && existsSync(path.join(candidate, "dist", "plugin-sdk"));
+}
+
+export function resolveOpenClawRootFromExecPath(execPath: string = process.execPath): string | null {
+  const execDir = path.dirname(path.resolve(execPath));
+  const prefixes = dedupeStrings([
+    path.resolve(execDir, ".."),
+    path.resolve(execDir, "..", ".."),
+  ]);
+
+  for (const prefix of prefixes) {
+    const candidates = [
+      path.join(prefix, "lib", "node_modules", "openclaw"),
+      path.join(prefix, "node_modules", "openclaw"),
+    ];
+    for (const candidate of candidates) {
+      if (isOpenClawPackageRoot(candidate)) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
 function resolveOpenClawRoot(override?: string): string {
   if (override) {
     return path.resolve(override);
   }
+  const envRoot = process.env.OPENCLAW_ROOT?.trim();
+  if (envRoot) {
+    return path.resolve(envRoot);
+  }
+  const execPathRoot = resolveOpenClawRootFromExecPath();
+  if (execPathRoot) {
+    return execPathRoot;
+  }
   const require = getRequire();
-  const sdkEntryPath = require.resolve("openclaw/plugin-sdk");
+  let sdkEntryPath: string;
+  try {
+    sdkEntryPath = require.resolve("openclaw/plugin-sdk");
+  } catch {
+    throw new Error(
+      "Unable to resolve openclaw package root from bridge context. Set bridge.openclawRoot explicitly or export OPENCLAW_ROOT.",
+    );
+  }
   let cursor = path.dirname(sdkEntryPath);
   while (true) {
     const packageJsonPath = path.join(cursor, "package.json");
@@ -155,6 +196,58 @@ function resolveOpenClawRoot(override?: string): string {
   }
 }
 
+export function resolveAcpRuntimeRegistryModulePath(openclawRoot: string): string {
+  const publicAcpRuntimePath = path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js");
+  if (existsSync(publicAcpRuntimePath)) {
+    return publicAcpRuntimePath;
+  }
+  return path.join(openclawRoot, "dist", "plugin-sdk", "index.js");
+}
+
+function resolveOpenClawStateDir(): string {
+  const envStateDir = process.env.OPENCLAW_STATE_DIR?.trim();
+  if (envStateDir) {
+    return path.resolve(envStateDir);
+  }
+  return path.join(os.homedir(), ".openclaw");
+}
+
+export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): string | null {
+  if (cfg?.plugins?.entries?.acpx?.enabled === false) {
+    return null;
+  }
+  const candidates: string[] = [];
+  const serviceRelativeCandidates = [
+    path.join("src", "service.ts"),
+    path.join("dist", "service.js"),
+    "service.js",
+  ];
+  const installPath =
+    typeof cfg?.plugins?.installs?.acpx?.installPath === "string" ? cfg.plugins.installs.acpx.installPath.trim() : "";
+  if (installPath) {
+    for (const relativePath of serviceRelativeCandidates) {
+      candidates.push(path.join(installPath, relativePath));
+    }
+  }
+
+  const globalExtensionRoot = path.join(resolveOpenClawStateDir(), "extensions", "acpx");
+  for (const relativePath of serviceRelativeCandidates) {
+    candidates.push(path.join(globalExtensionRoot, relativePath));
+  }
+
+  const bundledExtensionRoot = path.join(openclawRoot, "extensions", "acpx");
+  for (const relativePath of serviceRelativeCandidates) {
+    candidates.push(path.join(bundledExtensionRoot, relativePath));
+  }
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 async function resolveInternalModule(openclawRoot: string, versionAllow?: string[]) {
   const packageJson = JSON.parse(await fs.readFile(path.join(openclawRoot, "package.json"), "utf8")) as { version: string };
   const version = packageJson.version as string;
@@ -165,10 +258,14 @@ async function resolveInternalModule(openclawRoot: string, versionAllow?: string
   if (!spec) {
     throw new Error(`No internal bridge mapping is registered for OpenClaw ${version}`);
   }
-  const modulePath = path.join(openclawRoot, spec.relativeModulePath);
-  const mod = await import(pathToFileURL(modulePath).href);
-  const loadConfig = mod[spec.exportAliases.loadConfig] as (() => unknown) | undefined;
-  const getAcpSessionManager = mod[spec.exportAliases.getAcpSessionManager] as (() => any) | undefined;
+  const loadConfigModulePath = path.join(openclawRoot, spec.exports.loadConfig.relativeModulePath);
+  const managerModulePath = path.join(openclawRoot, spec.exports.getAcpSessionManager.relativeModulePath);
+  const [loadConfigModule, managerModule] = await Promise.all([
+    import(pathToFileURL(loadConfigModulePath).href),
+    import(pathToFileURL(managerModulePath).href),
+  ]);
+  const loadConfig = loadConfigModule[spec.exports.loadConfig.exportAlias] as (() => unknown) | undefined;
+  const getAcpSessionManager = managerModule[spec.exports.getAcpSessionManager.exportAlias] as (() => any) | undefined;
   if (!loadConfig || !getAcpSessionManager) {
     throw new Error(`Internal bridge mapping for OpenClaw ${version} is stale`);
   }
@@ -181,21 +278,21 @@ async function resolveInternalModule(openclawRoot: string, versionAllow?: string
 }
 
 async function resolvePatchedSubagentSpawner(openclawRoot: string, spec: InternalModuleSpec) {
-  const originalModulePath = path.join(openclawRoot, spec.relativeModulePath);
-  const patchedModulePath = path.join(openclawRoot, spec.patchedModulePath);
+  const originalModulePath = path.join(openclawRoot, spec.subagentPatch.relativeModulePath);
+  const patchedModulePath = path.join(openclawRoot, spec.subagentPatch.patchedModulePath);
   const source = await fs.readFile(originalModulePath, "utf8");
   await fs.writeFile(patchedModulePath, buildPatchedBridgeModuleSource(source), "utf8");
   const mod = await import(pathToFileURL(patchedModulePath).href);
-  const spawnSubagentDirect = mod[spec.patchedSubagentExports.spawn] as
+  const spawnSubagentDirect = mod[spec.subagentPatch.patchedSubagentExports.spawn] as
     | ((params: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<Record<string, unknown>>)
     | undefined;
-  const findLatestSubagentRunByChildSession = mod[spec.patchedSubagentExports.findLatestRun] as
+  const findLatestSubagentRunByChildSession = mod[spec.subagentPatch.patchedSubagentExports.findLatestRun] as
     | ((childSessionKey: string) => Record<string, unknown> | null)
     | undefined;
-  const killSubagentRunByChildSession = mod[spec.patchedSubagentExports.killByChildSession] as
+  const killSubagentRunByChildSession = mod[spec.subagentPatch.patchedSubagentExports.killByChildSession] as
     | ((cfg: unknown, childSessionKey: string) => Promise<Record<string, unknown>>)
     | undefined;
-  const isSubagentSessionRunActive = mod[spec.patchedSubagentExports.isRunActive] as
+  const isSubagentSessionRunActive = mod[spec.subagentPatch.patchedSubagentExports.isRunActive] as
     | ((childSessionKey: string) => boolean)
     | undefined;
   if (!spawnSubagentDirect || !findLatestSubagentRunByChildSession || !killSubagentRunByChildSession || !isSubagentSessionRunActive) {
@@ -336,8 +433,21 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
 }
 
 async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Promise<void> {
-  const serviceModulePath = pathToFileURL(path.join(openclawRoot, "extensions", "acpx", "src", "service.ts")).href;
-  const mod = await import(serviceModulePath);
+  const backendId = cfg?.acp?.backend ?? "acpx";
+  const registryModulePath = pathToFileURL(resolveAcpRuntimeRegistryModulePath(openclawRoot)).href;
+  const registryModule = await import(registryModulePath);
+  const getBackend = () => registryModule.getAcpRuntimeBackend?.(backendId) ?? null;
+  if (getBackend()) {
+    await waitForAcpBackendHealthy(getBackend, backendId);
+    return;
+  }
+
+  const serviceModulePath = resolveAcpxServiceModulePath(openclawRoot, cfg);
+  if (!serviceModulePath) {
+    throw new Error("ACP runtime backend is not configured. Install and enable the acpx plugin.");
+  }
+
+  const mod = await import(pathToFileURL(serviceModulePath).href);
   const createAcpxRuntimeService = mod.createAcpxRuntimeService as
     | ((params?: { pluginConfig?: unknown }) => { start(ctx: { config: unknown; workspaceDir?: string; stateDir: string; logger: any }): Promise<void> | void })
     | undefined;
@@ -366,13 +476,7 @@ async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Prom
       },
     },
   });
-
-  const registryModulePath = pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "index.js")).href;
-  const registryModule = await import(registryModulePath);
-  await waitForAcpBackendHealthy(
-    () => registryModule.getAcpRuntimeBackend?.(cfg?.acp?.backend ?? "acpx") ?? null,
-    cfg?.acp?.backend ?? "acpx",
-  );
+  await waitForAcpBackendHealthy(getBackend, backendId);
 }
 
 export async function waitForAcpBackendHealthy(

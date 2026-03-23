@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"

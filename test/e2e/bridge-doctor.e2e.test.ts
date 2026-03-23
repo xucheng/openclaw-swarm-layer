@@ -40,7 +40,7 @@ describe("e2e: bridge doctor", () => {
                 available: false,
                 status: "blocked",
                 currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-                targetImplementation: "real-openclaw-session-adapter via top-level public plugin-sdk export",
+                targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
                 affectedModules: [
                   "src/runtime/bridge-openclaw-session-adapter.ts",
                   "src/runtime/openclaw-exec-bridge.ts",
@@ -54,7 +54,7 @@ describe("e2e: bridge doctor", () => {
                 available: false,
                 status: "blocked",
                 currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-                targetImplementation: "public subagent spawn helper from top-level plugin-sdk export",
+                targetImplementation: "public subagent spawn helper from plugin-sdk export",
                 affectedModules: [
                   "src/runtime/bridge-openclaw-subagent-adapter.ts",
                   "src/runtime/openclaw-exec-bridge.ts",

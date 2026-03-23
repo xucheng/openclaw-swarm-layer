@@ -1,6 +1,6 @@
 {
   "name": "openclaw-swarm-layer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "license": "MIT",
   "author": "Xu Cheng",
@@ -21,8 +21,8 @@
     "plugin"
   ],
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "files": [
     "dist/src",
     "scripts",
@@ -31,7 +31,7 @@
   ],
   "openclaw": {
     "extensions": [
-      "./src/index.ts"
+      "./dist/src/index.js"
     ]
   },
   "scripts": {
