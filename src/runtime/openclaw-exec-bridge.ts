@@ -284,6 +284,7 @@ export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): st
     path.join("src", "service.ts"),
     path.join("dist", "service.js"),
     "service.js",
+    "index.js",
   ];
   const installPath =
     typeof cfg?.plugins?.installs?.acpx?.installPath === "string" ? cfg.plugins.installs.acpx.installPath.trim() : "";
@@ -298,9 +299,14 @@ export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): st
     candidates.push(path.join(globalExtensionRoot, relativePath));
   }
 
-  const bundledExtensionRoot = path.join(openclawRoot, "extensions", "acpx");
-  for (const relativePath of serviceRelativeCandidates) {
-    candidates.push(path.join(bundledExtensionRoot, relativePath));
+  const bundledExtensionRoots = [
+    path.join(openclawRoot, "dist", "extensions", "acpx"),
+    path.join(openclawRoot, "extensions", "acpx"),
+  ];
+  for (const bundledExtensionRoot of bundledExtensionRoots) {
+    for (const relativePath of serviceRelativeCandidates) {
+      candidates.push(path.join(bundledExtensionRoot, relativePath));
+    }
   }
 
   for (const candidate of candidates) {
@@ -509,6 +515,39 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
   return report;
 }
 
+type AcpxRuntimeService = {
+  start(ctx: { config: unknown; workspaceDir?: string; stateDir: string; logger: any }): Promise<void> | void;
+};
+
+export function resolveAcpxRuntimeServiceFactory(
+  mod: Record<string, unknown>,
+): ((params?: { pluginConfig?: unknown }) => AcpxRuntimeService) | null {
+  const exportedFactory = mod.createAcpxRuntimeService;
+  if (typeof exportedFactory === "function") {
+    return exportedFactory as (params?: { pluginConfig?: unknown }) => AcpxRuntimeService;
+  }
+
+  const plugin = mod.default as { register?: (api: { pluginConfig?: unknown; registerService: (service: AcpxRuntimeService) => void }) => void } | undefined;
+  const register = plugin?.register;
+  if (typeof register !== "function") {
+    return null;
+  }
+
+  return (params?: { pluginConfig?: unknown }) => {
+    let registeredService: AcpxRuntimeService | null = null;
+    register({
+      pluginConfig: params?.pluginConfig,
+      registerService(service) {
+        registeredService = service;
+      },
+    });
+    if (!registeredService) {
+      throw new Error("ACPX plugin did not register a runtime service");
+    }
+    return registeredService;
+  };
+}
+
 async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Promise<void> {
   const backendId = cfg?.acp?.backend ?? "acpx";
   const registryModulePath = pathToFileURL(resolveAcpRuntimeRegistryModulePath(openclawRoot)).href;
@@ -525,9 +564,7 @@ async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Prom
   }
 
   const mod = await import(pathToFileURL(serviceModulePath).href);
-  const createAcpxRuntimeService = mod.createAcpxRuntimeService as
-    | ((params?: { pluginConfig?: unknown }) => { start(ctx: { config: unknown; workspaceDir?: string; stateDir: string; logger: any }): Promise<void> | void })
-    | undefined;
+  const createAcpxRuntimeService = resolveAcpxRuntimeServiceFactory(mod as Record<string, unknown>);
   if (!createAcpxRuntimeService) {
     throw new Error("Unable to load acpx runtime service for bridge bootstrap");
   }

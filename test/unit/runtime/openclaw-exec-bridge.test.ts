@@ -10,6 +10,7 @@ import {
   encodeBridgeInputForEnv,
   readBridgeInput,
   resolveAcpxServiceModulePath,
+  resolveAcpxRuntimeServiceFactory,
   resolveAcpRuntimeRegistryModulePath,
   resolveOpenClawRootFromExecPath,
   spawnDetachedBridgeWorker,
@@ -90,6 +91,26 @@ describe("openclaw exec bridge", () => {
     }
   });
 
+  it("falls back to the bundled dist/extensions acpx directory when no global install exists", () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-acpx-bundled-"));
+    const bundledExtensionPath = path.join(tmpRoot, "dist", "extensions", "acpx");
+    fs.mkdirSync(bundledExtensionPath, { recursive: true });
+    fs.writeFileSync(path.join(bundledExtensionPath, "index.js"), "export default {};\n");
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    process.env.OPENCLAW_STATE_DIR = path.join(tmpRoot, ".openclaw-state");
+    try {
+      expect(resolveAcpxServiceModulePath(tmpRoot, { plugins: { entries: { acpx: { enabled: true } } } })).toBe(
+        path.join(bundledExtensionPath, "index.js"),
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+    }
+  });
+
   it("skips the acpx service path when the plugin is explicitly disabled", () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-acpx-disabled-"));
     const installPath = path.join(tmpRoot, "extensions", "acpx");
@@ -121,6 +142,30 @@ describe("openclaw exec bridge", () => {
     fs.writeFileSync(path.join(publicRuntimePath, "acp-runtime.js"), "export {};\n");
 
     expect(resolveAcpRuntimeRegistryModulePath(tmpRoot)).toBe(path.join(publicRuntimePath, "acp-runtime.js"));
+  });
+
+  it("uses an exported createAcpxRuntimeService factory when available", () => {
+    const start = vi.fn();
+    const factory = resolveAcpxRuntimeServiceFactory({
+      createAcpxRuntimeService: () => ({ start }),
+    });
+
+    expect(factory).toBeTypeOf("function");
+    expect(factory?.({ pluginConfig: { permissionMode: "approve-all" } })).toEqual({ start });
+  });
+
+  it("falls back to the default plugin register hook when bootstrapping bundled acpx", () => {
+    const start = vi.fn();
+    const factory = resolveAcpxRuntimeServiceFactory({
+      default: {
+        register(api: { registerService: (service: { start: typeof start }) => void }) {
+          api.registerService({ start });
+        },
+      },
+    });
+
+    expect(factory).toBeTypeOf("function");
+    expect(factory?.({ pluginConfig: { permissionMode: "approve-all" } })).toEqual({ start });
   });
 
   it("detects the host openclaw install root from the node executable prefix", () => {
