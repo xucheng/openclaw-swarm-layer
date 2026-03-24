@@ -22,6 +22,7 @@ describe("openclaw exec bridge", () => {
     expect(INTERNAL_MODULES_BY_VERSION["2026.2.26"]).toBeDefined();
     expect(INTERNAL_MODULES_BY_VERSION["2026.3.13"]).toBeDefined();
     expect(INTERNAL_MODULES_BY_VERSION["2026.3.22"]).toBeDefined();
+    expect(INTERNAL_MODULES_BY_VERSION["2026.3.23-1"]).toBeDefined();
   });
 
   it("waits until an ACP backend reports healthy", async () => {
@@ -207,7 +208,7 @@ describe("openclaw exec bridge", () => {
       blockers: ["OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)"],
       warnings: [],
       risks: [],
-      remediation: ["Update bridge.versionAllow to include the current OpenClaw version, or switch back to a tested version."],
+      remediation: ["Update bridge.versionAllow to include the current OpenClaw version or a compatible range such as >=2026.3.22."],
     };
 
     expect(deriveDoctorSeverity(report as any)).toBe("blocked");
@@ -220,7 +221,7 @@ describe("openclaw exec bridge", () => {
 
   it("round-trips bridge input through the detached worker env payload", () => {
     const input = {
-      bridge: { openclawRoot: "/opt/openclaw", versionAllow: ["2026.3.22"] },
+      bridge: { openclawRoot: "/opt/openclaw", versionAllow: [">=2026.3.22"] },
       params: { sessionKey: "agent:qwen:acp:123", task: "Create a file" },
     };
 

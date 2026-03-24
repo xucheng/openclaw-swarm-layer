@@ -133,7 +133,12 @@ export const swarmPluginConfigJsonSchema = {
         enabled: { type: "boolean", default: false },
         nodePath: { type: "string" },
         openclawRoot: { type: "string" },
-        versionAllow: { type: "array", items: { type: "string" }, default: [] },
+        versionAllow: {
+          type: "array",
+          items: { type: "string" },
+          default: [],
+          description: 'Accepts exact versions or comparator rules such as ">=2026.3.22".',
+        },
       },
     },
   },

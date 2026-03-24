@@ -56,6 +56,18 @@ describe("swarm plugin config", () => {
     });
   });
 
+  it("accepts bridge comparator rules in versionAllow", () => {
+    const resolved = resolveSwarmPluginConfig({
+      bridge: {
+        enabled: true,
+        openclawRoot: "/opt/openclaw",
+        versionAllow: [">=2026.3.22"],
+      },
+    });
+
+    expect(resolved.bridge.versionAllow).toEqual([">=2026.3.22"]);
+  });
+
   it("accepts bridge nodePath", () => {
     const resolved = resolveSwarmPluginConfig({
       bridge: {

@@ -54,6 +54,20 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     ).toBeInstanceOf(ExperimentalRealOpenClawSessionAdapter);
   });
 
+  it("auto-enables the public adapter on suffixed OpenClaw 2026.3.23 builds", () => {
+    expect(
+      createSessionAdapter(
+        {
+          ...runtime,
+          version: "2026.3.23-1",
+        } as any,
+        {
+          acp: { ...config.acp, experimentalControlPlaneAdapter: false },
+        } as any,
+      ),
+    ).toBeInstanceOf(ExperimentalRealOpenClawSessionAdapter);
+  });
+
   it("fails clearly when runtime sdk lacks control-plane export", async () => {
     const adapter = new ExperimentalRealOpenClawSessionAdapter(runtime, config as any, async () => ({}));
 

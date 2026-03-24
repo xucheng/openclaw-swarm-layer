@@ -8,9 +8,11 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   buildPatchedBridgeModuleSource,
   resolveBridgeCompatibility,
+  resolveInternalModuleSpecCandidates,
   resolveInternalModuleSpec,
   type InternalModuleSpec,
 } from "./bridge-manifest.js";
+import { matchesOpenClawVersionAllowlist } from "./openclaw-version.js";
 import { buildMigrationChecklist, buildReplacementPlan, detectPublicApiAvailability } from "./public-api-seams.js";
 
 type BridgeCommand =
@@ -83,7 +85,7 @@ export function deriveDoctorRemediation(report: Omit<BridgeDoctorResult, "remedi
   const warningText = report.warnings.join("\n");
 
   if (/not in bridge allowlist/i.test(text)) {
-    steps.push("Update bridge.versionAllow to include the current OpenClaw version, or switch back to a tested version.");
+    steps.push("Update bridge.versionAllow to include the current OpenClaw version or a compatible range such as >=2026.3.22.");
   }
   if (/No internal bridge mapping is registered|mapping is stale/i.test(text)) {
     steps.push("Refresh INTERNAL_MODULES_BY_VERSION for the installed OpenClaw build and re-run swarm doctor.");
@@ -95,7 +97,7 @@ export function deriveDoctorRemediation(report: Omit<BridgeDoctorResult, "remedi
     steps.push("Refresh the bridge patch export list for subagent helpers before using the subagent bridge path.");
   }
   if (/versionAllow is empty/i.test(warningText)) {
-    steps.push("Pin bridge.versionAllow to the exact OpenClaw versions you have validated.");
+    steps.push("Pin bridge.versionAllow to the validated OpenClaw versions or a minimum compatible range.");
   }
   if (/openclawRoot is not pinned/i.test(warningText)) {
     steps.push("Set bridge.openclawRoot explicitly so bridge execution does not rely on install auto-detection.");
@@ -312,30 +314,42 @@ export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): st
 async function resolveInternalModule(openclawRoot: string, versionAllow?: string[]) {
   const packageJson = JSON.parse(await fs.readFile(path.join(openclawRoot, "package.json"), "utf8")) as { version: string };
   const version = packageJson.version as string;
-  if (versionAllow && versionAllow.length > 0 && !versionAllow.includes(version)) {
-    throw new Error(`OpenClaw version ${version} is not in bridge allowlist (${versionAllow.join(", ")})`);
+  if (!matchesOpenClawVersionAllowlist(version, versionAllow)) {
+    throw new Error(`OpenClaw version ${version} is not in bridge allowlist (${(versionAllow ?? []).join(", ")})`);
   }
-  const spec = resolveInternalModuleSpec(version);
-  if (!spec) {
+  const specs = resolveInternalModuleSpecCandidates(version);
+  if (specs.length === 0) {
     throw new Error(`No internal bridge mapping is registered for OpenClaw ${version}`);
   }
-  const loadConfigModulePath = path.join(openclawRoot, spec.exports.loadConfig.relativeModulePath);
-  const managerModulePath = path.join(openclawRoot, spec.exports.getAcpSessionManager.relativeModulePath);
-  const [loadConfigModule, managerModule] = await Promise.all([
-    import(pathToFileURL(loadConfigModulePath).href),
-    import(pathToFileURL(managerModulePath).href),
-  ]);
-  const loadConfig = loadConfigModule[spec.exports.loadConfig.exportAlias] as (() => unknown) | undefined;
-  const getAcpSessionManager = managerModule[spec.exports.getAcpSessionManager.exportAlias] as (() => any) | undefined;
-  if (!loadConfig || !getAcpSessionManager) {
-    throw new Error(`Internal bridge mapping for OpenClaw ${version} is stale`);
+  let lastError: unknown;
+  for (const spec of specs) {
+    try {
+      const loadConfigModulePath = path.join(openclawRoot, spec.exports.loadConfig.relativeModulePath);
+      const managerModulePath = path.join(openclawRoot, spec.exports.getAcpSessionManager.relativeModulePath);
+      const [loadConfigModule, managerModule] = await Promise.all([
+        import(pathToFileURL(loadConfigModulePath).href),
+        import(pathToFileURL(managerModulePath).href),
+      ]);
+      const loadConfig = loadConfigModule[spec.exports.loadConfig.exportAlias] as (() => unknown) | undefined;
+      const getAcpSessionManager = managerModule[spec.exports.getAcpSessionManager.exportAlias] as (() => any) | undefined;
+      if (!loadConfig || !getAcpSessionManager) {
+        throw new Error(`Internal bridge mapping candidate is stale for OpenClaw ${version}`);
+      }
+      return {
+        version,
+        spec,
+        loadConfig,
+        getAcpSessionManager,
+      };
+    } catch (error) {
+      lastError = error;
+    }
   }
-  return {
-    version,
-    spec,
-    loadConfig,
-    getAcpSessionManager,
-  };
+  throw new Error(
+    `Internal bridge mapping for OpenClaw ${version} is stale${
+      lastError instanceof Error && lastError.message ? ` (${lastError.message})` : ""
+    }`,
+  );
 }
 
 async function resolvePatchedSubagentSpawner(openclawRoot: string, spec: InternalModuleSpec) {
@@ -452,7 +466,9 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
       };
     }
     report.checks.versionAllowed =
-      !input.bridge?.versionAllow || input.bridge.versionAllow.length === 0 || input.bridge.versionAllow.includes(packageJson.version);
+      !input.bridge?.versionAllow ||
+      input.bridge.versionAllow.length === 0 ||
+      matchesOpenClawVersionAllowlist(packageJson.version, input.bridge.versionAllow);
     if (!report.checks.versionAllowed) {
       report.blockers.push(`OpenClaw version ${packageJson.version} is not in bridge allowlist (${(input.bridge?.versionAllow ?? []).join(", ")})`);
     }

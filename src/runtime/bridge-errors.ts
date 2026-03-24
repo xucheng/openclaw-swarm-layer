@@ -20,7 +20,7 @@ export function classifyBridgeFailure(message: string): BridgeFailure {
       kind: "version-drift",
       message: trimmed,
       remediation: [
-        "Align bridge.versionAllow with the installed OpenClaw version or switch back to a tested version.",
+        "Align bridge.versionAllow with the installed OpenClaw version or a compatible range such as >=2026.3.22.",
         "Refresh the internal bridge mapping if the installed OpenClaw build changed.",
       ],
     };

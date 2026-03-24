@@ -1,3 +1,5 @@
+import { compareOpenClawVersions, normalizeOpenClawVersion } from "./openclaw-version.js";
+
 type InternalModuleExport = {
   relativeModulePath: string;
   exportAlias: string;
@@ -101,6 +103,50 @@ export const INTERNAL_MODULES_BY_VERSION: Record<string, InternalModuleSpec> = {
       },
     },
   },
+  "2026.3.23": {
+    exports: {
+      loadConfig: {
+        relativeModulePath: "dist/io-CZZeeo8R.js",
+        exportAlias: "s",
+      },
+      getAcpSessionManager: {
+        relativeModulePath: "dist/manager-BgeTqIfW.js",
+        exportAlias: "t",
+      },
+    },
+    subagentPatch: {
+      relativeModulePath: "dist/pi-embedded-CwMQzdKD.js",
+      patchedModulePath: "dist/pi-embedded-CwMQzdKD.swarm-bridge.mjs",
+      patchedSubagentExports: {
+        spawn: "__bridgeSpawnSubagentDirect",
+        findLatestRun: "__bridgeFindLatestSubagentRunByChildSession",
+        killByChildSession: "__bridgeKillSubagentRunByChildSession",
+        isRunActive: "__bridgeIsSubagentSessionRunActive",
+      },
+    },
+  },
+  "2026.3.23-1": {
+    exports: {
+      loadConfig: {
+        relativeModulePath: "dist/io-CZZeeo8R.js",
+        exportAlias: "s",
+      },
+      getAcpSessionManager: {
+        relativeModulePath: "dist/manager-BgeTqIfW.js",
+        exportAlias: "t",
+      },
+    },
+    subagentPatch: {
+      relativeModulePath: "dist/pi-embedded-CwMQzdKD.js",
+      patchedModulePath: "dist/pi-embedded-CwMQzdKD.swarm-bridge.mjs",
+      patchedSubagentExports: {
+        spawn: "__bridgeSpawnSubagentDirect",
+        findLatestRun: "__bridgeFindLatestSubagentRunByChildSession",
+        killByChildSession: "__bridgeKillSubagentRunByChildSession",
+        isRunActive: "__bridgeIsSubagentSessionRunActive",
+      },
+    },
+  },
 };
 
 export const BRIDGE_COMPATIBILITY_BY_VERSION: Record<string, BridgeCompatibility> = {
@@ -146,14 +192,84 @@ export const BRIDGE_COMPATIBILITY_BY_VERSION: Record<string, BridgeCompatibility
       subagentSpawnExport: "spawnSubagentDirect",
     },
   },
+  "2026.3.23": {
+    version: "2026.3.23",
+    strategy: "internal-bundle",
+    testedAt: "2026-03-24",
+    supportedRunners: ["acp", "subagent"],
+    notes: [
+      "ACP bridge bindings remain split across io + manager bundles in the 2026.3.23 line.",
+      "Subagent bridge patching still targets the pi-embedded bundle in the 2026.3.23 line.",
+    ],
+    replacementCandidates: {
+      acpControlPlaneExport: "getAcpSessionManager",
+      subagentSpawnExport: "spawnSubagentDirect",
+    },
+  },
+  "2026.3.23-1": {
+    version: "2026.3.23-1",
+    strategy: "internal-bundle",
+    testedAt: "2026-03-24",
+    supportedRunners: ["acp", "subagent"],
+    notes: [
+      "ACP bridge bindings remain split across io + manager bundles in the 2026.3.23 line.",
+      "Subagent bridge patching still targets the pi-embedded bundle in the 2026.3.23 line.",
+    ],
+    replacementCandidates: {
+      acpControlPlaneExport: "getAcpSessionManager",
+      subagentSpawnExport: "spawnSubagentDirect",
+    },
+  },
 };
 
+const POST_2026_3_22_FAMILY_VERSIONS = ["2026.3.23", "2026.3.22"] as const;
+
+function dedupeSpecs(specs: InternalModuleSpec[]): InternalModuleSpec[] {
+  const seen = new Set<string>();
+  return specs.filter((spec) => {
+    const key = JSON.stringify(spec);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+export function resolveInternalModuleSpecCandidates(version: string): InternalModuleSpec[] {
+  const normalizedVersion = normalizeOpenClawVersion(version) ?? version;
+  const exactSpecs = [INTERNAL_MODULES_BY_VERSION[version], INTERNAL_MODULES_BY_VERSION[normalizedVersion]].filter(
+    (spec): spec is InternalModuleSpec => Boolean(spec),
+  );
+  if (exactSpecs.length > 0) {
+    return dedupeSpecs(exactSpecs);
+  }
+
+  const compared = compareOpenClawVersions(normalizedVersion, "2026.3.22");
+  if (compared !== null && compared >= 0) {
+    return POST_2026_3_22_FAMILY_VERSIONS.map((candidateVersion) => INTERNAL_MODULES_BY_VERSION[candidateVersion]).filter(
+      (spec): spec is InternalModuleSpec => Boolean(spec),
+    );
+  }
+
+  return [];
+}
+
 export function resolveInternalModuleSpec(version: string): InternalModuleSpec | null {
-  return INTERNAL_MODULES_BY_VERSION[version] ?? null;
+  return resolveInternalModuleSpecCandidates(version)[0] ?? null;
 }
 
 export function resolveBridgeCompatibility(version: string): BridgeCompatibility | null {
-  return BRIDGE_COMPATIBILITY_BY_VERSION[version] ?? null;
+  const normalizedVersion = normalizeOpenClawVersion(version) ?? version;
+  const exactCompatibility = BRIDGE_COMPATIBILITY_BY_VERSION[version] ?? BRIDGE_COMPATIBILITY_BY_VERSION[normalizedVersion];
+  if (exactCompatibility) {
+    return exactCompatibility;
+  }
+  const compared = compareOpenClawVersions(normalizedVersion, "2026.3.22");
+  if (compared !== null && compared >= 0) {
+    return BRIDGE_COMPATIBILITY_BY_VERSION["2026.3.23"];
+  }
+  return null;
 }
 
 export function buildPatchedBridgeModuleSource(source: string): string {
