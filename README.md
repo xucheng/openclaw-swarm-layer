@@ -55,21 +55,6 @@ npm run build
 openclaw plugins install -l /path/to/openclaw-swarm-layer
 ```
 
-## Publish To ClawHub
-
-`openclaw-swarm-layer` can be published to ClawHub directly as a `code-plugin`; it does not currently collide with an existing plugin package name.
-
-```bash
-SHA=$(git rev-parse HEAD)
-npx clawhub@latest package publish . \
-  --family code-plugin \
-  --source-repo xucheng/openclaw-swarm-layer \
-  --source-commit "$SHA" \
-  --source-ref main
-```
-
-The published ClawHub package name is `openclaw-swarm-layer`, while the existing skill remains `swarm-layer`.
-
 ## Quick Start
 
 ```bash
