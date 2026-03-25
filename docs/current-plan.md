@@ -11,7 +11,8 @@
 - `M3.1`: complete
 - `M3.2`: complete
 - `M3.3`: complete
-- **All M1-M3 milestones delivered.**
+- `M4`: complete (Harness Enhancement)
+- **All M1-M4 milestones delivered.**
 
 ## M1-M3.3 Completion Matrix
 
@@ -27,6 +28,7 @@
 | M3.1 | `reuse_if_available` dispatches to idle session, `require_existing` fails cleanly, reuse visible in reports | Complete | Session reuse working |
 | M3.2 | Thread-bound dispatch, follow-up/steer commands, `allowThreadBinding` enforcement | Complete | Thread binding working |
 | M3.3 | Automatic retry, orphan detection/cleanup, dead letter tracking, configurable retry policy | Complete | Retry and recovery working |
+| M4 | Harness enhancement: progress summary, bootstrap, sprint contracts, evaluator injection, quality rubrics, session budget, assumption metadata, task immutability | Complete | GAN-inspired patterns applied |
 
 ## M3.1 Closeout Details
 
@@ -78,6 +80,23 @@ Delivered:
 - **P4** - Tests: 187 unit tests (11 new), 22 e2e tests, build clean, full regression green
 
 Test coverage: 187 unit tests across 40 files, 22 e2e tests across 16 files.
+
+## M4 Harness Enhancement Closeout Details
+
+Delivered (2026-03-25):
+
+- **Step 1** - Cross-session progress summary: `synthesizeProgress()` + `formatProgressMarkdown()`, auto-updated after run and review
+- **Step 2** - Session bootstrap sequence: 4-step deterministic startup with `bootstrap.enabled` config toggle
+- **Step 3** - Sprint contracts: `SprintContract` with `AcceptanceCriterion` types, auto-generated from spec acceptance criteria
+- **Step 4** - Task field immutability guard: `validateTaskImmutability()` enforced on `saveWorkflow()` when `enforceTaskImmutability` is true
+- **Step 5** - Automated evaluator task injection: GAN-inspired `<taskId>-eval` tasks with dependency chain preservation
+- **Step 6** - Structured quality rubrics: 4-dimension weighted scoring via `applyRubricResult()`, integrated with review gate
+- **Step 7** - Session budget control: `SessionBudget` + `BudgetUsage` tracking in run records with exceeded annotation
+- **Step 8** - Harness assumption metadata: `HarnessAssumption` lifecycle tracking on `WorkflowState`
+- **Step 9** - E2E regression: full enhanced flow + backward compatibility test
+- **Bridge fix** - `scripts/openclaw-exec-bridge.mjs` falls back to TS source when dist/ unavailable
+
+Test coverage: 283 unit tests across 51 files, 24 e2e tests across 17 files.
 
 ## What Still Needs Work
 
@@ -162,11 +181,11 @@ Work packages:
 
 ## Future Directions
 
-The M1-M3 roadmap is fully delivered. Potential future milestones:
+The M1-M4 roadmap is fully delivered. Potential future milestones:
 
-- **M4**: Multi-project orchestration — coordinate workflows across multiple project roots
-- **M4.1**: Public API migration — replace bridge-backed execution with upstream public SDK exports as they become available
-- **M4.2**: Distributed execution — extend beyond single-machine to multi-node coordination
-- **M4.3**: Unattended PR factory — autonomous spec-to-PR pipeline without operator in the loop
+- **M5**: Multi-project orchestration — coordinate workflows across multiple project roots
+- **M5.1**: Public API migration — replace bridge-backed execution with upstream public SDK exports as they become available
+- **M5.2**: Distributed execution — extend beyond single-machine to multi-node coordination
+- **M5.3**: Unattended PR factory — autonomous spec-to-PR pipeline without operator in the loop
 
 These are not planned. They represent potential directions once the current beta stabilizes in production use.

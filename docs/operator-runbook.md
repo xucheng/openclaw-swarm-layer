@@ -177,6 +177,9 @@ Do not delete project `.openclaw/swarm/` state automatically.
 
 When `obsidianJournal` is enabled, the plugin writes structured logs alongside the status report.
 
+State (always written to `<project>/.openclaw/swarm/`):
+- `progress.json` — cross-session progress summary (auto-updated after run and review)
+
 Local (always written to `<project>/.openclaw/swarm/reports/`):
 - `run-log.md` — append-only execution log
 - `review-log.md` — append-only review decision log

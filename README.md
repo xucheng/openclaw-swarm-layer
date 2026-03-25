@@ -11,7 +11,7 @@ Turn workflow specifications into executable task graphs, dispatch through plugg
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.2-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-187%20unit%20%7C%2022%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-283%20unit%20%7C%2024%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) &bull; [Features](#features) &bull; [CLI Reference](#cli-commands) &bull; [Configuration](docs/configuration.md) &bull; [License](LICENSE)
 
@@ -31,9 +31,12 @@ Turn workflow specifications into executable task graphs, dispatch through plugg
 
 - **Spec-driven orchestration** — import a spec, generate a task graph, execute in dependency order
 - **Multiple runners** — manual (operator-driven), ACP (external harness), subagent (OpenClaw-native)
-- **Review gates** — tasks require approval before marking done
+- **Review gates** — tasks require approval before marking done; structured quality rubrics for weighted multi-dimension scoring
 - **Session management** — persistent sessions with reuse, thread binding, follow-up/steer
-- **Automatic retry** — configurable retry policy with dead letter tracking
+- **Automatic retry** — configurable retry policy with dead letter tracking and session budget controls
+- **Sprint contracts** — negotiated verifiable acceptance criteria per task with automated evaluator injection
+- **Cross-session continuity** — progress summary synthesis, bootstrap startup sequence, harness assumption tracking
+- **Task immutability** — agents cannot mutate task definitions, only update execution results
 - **Operator UX** — attention items, highlights, recommended actions, reports
 - **Report sync** — local reports + optional Obsidian vault sync
 

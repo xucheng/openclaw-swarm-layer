@@ -2,6 +2,7 @@ import { resolveSwarmPaths } from "../lib/paths.js";
 import { journalCompletionSummary, journalReviewEntry } from "../reporting/obsidian-journal.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { applyReviewDecision } from "../review/review-gate.js";
+import { synthesizeProgress } from "../session/progress-summary.js";
 import { resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmReview(
@@ -25,11 +26,16 @@ export async function runSwarmReview(
   await journalReviewEntry(paths, stateStore.config.journal, options.task, decision, options.note);
 
   // Obsidian journal: completion summary (when all tasks done)
+  const runs = await stateStore.loadRuns(options.project);
   const allDone = result.workflow.tasks.every((t) => t.status === "done" || t.status === "dead_letter");
   if (allDone && result.workflow.tasks.length > 0) {
-    const runs = await stateStore.loadRuns(options.project);
     await journalCompletionSummary(paths, stateStore.config.journal, result.workflow, runs);
   }
+
+  // Update progress summary
+  const existingProgress = await stateStore.loadProgress(options.project);
+  const progress = synthesizeProgress(result.workflow, runs, existingProgress ?? undefined);
+  await stateStore.saveProgress(options.project, progress);
 
   return {
     ok: true,

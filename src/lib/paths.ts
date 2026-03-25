@@ -16,6 +16,7 @@ export type SwarmPaths = {
   localReviewLogPath: string;
   localSpecsArchiveDir: string;
   localCompletionPath: string;
+  progressFilePath: string;
   obsidianReportPath?: string;
   obsidianProjectDir?: string;
   obsidianRunLogPath?: string;
@@ -58,6 +59,7 @@ export function resolveSwarmPaths(projectRoot: string, config?: Partial<SwarmPlu
     localReviewLogPath: path.join(localReportsDir, "review-log.md"),
     localSpecsArchiveDir: path.join(localReportsDir, "specs"),
     localCompletionPath: path.join(localReportsDir, "completion-summary.md"),
+    progressFilePath: path.join(swarmRoot, "progress.json"),
     obsidianReportPath: obsidianReportsDir ? path.join(obsidianReportsDir, reportFileName) : undefined,
     obsidianProjectDir,
     obsidianRunLogPath: obsidianProjectDir ? path.join(obsidianProjectDir, "run-log.md") : undefined,

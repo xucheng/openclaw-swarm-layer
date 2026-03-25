@@ -2,8 +2,9 @@ import path from "node:path";
 import type { SwarmPluginConfig } from "../config.js";
 import { defaultSwarmPluginConfig } from "../config.js";
 import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+import { validateTaskImmutability } from "../planning/immutability-guard.js";
 import { resolveSwarmPaths, type SwarmPaths } from "../lib/paths.js";
-import type { RunRecord, SessionRecord, SpecDoc, TaskNode, WorkflowState, WorkflowStatusSummary } from "../types.js";
+import type { ProgressSummary, RunRecord, SessionRecord, SpecDoc, TaskNode, WorkflowState, WorkflowStatusSummary } from "../types.js";
 
 const CURRENT_WORKFLOW_VERSION = 1;
 
@@ -35,6 +36,13 @@ function assertTask(task: unknown): asserts task is TaskNode {
     "task.runner.type is invalid",
   );
   assert(isObject(task.review) && typeof task.review.required === "boolean", "task.review.required is invalid");
+  if (task.contract !== undefined) {
+    assert(isObject(task.contract), "task.contract must be an object");
+    assert(typeof task.contract.taskId === "string", "task.contract.taskId is required");
+    assert(typeof task.contract.negotiatedAt === "string", "task.contract.negotiatedAt is required");
+    assert(Array.isArray(task.contract.criteria), "task.contract.criteria must be an array");
+    assert(typeof task.contract.frozen === "boolean", "task.contract.frozen must be a boolean");
+  }
   if (task.session !== undefined) {
     assert(isObject(task.session), "task.session must be an object");
     assert(
@@ -109,6 +117,18 @@ export class StateStore {
   async saveWorkflow(projectRoot: string, workflow: WorkflowState): Promise<void> {
     this.assertValidWorkflow(workflow);
     const paths = await this.initProject(projectRoot);
+
+    // Immutability guard: check task fields haven't been illegally mutated
+    if (this.config.enforceTaskImmutability) {
+      const existing = await readJsonFile<WorkflowState>(paths.workflowStatePath);
+      if (existing && existing.tasks && existing.tasks.length > 0) {
+        const check = validateTaskImmutability(existing.tasks, workflow.tasks);
+        if (!check.ok) {
+          throw new Error(`Task immutability violation: ${check.violations.join("; ")}`);
+        }
+      }
+    }
+
     await writeJsonFileAtomic(paths.workflowStatePath, workflow);
   }
 
@@ -151,6 +171,16 @@ export class StateStore {
     }
     this.assertValidRun(runRecord);
     return runRecord;
+  }
+
+  async loadProgress(projectRoot: string): Promise<ProgressSummary | null> {
+    const paths = this.resolvePaths(projectRoot);
+    return readJsonFile<ProgressSummary>(paths.progressFilePath);
+  }
+
+  async saveProgress(projectRoot: string, progress: ProgressSummary): Promise<void> {
+    const paths = await this.initProject(projectRoot);
+    await writeJsonFileAtomic(paths.progressFilePath, progress);
   }
 
   async loadSessions(projectRoot: string): Promise<SessionRecord[]> {

@@ -2,13 +2,14 @@
 
 ## Summary
 
-The project now uses a three-stage roadmap:
+The project now uses a four-stage roadmap:
 
 - `M1` Orchestration Foundation
 - `M2` ACP Execution Beta
 - `M3` Sessionized Swarm
+- `M4` Harness Enhancement
 
-`M1` is the stable orchestration base. `M2` adds real ACP execution. `M3` adds persistent session and thread-bound capabilities.
+`M1` is the stable orchestration base. `M2` adds real ACP execution. `M3` adds persistent session and thread-bound capabilities. `M4` applies GAN-inspired harness patterns for long-running agents.
 
 ## M1 - Orchestration Foundation
 
@@ -124,7 +125,26 @@ Blocked today:
 - broader failure matrix and compatibility hardening
 - richer asynchronous completion/result ingestion
 
-## M1-M3.3 Assessment
+## M4 - Harness Enhancement
+
+Target:
+
+- cross-session progress memory bridge
+- sprint contracts with verifiable acceptance criteria
+- GAN-inspired evaluator task injection
+- structured quality rubrics replacing binary review
+- session budget controls
+- task field immutability
+- harness assumption metadata
+
+Delivery level:
+
+- all features opt-in via config, backward compatible with existing workflows
+- existing M1-M3 flows work unchanged when new features are disabled
+
+Current status: complete (2026-03-25)
+
+## M1-M4 Assessment
 
 - `M1` is complete
 - `M2.0` is complete
@@ -135,10 +155,11 @@ Blocked today:
 - `M3.1` is complete (closeout 2026-03-22)
 - `M3.2` is complete (closeout 2026-03-22)
 - `M3.3` is complete (closeout 2026-03-22)
+- `M4` is complete (closeout 2026-03-25)
 
-All M1-M3 milestones are complete. The three-stage roadmap is fully delivered.
+All M1-M4 milestones are complete. The four-stage roadmap is fully delivered.
 
-Test coverage: 187 unit tests across 40 files, 22 e2e tests across 16 files, build clean.
+Test coverage: 283 unit tests across 51 files, 24 e2e tests across 17 files, build clean.
 
 Delivery level reached:
 
@@ -149,6 +170,9 @@ Delivery level reached:
 - automatic retry with dead letter tracking
 - orphaned session detection and cleanup
 - full operator visibility through CLI, status, and reports
+- GAN-inspired harness patterns: sprint contracts, evaluator injection, quality rubrics
+- cross-session continuity: progress summary, bootstrap sequence, assumption tracking
+- protective guardrails: task immutability, session budgets
 
 ## Spawn Paths Comparison
 
