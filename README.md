@@ -159,7 +159,7 @@ npm run test:watch     # Watch mode
 - [Migration Checklist](docs/migration-checklist.md) — bridge replacement strategy
 
 **Project History:**
-- [Roadmap](docs/roadmap.md) — M1-M3 milestone structure
+- [Roadmap](docs/roadmap.md) — M1-M4 milestone structure
 - [Milestones](docs/milestones.md) — definition of done per milestone
 - [Current Plan](docs/current-plan.md) — delivery status and future directions
 

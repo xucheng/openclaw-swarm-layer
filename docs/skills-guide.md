@@ -1,6 +1,6 @@
 # Skills 使用指南
 
-OpenClaw Swarm Layer 提供 1 个统一 skill（`swarm-layer`），内含 5 个功能模块，覆盖从安装到日常运营的完整生命周期。
+OpenClaw Swarm Layer 提供 1 个统一 skill（`swarm-layer`），内含 5 个功能模块 + Harness Enhancement 子模块，覆盖从安装到日常运营的完整生命周期。
 
 ## 安装
 
@@ -22,6 +22,7 @@ Skill 根据用户意图自动路由到对应模块：
 | 规划、执行、审批、session 操作 | **Operate** | `plan`, `run`, `review`, `session *` |
 | 故障排查、任务卡住 | **Diagnose** | `doctor`, `session status/cancel/cleanup` |
 | 查看进度、报告分析 | **Report** | `status`, `report`, `session list/inspect` |
+| 启用 GAN 模式、增强编排 | **Operate → Harness** | `evaluator`, `bootstrap`, `immutability`, `rubric` |
 | AI 工具调用 | **Tools Reference** | 7 个 swarm tools 参数参考 |
 
 ## 使用方式
@@ -104,5 +105,6 @@ doctor → severity?
 | "生成报告" | `swarm report` |
 | "任务卡住了" | Diagnose: `doctor` → `status` → 排查 |
 | "清理超时 session" | `swarm session cleanup` |
+| "启用增强模式" | 添加 evaluator + immutability + bootstrap 配置 |
 | "追加任务到 session" | `swarm session follow-up` |
 | "改变方向" | `swarm session steer` |

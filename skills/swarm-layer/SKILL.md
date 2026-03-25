@@ -1,6 +1,6 @@
 ---
 name: swarm-layer
-description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP/subagent execution, persistent sessions, review gates, and automatic retry. Covers setup, operation, diagnosis, and reporting."
+description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP/subagent execution, persistent sessions, review gates, automatic retry, GAN-inspired harness patterns (sprint contracts, evaluator injection, quality rubrics), cross-session continuity, and protective guardrails. Covers setup, operation, diagnosis, and reporting."
 ---
 
 # OpenClaw Swarm Layer
@@ -12,7 +12,10 @@ Turn workflow specifications into executable task graphs. Dispatch tasks through
 - **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
 - **Multi-runner execution** — Manual (operator-driven), ACP (delegate to Codex/Claude Code/Gemini), Subagent (OpenClaw-native child agents)
 - **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
-- **Review gates** — Tasks require explicit approve/reject before marking done
+- **Review gates** — Tasks require explicit approve/reject; structured quality rubrics for weighted multi-dimension scoring
+- **Sprint contracts** — Negotiated verifiable acceptance criteria per task with automated evaluator injection (GAN-inspired pattern)
+- **Cross-session continuity** — Progress summary synthesis, bootstrap startup sequence, harness assumption tracking
+- **Protective guardrails** — Task field immutability guard, session budget control (duration + retries)
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking for exhausted tasks
 - **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
 
@@ -238,6 +241,37 @@ session cleanup --project . --stale-minutes 60              # Clean orphans
 | `reuse_if_available` | Reuse idle persistent session if match found |
 | `require_existing` | Fail if no matching session exists |
 
+### Harness Enhancement (GAN-Inspired Patterns)
+
+Enable advanced harness features for long-running agent orchestration:
+
+```json
+{
+  "enforceTaskImmutability": true,
+  "bootstrap": { "enabled": true },
+  "evaluator": { "enabled": true, "autoInjectAfter": ["coding"] }
+}
+```
+
+**Sprint Contracts** — Add `Acceptance Criteria` to your spec. `plan` auto-generates a `SprintContract` with verifiable criteria attached to coding tasks.
+
+**Evaluator Injection** — When `evaluator.enabled`, each coding task gets an auto-injected `-eval` task that validates the contract. Dependency chains adjust automatically:
+```
+coding-task → coding-task-eval → next-task
+```
+
+**Quality Rubrics** — Replace binary approve/reject with 4-dimension weighted scoring:
+- functionality (0.3) / correctness (0.3) / design (0.2) / craft (0.2)
+- Weighted total >= 6.0 → approve; < 6.0 → reject
+
+**Cross-Session Progress** — `progress.json` auto-updated after each `run` and `review`. Bootstrap sequence loads progress on startup: verify env → load progress → select task → verify baseline.
+
+**Task Immutability** — When `enforceTaskImmutability` is enabled, agents cannot mutate task definitions (title, deps, runner, etc.). Only `status`, `review.status`, and `contract.criteria[].passes` are mutable.
+
+**Session Budget** — Set `runner.budget.maxDurationSeconds` and `runner.budget.maxRetries` per task. Exceeded budgets annotate `[BUDGET EXCEEDED]` on run records.
+
+**Assumption Tracking** — `WorkflowState.assumptions` tracks model capability, environment, tooling, and workflow structure assumptions with validation lifecycle.
+
 ### Conversational Patterns
 | User Says | Do This |
 |-----------|---------|
@@ -245,6 +279,7 @@ session cleanup --project . --stale-minutes 60              # Clean orphans
 | "run the next task" | `status` → dry-run → `run` |
 | "what's happening?" | `status` → `session status` for running tasks |
 | "approve everything" | List review queue → approve each |
+| "enable harness mode" | Add evaluator + immutability + bootstrap config |
 | "something is stuck" | → [Diagnose](#diagnose) module |
 
 ---
