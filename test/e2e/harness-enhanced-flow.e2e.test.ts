@@ -39,7 +39,7 @@ describe("e2e: enhanced harness flow", () => {
 
     // Enhanced config: evaluator enabled, immutability enforced, bootstrap enabled
     const enhancedConfig = {
-      evaluator: { enabled: true, autoInjectAfter: ["coding"] as const },
+      evaluator: { enabled: true, autoInjectAfter: ["coding"] as string[] },
       enforceTaskImmutability: true,
       bootstrap: { enabled: true },
     };

@@ -34,6 +34,7 @@ function makePaths(base: string, obsidian?: string): SwarmPaths {
     obsidianReviewLogPath: obsProject ? path.join(obsProject, "review-log.md") : undefined,
     obsidianSpecsDir: obsProject ? path.join(obsProject, "specs") : undefined,
     obsidianCompletionPath: obsProject ? path.join(obsProject, "completion-summary.md") : undefined,
+    progressFilePath: path.join(base, "progress.json"),
   };
 }
 
