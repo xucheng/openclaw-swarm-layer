@@ -32,6 +32,15 @@ export type JournalConfig = {
 /** @deprecated Use JournalConfig */
 export type ObsidianJournalConfig = JournalConfig;
 
+export type SwarmEvaluatorConfig = {
+  enabled: boolean;
+  autoInjectAfter: string[];
+};
+
+export type SwarmBootstrapConfig = {
+  enabled: boolean;
+};
+
 export type SwarmPluginConfig = {
   stateRoot?: string;
   defaultProjectRoot?: string;
@@ -45,8 +54,11 @@ export type SwarmPluginConfig = {
   defaultRunner: RunnerType;
   maxParallelTasks: number;
   reviewRequiredByDefault: boolean;
+  enforceTaskImmutability: boolean;
+  evaluator: SwarmEvaluatorConfig;
   acp: SwarmAcpConfig;
   bridge: SwarmBridgeConfig;
+  bootstrap: SwarmBootstrapConfig;
 };
 
 export const defaultSwarmPluginConfig: SwarmPluginConfig = {
@@ -58,6 +70,11 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
   defaultRunner: "manual",
   maxParallelTasks: 1,
   reviewRequiredByDefault: true,
+  enforceTaskImmutability: false,
+  evaluator: {
+    enabled: false,
+    autoInjectAfter: ["coding"],
+  },
   journal: {
     enableRunLog: true,
     enableReviewLog: true,
@@ -78,6 +95,9 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
     openclawRoot: undefined,
     versionAllow: [],
   },
+  bootstrap: {
+    enabled: false,
+  },
 };
 
 const allowedConfigKeys = new Set([
@@ -93,8 +113,11 @@ const allowedConfigKeys = new Set([
   "maxParallelTasks",
   "reviewRequiredByDefault",
   "journal",
+  "enforceTaskImmutability",
+  "evaluator",
   "acp",
   "bridge",
+  "bootstrap",
 ]);
 
 export const swarmPluginConfigJsonSchema = {
@@ -112,6 +135,15 @@ export const swarmPluginConfigJsonSchema = {
     defaultRunner: { type: "string", enum: ["manual", "acp", "subagent"], default: "manual" },
     maxParallelTasks: { type: "integer", minimum: 1, default: 1 },
     reviewRequiredByDefault: { type: "boolean", default: true },
+    enforceTaskImmutability: { type: "boolean", default: false },
+    evaluator: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean", default: false },
+        autoInjectAfter: { type: "array", items: { type: "string" }, default: ["coding"] },
+      },
+    },
     acp: {
       type: "object",
       additionalProperties: false,
@@ -139,6 +171,13 @@ export const swarmPluginConfigJsonSchema = {
           default: [],
           description: 'Accepts exact versions or comparator rules such as ">=2026.3.22".',
         },
+      },
+    },
+    bootstrap: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean", default: false },
       },
     },
   },
@@ -171,7 +210,7 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
     if (input.obsidianRoot !== undefined && typeof input.obsidianRoot !== "string") {
       errors.push("obsidianRoot must be a string");
     }
-    for (const key of ["enableCli", "enableTools", "enableService", "enableChatCommand", "reviewRequiredByDefault"]) {
+    for (const key of ["enableCli", "enableTools", "enableService", "enableChatCommand", "reviewRequiredByDefault", "enforceTaskImmutability"]) {
       if (input[key] !== undefined && typeof input[key] !== "boolean") {
         errors.push(`${key} must be a boolean`);
       }
@@ -189,6 +228,28 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
     }
     if (input.maxParallelTasks !== undefined && (!Number.isInteger(input.maxParallelTasks) || Number(input.maxParallelTasks) < 1)) {
       errors.push("maxParallelTasks must be an integer >= 1");
+    }
+    if (input.evaluator !== undefined) {
+      if (!input.evaluator || typeof input.evaluator !== "object" || Array.isArray(input.evaluator)) {
+        errors.push("evaluator must be an object");
+      } else {
+        const evaluator = input.evaluator as Record<string, unknown>;
+        const allowedEvaluatorKeys = new Set(["enabled", "autoInjectAfter"]);
+        for (const key of Object.keys(evaluator)) {
+          if (!allowedEvaluatorKeys.has(key)) {
+            errors.push(`Unrecognized key: "evaluator.${key}"`);
+          }
+        }
+        if (evaluator.enabled !== undefined && typeof evaluator.enabled !== "boolean") {
+          errors.push("evaluator.enabled must be a boolean");
+        }
+        if (
+          evaluator.autoInjectAfter !== undefined &&
+          (!Array.isArray(evaluator.autoInjectAfter) || evaluator.autoInjectAfter.some((v) => typeof v !== "string"))
+        ) {
+          errors.push("evaluator.autoInjectAfter must be an array of strings");
+        }
+      }
     }
     if (input.acp !== undefined) {
       if (!input.acp || typeof input.acp !== "object" || Array.isArray(input.acp)) {
@@ -274,6 +335,23 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
       }
     }
 
+    if (input.bootstrap !== undefined) {
+      if (!input.bootstrap || typeof input.bootstrap !== "object" || Array.isArray(input.bootstrap)) {
+        errors.push("bootstrap must be an object");
+      } else {
+        const bootstrap = input.bootstrap as Record<string, unknown>;
+        const allowedBootstrapKeys = new Set(["enabled"]);
+        for (const key of Object.keys(bootstrap)) {
+          if (!allowedBootstrapKeys.has(key)) {
+            errors.push(`Unrecognized key: "bootstrap.${key}"`);
+          }
+        }
+        if (bootstrap.enabled !== undefined && typeof bootstrap.enabled !== "boolean") {
+          errors.push("bootstrap.enabled must be a boolean");
+        }
+      }
+    }
+
     if (errors.length > 0) {
       return { ok: false, errors };
     }
@@ -307,6 +385,22 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
       typeof input.reviewRequiredByDefault === "boolean"
         ? input.reviewRequiredByDefault
         : defaultSwarmPluginConfig.reviewRequiredByDefault,
+    enforceTaskImmutability:
+      typeof input.enforceTaskImmutability === "boolean"
+        ? input.enforceTaskImmutability
+        : defaultSwarmPluginConfig.enforceTaskImmutability,
+    evaluator: {
+      enabled:
+        Boolean(input.evaluator) && typeof (input.evaluator as Record<string, unknown>).enabled === "boolean"
+          ? ((input.evaluator as Record<string, unknown>).enabled as boolean)
+          : defaultSwarmPluginConfig.evaluator.enabled,
+      autoInjectAfter:
+        Boolean(input.evaluator) && Array.isArray((input.evaluator as Record<string, unknown>).autoInjectAfter)
+          ? ((input.evaluator as Record<string, unknown>).autoInjectAfter as unknown[]).filter(
+              (value): value is string => typeof value === "string",
+            )
+          : defaultSwarmPluginConfig.evaluator.autoInjectAfter,
+    },
     journal: {
       enableRunLog:
         Boolean(input.journal) && typeof (input.journal as Record<string, unknown>).enableRunLog === "boolean"
@@ -381,6 +475,12 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
               (value): value is string => typeof value === "string",
             )
           : defaultSwarmPluginConfig.bridge.versionAllow,
+    },
+    bootstrap: {
+      enabled:
+        Boolean(input.bootstrap) && typeof (input.bootstrap as Record<string, unknown>).enabled === "boolean"
+          ? ((input.bootstrap as Record<string, unknown>).enabled as boolean)
+          : defaultSwarmPluginConfig.bootstrap.enabled,
     },
   };
 }

@@ -87,6 +87,27 @@ openclaw plugins info openclaw-swarm-layer
 }
 ```
 
+### 增强 Harness 配置
+
+```json
+{
+  "enforceTaskImmutability": true,
+  "bootstrap": {
+    "enabled": true
+  },
+  "evaluator": {
+    "enabled": true,
+    "autoInjectAfter": ["coding"]
+  }
+}
+```
+
+| 功能 | 配置项 | 说明 |
+|------|--------|------|
+| 任务不可变保护 | `enforceTaskImmutability` | 防止 agent 篡改任务定义（标题、依赖等）|
+| 启动引导序列 | `bootstrap.enabled` | 每次执行前验证环境、加载进度、选择任务 |
+| 评估器注入 | `evaluator.enabled` | 在 coding 任务后自动插入评估任务（GAN 模式）|
+
 完整配置参考：[configuration.md](configuration.md)
 
 ---
@@ -206,6 +227,54 @@ cat .openclaw/swarm/reports/swarm-report.md
 | `create_persistent` | 创建持久 session，后续任务可复用 |
 | `reuse_if_available` | 优先复用匹配的空闲 session |
 | `require_existing` | 必须有匹配的 session，否则报错 |
+
+---
+
+## 5.1 增强 Harness 功能
+
+### Sprint 合约
+
+在 Spec 中定义 `Acceptance Criteria` 后，`swarm plan` 会自动生成 Sprint 合约并附加到首个 coding 任务：
+
+```markdown
+## Acceptance Criteria
+- 所有单测通过
+- API 响应时间 < 200ms
+```
+
+合约包含可验证的验收条件（`test_passes`、`file_exists`、`content_matches`、`command_exits_zero`、`manual_check`）。
+
+### 评估器任务
+
+启用 `evaluator.enabled` 后，每个 coding 任务后会自动插入一个 evaluate 任务，继承源任务的 Sprint 合约。依赖链自动调整：
+
+```
+coding-task-1 → coding-task-1-eval → coding-task-2 → coding-task-2-eval
+```
+
+### 质量评分
+
+支持加权多维度质量评分替代简单的 approve/reject：
+
+- **functionality** (0.3) — 核心功能是否正确
+- **correctness** (0.3) — 逻辑是否健全
+- **design** (0.2) — 架构是否清晰
+- **craft** (0.2) — 代码质量与一致性
+
+加权总分 >= 6.0 自动 approve，否则 reject。
+
+### 跨 Session 进度
+
+每次 `swarm run` 和 `swarm review` 后自动更新 `progress.json`，新 session 启动时可通过 bootstrap 序列加载历史进度。
+
+### Session 预算
+
+可为任务设置执行预算：
+
+- `maxDurationSeconds` — 最大执行时长
+- `maxRetries` — 最大重试次数
+
+超出预算时在 run record 中标注 `[BUDGET EXCEEDED]`。
 
 ---
 

@@ -114,6 +114,21 @@ Current status: complete (2026-03-22)
 
 Current status: complete (2026-03-22)
 
+## M4 DoD
+
+- cross-session progress summary synthesized after run and review
+- session bootstrap verifies environment, loads progress, selects task, verifies baseline
+- sprint contracts generated from spec acceptance criteria and attached to coding tasks
+- task field immutability enforced on workflow save (when enabled)
+- evaluator tasks auto-injected after coding tasks with dependency chain preserved
+- quality rubrics score across weighted dimensions and integrate with review gate
+- session budget tracks duration and retries with exceeded annotation
+- harness assumption metadata stored and validated on workflow state
+- all features opt-in, backward compatible with existing M1-M3 flows
+- e2e regression covers full enhanced flow and backward compatibility
+
+Current status: complete (2026-03-25)
+
 ## M3 Overall DoD
 
 - persistent session reuse works (M3.1)
@@ -159,3 +174,9 @@ Current status: complete (2026-03-22)
 - complete (2026-03-22)
 - all M3 DoD criteria met
 - 187 unit tests across 40 files, 22 e2e tests across 16 files
+
+### M4
+
+- complete (2026-03-25)
+- 8 harness features + 1 bridge fix + e2e regression
+- 283 unit tests across 51 files, 24 e2e tests across 17 files

@@ -14,9 +14,16 @@ Must cover:
 - state-store behavior
 - planner and task graph
 - runner selection and runner behavior
-- review gate
+- review gate (including quality rubric scoring)
 - report generation
 - ACP mapping and status mapping once `M2` work starts
+- sprint contract lifecycle (create, freeze, update, evaluate)
+- task field immutability guard
+- evaluator task injection and dependency chain
+- session budget tracking
+- harness assumption metadata
+- cross-session progress synthesis
+- session bootstrap sequence
 
 ## E2E Coverage
 
@@ -25,6 +32,8 @@ Current baseline:
 - `init -> plan -> status`
 - `run -> review -> report`
 - ACP dry-run scaffold
+- harness enhanced flow: plan with contract → evaluator injection → run → rubric review → progress → bootstrap → immutability
+- backward compatibility: existing flow works with no enhanced features enabled
 
 Required after `M2.0`:
 

@@ -1,4 +1,5 @@
-import type { RunRecord, TaskNode, WorkflowState } from "../types.js";
+import type { QualityRubric, RubricResult, RubricScore, RunRecord, TaskNode, WorkflowState } from "../types.js";
+import { rubricToDecision, scoreRubric } from "./quality-rubric.js";
 
 export type ReviewDecision = "approve" | "reject";
 
@@ -143,5 +144,37 @@ export function applyReviewDecision(
   return {
     workflow: nextWorkflow,
     task: updatedTask,
+  };
+}
+
+export function applyRubricResult(
+  workflow: WorkflowState,
+  taskId: string,
+  rubric: QualityRubric,
+  scores: RubricScore[],
+): ReviewResult & { rubricResult: RubricResult } {
+  const task = workflow.tasks.find((entry) => entry.taskId === taskId);
+  if (!task) {
+    throw new Error(`Unknown taskId: ${taskId}`);
+  }
+
+  const rubricResult = scoreRubric(rubric, scores);
+  const decision = rubricToDecision(rubricResult);
+
+  // Update task with rubric result before applying decision
+  const taskWithRubric: WorkflowState = {
+    ...workflow,
+    tasks: workflow.tasks.map((entry) =>
+      entry.taskId === taskId
+        ? { ...entry, review: { ...entry.review, rubric, rubricResult } }
+        : entry,
+    ),
+  };
+
+  const result = applyReviewDecision(taskWithRubric, taskId, decision);
+
+  return {
+    ...result,
+    rubricResult,
   };
 }

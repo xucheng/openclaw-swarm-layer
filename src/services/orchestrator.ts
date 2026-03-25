@@ -12,7 +12,9 @@ import { buildSessionRecordFromRun } from "../session/session-lifecycle.js";
 import { selectReusableSessionForTask } from "../session/session-selector.js";
 import { SessionStore } from "../session/session-store.js";
 import { StateStore } from "../state/state-store.js";
-import type { RunRecord, SessionRecord, TaskNode, WorkflowState } from "../types.js";
+import { runBootstrap } from "../session/session-bootstrap.js";
+import { buildBudgetUsageFromRun, checkBudgetExceeded } from "../session/session-budget.js";
+import type { BootstrapResult, RunRecord, SessionRecord, TaskNode, WorkflowState } from "../types.js";
 
 export type RunOnceInput = {
   projectRoot: string;
@@ -28,6 +30,7 @@ export type RunOnceResult = {
   runIds?: string[];
   reusedSessionId?: string;
   message?: string;
+  bootstrap?: BootstrapResult;
 };
 
 type OrchestratorDeps = {
@@ -55,6 +58,19 @@ export class SwarmOrchestrator {
   ) {}
 
   async runOnce(input: RunOnceInput): Promise<RunOnceResult> {
+    // Bootstrap sequence (when enabled)
+    if (this.stateStore.config.bootstrap.enabled) {
+      const bootstrapResult = await runBootstrap(input.projectRoot, this.stateStore);
+      if (!bootstrapResult.ok) {
+        return {
+          ok: false,
+          action: "noop",
+          message: `Bootstrap failed: ${bootstrapResult.checks.filter((c) => !c.ok).map((c) => c.message).join("; ")}`,
+          bootstrap: bootstrapResult,
+        };
+      }
+    }
+
     const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
     const runnableTasks = getRunnableTasks(workflow.tasks);
     const task = pickTask(runnableTasks, input.taskId);
@@ -127,8 +143,23 @@ export class SwarmOrchestrator {
       reusedSession,
     });
 
-    await this.stateStore.writeRun(workflow.projectRoot, result.runRecord);
-    const sessionRecord = buildSessionRecordFromRun(workflow, result.runRecord, effectiveTask);
+    // --- Budget tracking ---
+    const runRecordWithBudget = { ...result.runRecord };
+    if (effectiveTask.runner.budget) {
+      const budgetUsage = buildBudgetUsageFromRun(result.runRecord, result.runRecord.budgetUsage);
+      const budgetCheck = checkBudgetExceeded(effectiveTask.runner.budget, budgetUsage);
+      runRecordWithBudget.budgetUsage = {
+        ...budgetUsage,
+        exceeded: budgetCheck.exceeded,
+        exceededReason: budgetCheck.reason,
+      };
+      if (budgetCheck.exceeded) {
+        runRecordWithBudget.resultSummary = `${runRecordWithBudget.resultSummary ?? ""} [BUDGET EXCEEDED: ${budgetCheck.reason}]`.trim();
+      }
+    }
+
+    await this.stateStore.writeRun(workflow.projectRoot, runRecordWithBudget);
+    const sessionRecord = buildSessionRecordFromRun(workflow, runRecordWithBudget, effectiveTask);
     if (sessionRecord) {
       const existingSession = await this.sessionStore.loadSession(workflow.projectRoot, sessionRecord.sessionId);
       await this.sessionStore.writeSession(

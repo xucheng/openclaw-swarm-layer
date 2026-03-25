@@ -1,6 +1,8 @@
 import type { SwarmPluginConfig } from "../config.js";
 import { defaultSwarmPluginConfig } from "../config.js";
 import type { SpecDoc, TaskNode } from "../types.js";
+import { injectEvaluatorTasks } from "./evaluator-injection.js";
+import { contractFromSpecCriteria } from "./sprint-contract.js";
 import { upsertTaskStatuses, validateTaskGraph } from "./task-graph.js";
 
 function taskIdForPhase(phaseId: string, index: number): string {
@@ -37,9 +39,22 @@ export function planTasksFromSpec(spec: SpecDoc, config?: Partial<SwarmPluginCon
     });
   }
 
-  const validation = validateTaskGraph(tasks);
+  // Attach sprint contracts from spec acceptance criteria
+  if (spec.acceptanceCriteria.length > 0 && tasks.length > 0) {
+    const firstCodingTask = tasks.find((t) => t.kind === "coding");
+    if (firstCodingTask) {
+      firstCodingTask.contract = contractFromSpecCriteria(firstCodingTask.taskId, spec.acceptanceCriteria);
+    }
+  }
+
+  // Inject evaluator tasks after coding tasks (when enabled)
+  const finalTasks = resolvedConfig.evaluator.enabled
+    ? injectEvaluatorTasks(tasks, resolvedConfig)
+    : tasks;
+
+  const validation = validateTaskGraph(finalTasks);
   if (!validation.ok) {
     throw new Error(`Invalid task graph: ${validation.errors.join("; ")}`);
   }
-  return upsertTaskStatuses(tasks);
+  return upsertTaskStatuses(finalTasks);
 }

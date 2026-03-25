@@ -44,6 +44,31 @@ Controls the bridge-backed execution path for ACP and subagent runners.
 | `openclawRoot` | string | - | Path to OpenClaw installation root. Use `$(npm root -g)/openclaw` |
 | `versionAllow` | string[] | `[]` | Allowed OpenClaw versions for bridge compatibility |
 
+## Harness Enhancement Options
+
+Controls features inspired by long-running agent harness patterns.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enforceTaskImmutability` | boolean | `false` | When enabled, `saveWorkflow()` validates that immutable task fields (taskId, specId, title, description, kind, deps, workspace, runner) have not been modified between saves. Mutable fields: status, review.status, session, contract.criteria[].passes, contract.frozen |
+
+## Bootstrap Configuration (`bootstrap`)
+
+Controls the session startup bootstrap sequence.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable deterministic 4-step bootstrap: verify environment → load progress → select task → verify baseline. When enabled, `runOnce()` calls `runBootstrap()` at startup and short-circuits on failure |
+
+## Evaluator Configuration (`evaluator`)
+
+Controls automated evaluator task injection (GAN-inspired pattern).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable automatic evaluator task injection after matching task kinds |
+| `autoInjectAfter` | string[] | `["coding"]` | Task kinds that trigger evaluator injection. Each matching task gets a `<taskId>-eval` evaluator task inserted after it with correct dependency chain |
+
 ## Journal Configuration (`journal`)
 
 Controls document journaling. **All journals are enabled by default** and always write to the local project directory. When `obsidianRoot` is configured, journals are additionally async-mirrored to Obsidian.
@@ -58,6 +83,17 @@ Controls document journaling. **All journals are enabled by default** and always
 ### Document Directory Structure
 
 When journaling is enabled, the following files are generated:
+
+**State** (under `<project>/.openclaw/swarm/`):
+
+```
+<project>/.openclaw/swarm/
+├── workflow-state.json          # Task graph, lifecycle, assumptions
+├── progress.json                # Cross-session progress summary (auto-updated)
+├── runs/                        # Run records with budgetUsage
+├── sessions/                    # Session records
+└── specs/                       # Spec documents
+```
 
 **Local** (always, under `<project>/.openclaw/swarm/reports/`):
 
@@ -135,6 +171,14 @@ This enables CLI and tools with manual runner only.
             "defaultMode": "run",
             "allowThreadBinding": true,
             "defaultTimeoutSeconds": 600
+          },
+          "enforceTaskImmutability": true,
+          "bootstrap": {
+            "enabled": true
+          },
+          "evaluator": {
+            "enabled": true,
+            "autoInjectAfter": ["coding"]
           },
           "journal": {
             "enableRunLog": true,

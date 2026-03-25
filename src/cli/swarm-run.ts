@@ -2,6 +2,7 @@ import { resolveSwarmPaths } from "../lib/paths.js";
 import { journalRunEntry } from "../reporting/obsidian-journal.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { createOrchestrator } from "../services/orchestrator.js";
+import { synthesizeProgress } from "../session/progress-summary.js";
 import { SessionStore } from "../session/session-store.js";
 import { resolveSessionAdapter, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
 
@@ -24,17 +25,22 @@ export async function runSwarmRun(
 
   if (!options.dryRun) {
     const workflow = await stateStore.loadWorkflow(options.project);
+    const runs = await stateStore.loadRuns(options.project);
     const report = await writeWorkflowReport(options.project, workflow, reportConfig);
 
     // Obsidian journal: run log
     if (result.runIds?.[0]) {
-      const runs = await stateStore.loadRuns(options.project);
       const runRecord = runs.find((r) => r.runId === result.runIds?.[0]);
       if (runRecord) {
         const paths = resolveSwarmPaths(options.project, reportConfig);
         await journalRunEntry(paths, stateStore.config.journal, runRecord);
       }
     }
+
+    // Update progress summary
+    const existingProgress = await stateStore.loadProgress(options.project);
+    const progress = synthesizeProgress(workflow, runs, existingProgress ?? undefined);
+    await stateStore.saveProgress(options.project, progress);
 
     return {
       ...result,
