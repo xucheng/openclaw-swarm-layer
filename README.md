@@ -45,6 +45,8 @@ Turn workflow specifications into executable task graphs, dispatch through plugg
 - Node.js >= 22
 - [OpenClaw](https://openclaw.dev) >= 2026.2.24
 
+Tested against OpenClaw `2026.3.24`.
+
 ## Installation
 
 ```bash

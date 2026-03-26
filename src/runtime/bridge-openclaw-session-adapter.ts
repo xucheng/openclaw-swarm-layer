@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { PluginRuntime } from "openclaw/plugin-sdk";
@@ -50,6 +51,16 @@ export function resolveBridgeScriptPath() {
 }
 
 export function resolveTsxLoaderPath() {
+  const require = createRequire(import.meta.url);
+  try {
+    const resolved = require.resolve("tsx");
+    if (existsSync(resolved)) {
+      return resolved;
+    }
+  } catch {
+    // Fall back to direct node_modules probing for path-linked plugin installs.
+  }
+
   const currentFile = fileURLToPath(import.meta.url);
   let cursor = path.dirname(currentFile);
   while (true) {

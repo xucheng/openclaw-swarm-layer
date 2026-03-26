@@ -1,4 +1,5 @@
-import type { OpenClawPluginApi, OpenClawPluginService } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginService } from "openclaw/plugin-sdk/core";
 import { getRunnableTasks } from "../planning/task-graph.js";
 import { enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";

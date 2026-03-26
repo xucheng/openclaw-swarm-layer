@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 (2026-03-26)
+
+Bridge compatibility and release hygiene update for OpenClaw `2026.3.24`.
+
+- Added bridge compatibility mappings for OpenClaw `2026.3.24`, including the renamed `loadConfig` export and current bundle aliases
+- Aligned ACP runtime integration with the current public SDK surface (`openclaw/plugin-sdk/core`)
+- Resolved `tsx` loader discovery for path-linked plugin installs so rebuilds stay reproducible from source
+- Updated live/unit diagnostics to reflect the current ACP public export availability in `2026.3.24`
+- Refreshed package metadata and lockfile so source dependencies are complete before npm publishing
+
 ## 0.2.0 (2026-03-25)
 
 ### M4 — Harness Enhancement (GAN-inspired patterns for long-running agents)

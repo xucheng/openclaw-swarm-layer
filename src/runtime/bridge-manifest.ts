@@ -147,6 +147,28 @@ export const INTERNAL_MODULES_BY_VERSION: Record<string, InternalModuleSpec> = {
       },
     },
   },
+  "2026.3.24": {
+    exports: {
+      loadConfig: {
+        relativeModulePath: "dist/io-Ddcnnsbo.js",
+        exportAlias: "loadConfig",
+      },
+      getAcpSessionManager: {
+        relativeModulePath: "dist/manager-BFi-xqLj.js",
+        exportAlias: "t",
+      },
+    },
+    subagentPatch: {
+      relativeModulePath: "dist/pi-embedded-BaSvmUpW.js",
+      patchedModulePath: "dist/pi-embedded-BaSvmUpW.swarm-bridge.mjs",
+      patchedSubagentExports: {
+        spawn: "__bridgeSpawnSubagentDirect",
+        findLatestRun: "__bridgeFindLatestSubagentRunByChildSession",
+        killByChildSession: "__bridgeKillSubagentRunByChildSession",
+        isRunActive: "__bridgeIsSubagentSessionRunActive",
+      },
+    },
+  },
 };
 
 export const BRIDGE_COMPATIBILITY_BY_VERSION: Record<string, BridgeCompatibility> = {
@@ -220,9 +242,23 @@ export const BRIDGE_COMPATIBILITY_BY_VERSION: Record<string, BridgeCompatibility
       subagentSpawnExport: "spawnSubagentDirect",
     },
   },
+  "2026.3.24": {
+    version: "2026.3.24",
+    strategy: "internal-bundle",
+    testedAt: "2026-03-26",
+    supportedRunners: ["acp", "subagent"],
+    notes: [
+      "ACP bridge bindings still span the io + manager bundles in the 2026.3.24 line, but loadConfig is now a named io export.",
+      "Subagent bridge patching still targets the pi-embedded bundle in the 2026.3.24 line.",
+    ],
+    replacementCandidates: {
+      acpControlPlaneExport: "getAcpSessionManager",
+      subagentSpawnExport: "spawnSubagentDirect",
+    },
+  },
 };
 
-const POST_2026_3_22_FAMILY_VERSIONS = ["2026.3.23", "2026.3.22"] as const;
+const POST_2026_3_22_FAMILY_VERSIONS = ["2026.3.24", "2026.3.23", "2026.3.22"] as const;
 
 function dedupeSpecs(specs: InternalModuleSpec[]): InternalModuleSpec[] {
   const seen = new Set<string>();
@@ -267,7 +303,7 @@ export function resolveBridgeCompatibility(version: string): BridgeCompatibility
   }
   const compared = compareOpenClawVersions(normalizedVersion, "2026.3.22");
   if (compared !== null && compared >= 0) {
-    return BRIDGE_COMPATIBILITY_BY_VERSION["2026.3.23"];
+    return BRIDGE_COMPATIBILITY_BY_VERSION["2026.3.24"];
   }
   return null;
 }

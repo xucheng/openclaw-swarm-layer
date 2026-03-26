@@ -6,7 +6,7 @@ describe("bridge manifest", () => {
     expect(resolveInternalModuleSpec("2026.3.22")).toEqual(INTERNAL_MODULES_BY_VERSION["2026.3.22"]);
     expect(resolveInternalModuleSpec("2026.3.23-1")).toEqual(INTERNAL_MODULES_BY_VERSION["2026.3.23-1"]);
     expect(resolveInternalModuleSpec("2026.3.23-hotfix")).toEqual(INTERNAL_MODULES_BY_VERSION["2026.3.23"]);
-    expect(resolveInternalModuleSpec("2026.3.24")).toEqual(INTERNAL_MODULES_BY_VERSION["2026.3.23"]);
+    expect(resolveInternalModuleSpec("2026.3.24")).toEqual(INTERNAL_MODULES_BY_VERSION["2026.3.24"]);
   });
 
   it("exposes compatibility metadata for tested versions", () => {
