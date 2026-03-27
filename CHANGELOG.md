@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 (2026-03-27)
+
+Doctor and packaging consistency patch for OpenClaw `2026.3.24`.
+
+- Fixed `openclaw swarm doctor --json` so npm-installed extensions detect the host ACP public SDK exports instead of reporting a false `blocked` status
+- Aligned doctor-side ACP export probing with the real runtime ACP loader used by the published plugin
+- Added regression coverage for host-root SDK detection when bare `openclaw/...` package imports are unavailable in the plugin install context
+
 ## 0.3.0 (2026-03-27)
 
 ACP convergence release for OpenClaw `2026.3.24`.
