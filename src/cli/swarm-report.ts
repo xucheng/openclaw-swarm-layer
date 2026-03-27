@@ -8,7 +8,7 @@ export async function runSwarmReport(
   const stateStore = resolveStateStore(context);
   const reportConfig = context?.config ?? stateStore.config;
   const workflow = await stateStore.loadWorkflow(options.project);
-  const written = await writeWorkflowReport(options.project, workflow, reportConfig);
+  const written = await writeWorkflowReport(options.project, workflow, reportConfig, stateStore);
 
   return {
     ok: true,

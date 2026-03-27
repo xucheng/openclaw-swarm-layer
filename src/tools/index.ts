@@ -19,7 +19,7 @@ function jsonResult(payload: unknown) {
 
 export function registerSwarmTools(api: OpenClawPluginApi): void {
   const config = resolvePluginConfigFromApi(api);
-  const stateStore = new StateStore(config);
+  const stateStore = new StateStore(config, { runtimeVersion: api.runtime?.version });
   const toolContext = { config, stateStore, runtime: api.runtime };
 
   api.registerTool(

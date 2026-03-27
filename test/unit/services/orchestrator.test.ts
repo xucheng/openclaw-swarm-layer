@@ -421,4 +421,63 @@ describe("SwarmOrchestrator", () => {
     expect(result.ok).toBe(true);
     expect(result.action).toBe("dispatched");
   });
+
+  it("rejects subagent dispatch when subagent is disabled", async () => {
+    const { projectRoot, stateStore } = await setupProject();
+    const orchestrator = createOrchestrator({ stateStore });
+
+    const result = await orchestrator.runOnce({ projectRoot, runnerOverride: "subagent" });
+    const runs = await stateStore.loadRuns(projectRoot);
+
+    expect(result.ok).toBe(false);
+    expect(result.action).toBe("noop");
+    expect(result.selectedRunner).toBe("subagent");
+    expect(result.message).toContain("subagent runner is disabled by config");
+    expect(runs).toEqual([]);
+  });
+
+  it("surfaces ACP as the selected runner when workflow default resolves from auto", async () => {
+    const projectRoot = await makeTempProject();
+    const stateStore = new StateStore({
+      acp: {
+        enabled: true,
+        defaultAgentId: "codex",
+        allowedAgents: ["codex"],
+        defaultMode: "run",
+        allowThreadBinding: false,
+        defaultTimeoutSeconds: 600,
+        experimentalControlPlaneAdapter: false,
+      },
+    }, { runtimeVersion: "2026.3.24" });
+    const spec = makeSpec(projectRoot);
+    const tasks = planTasksFromSpec(spec, stateStore.config, { runtimeVersion: stateStore.runtimeVersion });
+
+    await stateStore.initProject(projectRoot);
+    await stateStore.saveWorkflow(projectRoot, {
+      version: 1,
+      projectRoot,
+      activeSpecId: spec.specId,
+      lifecycle: "planned",
+      tasks,
+      reviewQueue: [],
+      runtime: {
+        defaultRunner: "acp",
+        allowedRunners: ["manual", "acp"],
+      },
+    });
+
+    const orchestrator = createOrchestrator({
+      stateStore,
+      runnerRegistry: new RunnerRegistry([makeAcpRunner()]),
+    });
+
+    const result = await orchestrator.runOnce({ projectRoot, dryRun: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.action).toBe("planned");
+    expect(result.selectedRunner).toBe("acp");
+    expect(result.runtime?.configuredDefaultRunner).toBe("auto");
+    expect(result.runtime?.resolvedDefaultRunner).toBe("acp");
+    expect(result.message).toContain("acp runner is scaffolded");
+  });
 });

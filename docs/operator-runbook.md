@@ -1,5 +1,13 @@
 # Operator Runbook
 
+## Runtime Posture
+
+- ACP public control-plane is the normal execution path on supported OpenClaw versions.
+- `defaultRunner: "auto"` resolves to `acp` only when ACP automation is available on the current install.
+- If ACP automation is unavailable, `auto` falls back to `manual`.
+- Bridge is compatibility fallback only.
+- `subagent` is experimental and disabled by default.
+
 ## Install
 
 ```bash
@@ -13,29 +21,95 @@ Ensure config includes:
 - `plugins.entries.openclaw-swarm-layer.enabled = true`
 - optional `plugins.entries.openclaw-swarm-layer.config.obsidianRoot`
 
+## ACP Bridge Exit Gate
+
+The bridge-exit gate fixes the bridge-free ACP floor at OpenClaw `>=2026.3.22`.
+
+Use these operator surfaces:
+
+- `openclaw swarm doctor --json`
+- `openclaw swarm status --project <path> --json`
+- `openclaw swarm report --project <path> --json`
+
+Read them as follows:
+
+- `acpBridgeExitGate.minimumVersion`: supported bridge-free ACP floor
+- `acpBridgeExitGate.versionSatisfied`: whether the current install meets that floor
+- `acpBridgeExitGate.publicControlPlaneExportReady`: whether doctor has confirmed the public ACP export on this install
+- `acpBridgeExitGate.readyForBridgeRemoval`: whether version floor and export readiness are both satisfied
+- `remainingBridgeDependencies`: ACP bridge blockers that still need deletion before `M5.4b`
+
 ## Basic Smoke
 
 ```bash
-openclaw plugins info openclaw-swarm-layer
-openclaw swarm --help
+openclaw swarm doctor --json
 openclaw swarm init --project <path>
-openclaw swarm plan --project <path> --spec <spec>
-openclaw swarm status --project <path>
+openclaw swarm plan --project <path> --spec <spec> --json
+openclaw swarm status --project <path> --json
+openclaw swarm run --project <path> --dry-run --json
 ```
 
-## ACP Preflight For M2
+Expect:
 
-Check:
+- doctor reports the bridge-exit gate and remaining blockers
+- plan creates workflow state and a local report
+- status shows configured default, resolved default, and gate notes
+- dry-run selects ACP when ACP is actually available on the install
 
-- `acp.enabled = true`
-- `acp.dispatch.enabled = true`
-- backend is present
-- default or allowed ACP agents are configured
-- chosen harness can pass a smoke run
+## Full Live Smoke Matrix
 
-## Bridge Mode
+Run these before claiming bridge-free ACP readiness:
 
-Use bridge mode when plugin public SDK exports are insufficient for real execution.
+1. `~/.openclaw/scripts/openclaw-acp-post-upgrade-smoke.sh`
+2. `openclaw swarm doctor --json`
+3. `openclaw swarm init --project <path>`
+4. `openclaw swarm plan --project <path> --spec <spec> --json`
+5. `openclaw swarm status --project <path> --json`
+6. `openclaw swarm run --project <path> --dry-run --json`
+7. `openclaw swarm run --project <path> --json`
+8. `openclaw swarm session status --project <path> --run <runId> --json`
+9. `openclaw swarm session cancel --project <path> --run <runId> --json`
+10. `openclaw swarm session close --project <path> --run <runId> --json`
+11. `openclaw swarm review --project <path> --task <taskId> --approve --json`
+12. `openclaw swarm report --project <path> --json`
+
+## Artifact Expectations
+
+Local artifacts:
+
+- `<project>/.openclaw/swarm/workflow-state.json`
+- `<project>/.openclaw/swarm/reports/swarm-report.md`
+- `<project>/.openclaw/swarm/reports/specs/<specId>.md`
+- `<project>/.openclaw/swarm/reports/run-log.md` after run
+
+Obsidian mirror when enabled:
+
+- top-level report file: `<obsidianRoot>/<project>-swarm-report.md`
+- project journal directory: `<obsidianRoot>/<project>/`
+
+Full Obsidian journal shape:
+
+```text
+<obsidianRoot>/
+├── <project>-swarm-report.md
+└── <project>/
+    ├── run-log.md
+    ├── review-log.md
+    ├── completion-summary.md
+    └── specs/
+        └── <specId>.md
+```
+
+Stage-dependent partial output is expected:
+
+- `plan` writes the spec archive
+- `run` writes `run-log.md`
+- `review` writes `review-log.md`
+- full completion writes `completion-summary.md`
+
+## ACP Compatibility Fallback
+
+Use bridge only when public ACP is unavailable or incomplete and you deliberately want compatibility fallback.
 
 Recommended config:
 
@@ -45,11 +119,17 @@ Recommended config:
     "entries": {
       "openclaw-swarm-layer": {
         "config": {
-          "bridge": {
+          "acp": {
             "enabled": true,
+            "defaultAgentId": "codex",
+            "allowedAgents": ["codex"],
+            "defaultMode": "run"
+          },
+          "bridge": {
+            "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.3.13"]
+            "versionAllow": [">=2026.3.22"]
           }
         }
       }
@@ -58,106 +138,53 @@ Recommended config:
 }
 ```
 
-Run doctor:
+Operator rules:
+
+- keep bridge fallback explicit and narrow
+- keep `versionAllow` tight to tested builds
+- prefer returning to public ACP once doctor reports it ready
+
+## Subagent Experimental Smoke
+
+Use this only when you explicitly opt in to `subagent`.
 
 ```bash
 openclaw swarm doctor --json
+openclaw swarm run --project <path> --runner subagent --dry-run --json
+openclaw swarm run --project <path> --runner subagent --json
 ```
 
-Interpretation:
-
-- `checks.*=true` means the bridge is compatible with the currently installed OpenClaw build
-- `blockers` means execution should be treated as unavailable until fixed
-- `remediation` lists the first actions to take before retrying runs
-- `severity=healthy|warning|blocked` shows whether bridge mode is ready, risky, or unusable
-- `nextAction` is the first recommended operator step
-- `publicApi` shows whether top-level public spawn/control exports are available yet
-- `replacementPlan` shows which bridge paths could be replaced first if public exports appear
-- `migrationChecklist` gives the staged order for replacing bridge-backed paths when a public export becomes ready
-
-## Migration Checklist
-
-Use the doctor output together with `docs/migration-checklist.md`.
-
-Operator rule:
-
-- do not replace bridge internals just because a public export appears in one release
-- first confirm `replacementPlan[*].status = ready`
-- then follow the staged replacement order from the migration checklist
+Do not treat subagent as the normal default path.
 
 ## Upgrade Checklist
 
 Before upgrading OpenClaw:
 
-1. Check current bridge config and note `bridge.versionAllow`
-2. Upgrade OpenClaw in a non-critical session first
-3. Run:
-
-```bash
-openclaw swarm doctor --json
-```
-
-4. If doctor reports version drift:
+1. Check whether bridge fallback is enabled for ACP or subagent.
+2. If bridge fallback is enabled, note `bridge.versionAllow`.
+3. Upgrade OpenClaw in a non-critical session first.
+4. Run `openclaw swarm doctor --json`.
+5. If doctor reports public ACP ready and no compatibility blockers:
+   - keep ACP on the public path
+   - remove unnecessary bridge fallback only after the smoke matrix is green
+6. If doctor reports version drift or missing exports:
    - update bridge mappings in the plugin repo
    - update `bridge.versionAllow`
-   - rerun unit/e2e bridge regressions
-5. Only then re-enable normal operator use
-
-If the upgrade breaks bridge mode unexpectedly:
-
-- keep manual runner available
-- disable bridge-backed execution paths temporarily
-- prefer rollback to a tested OpenClaw version over ad-hoc internal patching in production use
-
-## Compatibility Policy
-
-- keep `bridge.versionAllow` narrow
-- treat every new OpenClaw version as incompatible until explicitly smoke-tested
-- record tested versions in repo docs and operator notes
+   - rerun unit, e2e, and smoke verification
 
 ## Failure Remediation Quick Guide
 
-- `backend-unavailable`
-  - verify `acpx` is enabled
-  - run `openclaw swarm doctor --json`
-  - retry only after doctor reports `acpBackendHealthy=true`
-- `version-drift`
+- ACP backend direct smoke fails
+  - verify the local `acpx` tooling path or replace the smoke probe with the supported backend check for the current install
+- doctor green but live ACP run fails
+  - treat that as an environment blocker, not bridge-removal proof
+  - fix runtime backend configuration and rerun the matrix
+- version drift
   - compare installed OpenClaw version with `bridge.versionAllow`
-  - update bridge mappings and allowlist together
-  - rerun unit/e2e bridge regressions before normal use
-- `timeout`
-  - determine whether the child run was truly slow or bridge startup hung
-  - if startup hung, re-run doctor and inspect backend health
-  - if task is simply long-running, adjust timeout-related settings deliberately
-- `close-race`
-  - trust local run ledger first
-  - avoid repeatedly polling a just-closed session
-  - confirm report and workflow state before attempting cleanup again
-
-## Compatibility And Risk
-
-- bridge mode is version-pinned and depends on internal OpenClaw bundle aliases
-- changing OpenClaw versions may require updating bridge mappings before execution works again
-- keep `versionAllow` narrow and explicit
-- prefer bridge mode over scattering private imports through plugin business logic
-- when upstream public spawn/control surfaces become available, plan to retire bridge mode
-
-## Suggested Smoke
-
-ACP bridge smoke:
-
-```bash
-openclaw swarm init --project <path>
-openclaw swarm plan --project <path> --spec <spec>
-openclaw swarm run --project <path> --runner acp --json
-openclaw swarm session status --project <path> --run <runId> --json
-```
-
-Subagent bridge smoke:
-
-```bash
-openclaw swarm run --project <path> --runner subagent --json
-```
+  - update mappings and allowlist together
+- subagent blocked
+  - confirm `subagent.enabled=true`
+  - keep `bridge.subagentEnabled=true` until a public spawn export exists
 
 ## Rollback
 
@@ -172,34 +199,3 @@ openclaw plugins uninstall openclaw-swarm-layer
 ```
 
 Do not delete project `.openclaw/swarm/` state automatically.
-
-## Document Journaling
-
-When `obsidianJournal` is enabled, the plugin writes structured logs alongside the status report.
-
-State (always written to `<project>/.openclaw/swarm/`):
-- `progress.json` — cross-session progress summary (auto-updated after run and review)
-
-Local (always written to `<project>/.openclaw/swarm/reports/`):
-- `run-log.md` — append-only execution log
-- `review-log.md` — append-only review decision log
-- `specs/<specId>.md` — spec archive on plan
-- `completion-summary.md` — generated when all tasks complete
-
-Obsidian (mirrored to `<obsidianRoot>/<project-name>/` if configured):
-- Same files as above, async fire-and-forget
-
-Enable via config:
-
-```json
-{
-  "obsidianJournal": {
-    "enableRunLog": true,
-    "enableReviewLog": true,
-    "enableSpecArchive": true,
-    "enableCompletionSummary": true
-  }
-}
-```
-
-See [configuration.md](configuration.md) for full details.

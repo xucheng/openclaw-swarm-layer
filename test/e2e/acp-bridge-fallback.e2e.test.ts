@@ -12,12 +12,14 @@ async function makeTempProject(): Promise<string> {
 }
 
 describe("e2e: bridge-backed ACP runner path", () => {
-  it("uses the bridge-backed session adapter when bridge mode is enabled", async () => {
+  it("uses the bridge-backed session adapter when ACP bridge fallback is enabled", async () => {
     const projectRoot = await makeTempProject();
     const specPath = path.join(projectRoot, "SPEC-BRIDGE.md");
     const stateStore = new StateStore({
       bridge: {
         enabled: true,
+        acpFallbackEnabled: true,
+        subagentEnabled: false,
         openclawRoot: "/opt/openclaw",
         versionAllow: ["2026.2.26"],
       },
@@ -33,21 +35,21 @@ describe("e2e: bridge-backed ACP runner path", () => {
       },
     });
     const bridgeRunner = vi.fn(async () => ({
-          code: 0,
-          stdout: JSON.stringify({
-            ok: true,
-            version: "2026.2.26",
-            result: {
-              sessionKey: "agent:codex:acp:bridge",
-              backend: "acpx",
-              acceptedAt: "2026-03-21T00:00:00.000Z",
-            },
-          }),
-          stderr: "",
-          pid: 1,
-          signal: null,
-          killed: false,
-        }));
+      code: 0,
+      stdout: JSON.stringify({
+        ok: true,
+        version: "2026.2.26",
+        result: {
+          sessionKey: "agent:codex:acp:bridge",
+          backend: "acpx",
+          acceptedAt: "2026-03-21T00:00:00.000Z",
+        },
+      }),
+      stderr: "",
+      pid: 1,
+      signal: null,
+      killed: false,
+    }));
     const sessionAdapter = new BridgeOpenClawSessionAdapter(
       undefined,
       stateStore.config,

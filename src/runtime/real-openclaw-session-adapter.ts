@@ -6,7 +6,7 @@ import type { PluginRuntime } from "openclaw/plugin-sdk";
 import type { OpenClawSessionAdapter, AcpAcceptedSession, AcpSessionStatus } from "./openclaw-session-adapter.js";
 import type { AcpSpawnParams } from "./acp-mapping.js";
 import { supportsPublicAcpRuntime } from "./openclaw-version.js";
-import { resolveAcpRuntimeRegistryModulePath, resolveOpenClawRoot } from "./openclaw-exec-bridge.js";
+import { ensureAcpxBackendRegistered, resolveAcpRuntimeRegistryModulePath, resolveOpenClawRoot } from "./openclaw-exec-bridge.js";
 
 type AcpManager = {
   initializeSession(input: {
@@ -63,7 +63,7 @@ function defaultImportModule(specifier: string): Promise<SdkLike> {
   return import(specifier) as Promise<SdkLike>;
 }
 
-function buildFallbackSdkImportSpecifiers(runtimeVersion?: string | null, rootResolver: () => string = resolveOpenClawRoot): string[] {
+function buildHostSdkImportSpecifiers(runtimeVersion?: string | null, rootResolver: () => string = resolveOpenClawRoot): string[] {
   const openclawRoot = rootResolver();
   const fallbackPaths = supportsPublicAcpRuntime(runtimeVersion)
     ? [
@@ -80,12 +80,20 @@ export async function loadCompatibleAcpSdk(
 ): Promise<SdkLike> {
   const importModule = options.importModule ?? defaultImportModule;
   const rootResolver = options.resolveOpenClawRoot ?? resolveOpenClawRoot;
-  const primarySpecifiers = supportsPublicAcpRuntime(runtimeVersion)
+  const packageSpecifiers = supportsPublicAcpRuntime(runtimeVersion)
     ? ["openclaw/plugin-sdk/acp-runtime", "openclaw/plugin-sdk"]
     : ["openclaw/plugin-sdk"];
   let lastError: unknown;
+  let hostSpecifiers: string[] = [];
 
-  for (const specifier of primarySpecifiers) {
+  try {
+    // Prefer the host OpenClaw install so local devDependencies do not shadow the live ACP registry.
+    hostSpecifiers = buildHostSdkImportSpecifiers(runtimeVersion, rootResolver);
+  } catch (error) {
+    lastError = error;
+  }
+
+  for (const specifier of hostSpecifiers) {
     try {
       return await importModule(specifier);
     } catch (error) {
@@ -93,7 +101,7 @@ export async function loadCompatibleAcpSdk(
     }
   }
 
-  for (const specifier of buildFallbackSdkImportSpecifiers(runtimeVersion, rootResolver)) {
+  for (const specifier of packageSpecifiers) {
     try {
       return await importModule(specifier);
     } catch (error) {
@@ -139,12 +147,15 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
     private readonly runtime: Pick<PluginRuntime, "config" | "version">,
     private readonly config: Pick<SwarmPluginConfig, "acp">,
     private readonly sdkLoader: () => Promise<SdkLike> = () => loadCompatibleAcpSdk(runtime.version),
+    private readonly ensureBackendRegistered: (openclawRoot: string, cfg: unknown) => Promise<void> = ensureAcpxBackendRegistered,
   ) {}
 
   private async getManager(): Promise<{ manager: AcpManager; cfg: unknown }> {
     if (!shouldUsePublicSessionAdapter(this.runtime, this.config)) {
       throw new Error("OpenClaw public ACP session adapter is disabled for this runtime/config combination");
     }
+    const cfg = this.runtime.config.loadConfig();
+    await this.ensureBackendRegistered(resolveOpenClawRoot(), cfg);
     const sdk = await this.sdkLoader();
     const manager = sdk.getAcpSessionManager?.();
     if (!manager) {
@@ -152,7 +163,6 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
         "OpenClaw public ACP runtime does not expose getAcpSessionManager at runtime; real ACP adapter remains blocked on an upstream public control-plane export",
       );
     }
-    const cfg = this.runtime.config.loadConfig();
     return { manager, cfg };
   }
 

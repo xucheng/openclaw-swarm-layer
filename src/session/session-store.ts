@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { SwarmPluginConfig } from "../config.js";
-import { defaultSwarmPluginConfig } from "../config.js";
+import { resolveSwarmPluginConfig } from "../config.js";
 import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { resolveSwarmPaths, type SwarmPaths } from "../lib/paths.js";
 import type { SessionRecord } from "../types.js";
@@ -29,7 +29,7 @@ export class SessionStore {
   readonly config: SwarmPluginConfig;
 
   constructor(config?: Partial<SwarmPluginConfig>) {
-    this.config = { ...defaultSwarmPluginConfig, ...config };
+    this.config = resolveSwarmPluginConfig(config);
   }
 
   resolvePaths(projectRoot: string): SwarmPaths {

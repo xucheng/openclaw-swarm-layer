@@ -19,7 +19,7 @@ export async function runSwarmReview(
   const workflow = await stateStore.loadWorkflow(options.project);
   const result = applyReviewDecision(workflow, options.task, decision, options.note);
   await stateStore.saveWorkflow(options.project, result.workflow);
-  const report = await writeWorkflowReport(options.project, result.workflow, reportConfig);
+  const report = await writeWorkflowReport(options.project, result.workflow, reportConfig, stateStore);
 
   // Obsidian journal: review log
   const paths = resolveSwarmPaths(options.project, reportConfig);

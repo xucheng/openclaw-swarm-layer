@@ -15,7 +15,9 @@ describe("e2e: subagent fallback run", () => {
   it("dispatches a subagent runner and writes an accepted run ledger", async () => {
     const projectRoot = await makeTempProject();
     const specPath = path.join(projectRoot, "SPEC-SUBAGENT.md");
-    const stateStore = new StateStore();
+    const stateStore = new StateStore({
+      subagent: { enabled: true },
+    });
     const subagentAdapter: OpenClawSubagentAdapter = {
       async spawnSubagent() {
         return {

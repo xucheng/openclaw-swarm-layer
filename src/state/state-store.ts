@@ -1,6 +1,6 @@
 import path from "node:path";
-import type { SwarmPluginConfig } from "../config.js";
-import { defaultSwarmPluginConfig } from "../config.js";
+import type { AcpAutomationResolutionHints, SwarmPluginConfig } from "../config.js";
+import { resolveDefaultAllowedRunners, resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
 import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { validateTaskImmutability } from "../planning/immutability-guard.js";
 import { resolveSwarmPaths, type SwarmPaths } from "../lib/paths.js";
@@ -61,7 +61,12 @@ function assertTask(task: unknown): asserts task is TaskNode {
   }
 }
 
-export function createEmptyWorkflowState(projectRoot: string): WorkflowState {
+export function createEmptyWorkflowState(
+  projectRoot: string,
+  config: Partial<SwarmPluginConfig> = {},
+  hints?: AcpAutomationResolutionHints,
+): WorkflowState {
+  const resolvedConfig = resolveSwarmPluginConfig(config);
   return {
     version: CURRENT_WORKFLOW_VERSION,
     projectRoot,
@@ -69,17 +74,19 @@ export function createEmptyWorkflowState(projectRoot: string): WorkflowState {
     tasks: [],
     reviewQueue: [],
     runtime: {
-      defaultRunner: defaultSwarmPluginConfig.defaultRunner,
-      allowedRunners: ["manual", "acp", "subagent"],
+      defaultRunner: resolveWorkflowDefaultRunner(resolvedConfig, hints),
+      allowedRunners: resolveDefaultAllowedRunners(resolvedConfig),
     },
   };
 }
 
 export class StateStore {
   readonly config: SwarmPluginConfig;
+  readonly runtimeVersion?: string | null;
 
-  constructor(config?: Partial<SwarmPluginConfig>) {
-    this.config = { ...defaultSwarmPluginConfig, ...config };
+  constructor(config?: Partial<SwarmPluginConfig>, hints?: AcpAutomationResolutionHints) {
+    this.config = resolveSwarmPluginConfig(config);
+    this.runtimeVersion = hints?.runtimeVersion;
   }
 
   resolvePaths(projectRoot: string): SwarmPaths {
@@ -99,7 +106,10 @@ export class StateStore {
 
     const existing = await readJsonFile<WorkflowState>(paths.workflowStatePath);
     if (!existing) {
-      await writeJsonFileAtomic(paths.workflowStatePath, createEmptyWorkflowState(paths.projectRoot));
+      await writeJsonFileAtomic(
+        paths.workflowStatePath,
+        createEmptyWorkflowState(paths.projectRoot, this.config, { runtimeVersion: this.runtimeVersion }),
+      );
     }
     return paths;
   }

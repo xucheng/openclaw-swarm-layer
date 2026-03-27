@@ -63,7 +63,7 @@ describe("e2e: bridge doctor", () => {
               },
             ],
             migrationChecklist: [
-              "Run `openclaw swarm doctor --json` before changing bridge or public API integration code.",
+              "Run openclaw swarm doctor --json before changing bridge or public API integration code.",
               "[acp] Keep the current bridge path until the public export getAcpSessionManager is available.",
               "[subagent] Keep the current bridge path until the public export spawnSubagentDirect is available.",
               "After any replacement, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
@@ -91,6 +91,10 @@ describe("e2e: bridge doctor", () => {
     expect(result.checks.acpBackendHealthy).toBe(true);
     expect(result.severity).toBe("healthy");
     expect(result.migrationChecklist[1]).toContain("[acp] Keep");
+    expect(result.acpBridgeExitGate.minimumVersion).toBe("2026.3.22");
+    expect(result.acpBridgeExitGate.versionSatisfied).toBe(false);
+    expect(result.acpBridgeExitGate.evidenceMode).toBe("doctor");
+    expect(result.acpBridgeExitGate.liveSmokeMatrix.at(-1)?.id).toBe("swarm-review-report-journal");
   });
 
   it("returns remediation for a simulated version drift case", async () => {
@@ -148,5 +152,8 @@ describe("e2e: bridge doctor", () => {
     expect(result.remediation[0]).toContain("Update bridge.versionAllow");
     expect(result.severity).toBe("blocked");
     expect(result.migrationChecklist).toEqual([]);
+    expect(result.acpBridgeExitGate.versionSatisfied).toBe(true);
+    expect(result.acpBridgeExitGate.publicControlPlaneExportReady).toBe(false);
+    expect(result.acpBridgeExitGate.readyForBridgeRemoval).toBe(false);
   });
 });

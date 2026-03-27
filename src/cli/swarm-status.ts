@@ -1,9 +1,15 @@
-import { resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
+import type { RuntimePolicySnapshot } from "../config.js";
+import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
+import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes, type AcpBridgeExitGate } from "../runtime/acp-bridge-exit-gate.js";
 import { buildAttentionItems, buildOperatorHighlights, buildRecommendedActions, buildReviewQueueItems } from "../reporting/operator-summary.js";
 import { summarizeSessionReuseForTask } from "../session/session-selector.js";
+import { resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export type SwarmStatusResult = {
   ok: true;
+  runtime: RuntimePolicySnapshot;
+  acpBridgeExitGate: AcpBridgeExitGate;
+  notes: string[];
   workflow: {
     lifecycle: string;
     activeSpecId?: string;
@@ -90,8 +96,23 @@ export async function runSwarmStatus(
   const runs = await stateStore.loadRuns(options.project);
   const sessions = await sessionStore.listSessions(options.project);
   const summary = stateStore.summarizeWorkflow(workflow);
+  const runtime = resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion });
+  const acpBridgeExitGate = buildAcpBridgeExitGate(stateStore.runtimeVersion, {
+    publicControlPlaneExportReady: null,
+    evidenceMode: "runtime-version-only",
+  });
+
   return {
     ok: true,
+    runtime,
+    acpBridgeExitGate,
+    notes: [
+      `Default runner resolution: ${runtime.configuredDefaultRunner} -> ${runtime.resolvedDefaultRunner} on this install.`,
+      `Manual runner remains the safe explicit fallback.`,
+      `ACP execution posture: ${describeAcpExecutionPosture(stateStore.config)}.`,
+      `Subagent posture: ${describeSubagentPosture(stateStore.config)}.`,
+      ...formatAcpBridgeExitGateNotes(acpBridgeExitGate),
+    ],
     workflow: {
       ...summary,
       lastAction: workflow.lastAction,

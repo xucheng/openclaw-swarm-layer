@@ -1,4 +1,5 @@
 import {
+  ACP_BRIDGE_FREE_VERSION_FLOOR,
   compareOpenClawVersions,
   matchesOpenClawVersionAllowlist,
   matchesOpenClawVersionRule,
@@ -7,6 +8,10 @@ import {
 } from "../../../src/runtime/openclaw-version.js";
 
 describe("openclaw version helpers", () => {
+  it("exports the ACP bridge-free version floor", () => {
+    expect(ACP_BRIDGE_FREE_VERSION_FLOOR).toBe("2026.3.22");
+  });
+
   it("normalizes build suffixes to the release version", () => {
     expect(normalizeOpenClawVersion("2026.3.23-1")).toBe("2026.3.23");
     expect(normalizeOpenClawVersion("2026.3.23-hotfix")).toBe("2026.3.23");
@@ -19,6 +24,8 @@ describe("openclaw version helpers", () => {
 
   it("treats suffixed 2026.3.22+ builds as supporting the public ACP runtime", () => {
     expect(supportsPublicAcpRuntime("2026.3.23-1")).toBe(true);
+    expect(supportsPublicAcpRuntime(ACP_BRIDGE_FREE_VERSION_FLOOR)).toBe(true);
+    expect(supportsPublicAcpRuntime("2026.3.21")).toBe(false);
   });
 
   it("matches exact and comparator version rules", () => {

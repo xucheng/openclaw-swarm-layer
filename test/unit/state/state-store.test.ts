@@ -18,7 +18,28 @@ describe("StateStore", () => {
 
     expect(paths.swarmRoot).toContain(path.join(".openclaw", "swarm"));
     await expect(fs.stat(paths.sessionsDir)).resolves.toBeTruthy();
-    expect(workflow).toEqual(createEmptyWorkflowState(projectRoot));
+    expect(workflow).toEqual(createEmptyWorkflowState(projectRoot, store.config));
+  });
+
+  it("uses ACP-preferred workflow defaults on supported runtimes and keeps subagent out of fresh allowed runners", () => {
+    const workflow = createEmptyWorkflowState("/tmp/project", {
+      defaultRunner: "auto",
+      acp: { enabled: true },
+      subagent: { enabled: false },
+    } as any, { runtimeVersion: "2026.3.24" });
+
+    expect(workflow.runtime?.defaultRunner).toBe("acp");
+    expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp"]);
+  });
+
+  it("includes subagent in fresh allowed runners only when explicitly enabled", () => {
+    const workflow = createEmptyWorkflowState("/tmp/project", {
+      defaultRunner: "subagent",
+      subagent: { enabled: true },
+    } as any);
+
+    expect(workflow.runtime?.defaultRunner).toBe("subagent");
+    expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp", "subagent"]);
   });
 
   it("persists validated spec and run records", async () => {
@@ -137,8 +158,6 @@ describe("StateStore", () => {
     const store = new StateStore();
     await store.initProject(projectRoot);
 
-    // Sessions are not validated by StateStore (they go through SessionStore)
-    // but loadSessions reads from the sessionsDir
     const sessions = await store.loadSessions(projectRoot);
     expect(sessions).toEqual([]);
   });

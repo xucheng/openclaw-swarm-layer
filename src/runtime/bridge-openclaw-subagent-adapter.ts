@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { PluginRuntime } from "openclaw/plugin-sdk";
-import type { SwarmPluginConfig } from "../config.js";
+import { isBridgeEnabledForRunner, type SwarmPluginConfig } from "../config.js";
 import { formatBridgeFailure } from "./bridge-errors.js";
 import type { OpenClawSubagentAdapter, SubagentAcceptedRun, SubagentRunStatus, SubagentSpawnParams } from "./openclaw-subagent-adapter.js";
 
@@ -172,7 +172,7 @@ export class BridgeOpenClawSubagentAdapter implements OpenClawSubagentAdapter {
 export function createBridgeSubagentAdapter(
   config: Pick<SwarmPluginConfig, "bridge">,
 ): OpenClawSubagentAdapter | null {
-  if (!config.bridge.enabled) {
+  if (!isBridgeEnabledForRunner(config, "subagent")) {
     return null;
   }
   return new BridgeOpenClawSubagentAdapter(config);

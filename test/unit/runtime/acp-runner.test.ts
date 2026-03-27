@@ -56,7 +56,7 @@ describe("AcpRunner", () => {
       },
     });
     await expect(runner.run({ projectRoot: workflow.projectRoot, task, workflow })).rejects.toThrow(
-      "ACP execution is not wired",
+      "ACP public control-plane execution is unavailable",
     );
   });
 

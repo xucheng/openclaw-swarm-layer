@@ -9,9 +9,19 @@ async function makeTempProject(): Promise<string> {
 }
 
 describe("swarm status cli", () => {
-  it("returns last action, review queue, and recent runs", async () => {
+  it("returns runtime policy, last action, review queue, and recent runs", async () => {
     const projectRoot = await makeTempProject();
-    const stateStore = new StateStore();
+    const stateStore = new StateStore({
+      acp: {
+        enabled: true,
+        defaultAgentId: "codex",
+        allowedAgents: ["codex"],
+        defaultMode: "run",
+        allowThreadBinding: false,
+        defaultTimeoutSeconds: 600,
+        experimentalControlPlaneAdapter: false,
+      },
+    }, { runtimeVersion: "2026.3.24" });
     await stateStore.initProject(projectRoot);
     await stateStore.saveWorkflow(projectRoot, {
       version: 1,
@@ -37,6 +47,10 @@ describe("swarm status cli", () => {
         },
       ],
       reviewQueue: ["task-1"],
+      runtime: {
+        defaultRunner: "acp",
+        allowedRunners: ["manual", "acp"],
+      },
       lastAction: {
         at: "2026-03-21T00:20:00.000Z",
         type: "run:completed",
@@ -80,6 +94,30 @@ describe("swarm status cli", () => {
 
     const result = await runSwarmStatus({ project: projectRoot }, { stateStore });
 
+    expect(result.runtime).toEqual({
+      configuredDefaultRunner: "auto",
+      resolvedDefaultRunner: "acp",
+      workflowDefaultRunner: "acp",
+      allowedRunners: ["manual", "acp"],
+      subagentEnabled: false,
+    });
+    expect(result.acpBridgeExitGate).toMatchObject({
+      minimumVersion: "2026.3.22",
+      currentVersion: "2026.3.24",
+      versionSatisfied: true,
+      publicControlPlaneExportReady: null,
+      readyForBridgeRemoval: false,
+      evidenceMode: "runtime-version-only",
+    });
+    expect(result.notes).toContain("Default runner resolution: auto -> acp on this install.");
+    expect(result.notes).toContain("Manual runner remains the safe explicit fallback.");
+    expect(result.notes).toContain("ACP execution posture: public control-plane primary without bridge fallback.");
+    expect(result.notes).toContain("Subagent posture: experimental (disabled by default).");
+    expect(result.notes).toContain("Bridge-free ACP floor: >=2026.3.22.");
+    expect(result.notes).toContain("OpenClaw runtime version: 2026.3.24.");
+    expect(result.notes).toContain(
+      "ACP bridge exit gate: version floor satisfied; verify public ACP export readiness with swarm doctor before removing ACP bridge.",
+    );
     expect(result.workflow.lastAction?.type).toBe("run:completed");
     expect(result.reviewQueue).toEqual([
       {

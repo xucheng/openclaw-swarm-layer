@@ -1,6 +1,6 @@
 import type { PluginRuntime } from "openclaw/plugin-sdk";
 import type { SwarmPluginConfig } from "../config.js";
-import { defaultSwarmPluginConfig } from "../config.js";
+import { resolveSwarmPluginConfig } from "../config.js";
 import { createBridgeSessionAdapter } from "../runtime/bridge-openclaw-session-adapter.js";
 import { createBridgeSubagentAdapter } from "../runtime/bridge-openclaw-subagent-adapter.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
@@ -19,17 +19,20 @@ export type SwarmCliContext = {
 };
 
 export function resolveStateStore(context?: SwarmCliContext): StateStore {
-  return context?.stateStore ?? new StateStore(context?.config);
+  return context?.stateStore ?? new StateStore(context?.config, { runtimeVersion: context?.runtime?.version });
 }
 
 export function resolveSessionStore(context?: SwarmCliContext): SessionStore {
   return context?.sessionStore ?? new SessionStore(context?.stateStore?.config ?? context?.config);
 }
 
-class FallbackSessionAdapter implements OpenClawSessionAdapter {
+const ACP_BRIDGE_DISABLED_HINT =
+  "ACP bridge fallback is disabled; keep manual runner as the safe fallback or enable bridge.acpFallbackEnabled for legacy compatibility.";
+
+class PublicAcpSessionAdapter implements OpenClawSessionAdapter {
   constructor(
     private readonly primary: OpenClawSessionAdapter,
-    private readonly fallback: OpenClawSessionAdapter,
+    private readonly fallback?: OpenClawSessionAdapter,
   ) {}
 
   private async preferPrimary<T>(operation: (adapter: OpenClawSessionAdapter) => Promise<T>): Promise<T> {
@@ -38,6 +41,10 @@ class FallbackSessionAdapter implements OpenClawSessionAdapter {
     } catch (error) {
       if (!isPublicAcpRuntimeUnavailableError(error)) {
         throw error;
+      }
+      if (!this.fallback) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`${message}. ${ACP_BRIDGE_DISABLED_HINT}`);
       }
       return await operation(this.fallback);
     }
@@ -64,49 +71,23 @@ export function resolveSessionAdapter(context?: SwarmCliContext): OpenClawSessio
   if (context?.sessionAdapter) {
     return context.sessionAdapter;
   }
-  const config = context?.stateStore?.config
-    ? context.stateStore.config
-    : context?.config
-      ? {
-          ...defaultSwarmPluginConfig,
-          ...context.config,
-          acp: {
-            ...defaultSwarmPluginConfig.acp,
-            ...context.config.acp,
-          },
-        }
-      : defaultSwarmPluginConfig;
+  const config = context?.stateStore?.config ?? resolveSwarmPluginConfig(context?.config);
   const runtimeAdapter = createSessionAdapter(context?.runtime, { acp: config.acp });
   const bridgeAdapter = createBridgeSessionAdapter(context?.runtime, { acp: config.acp, bridge: config.bridge });
-  if (runtimeAdapter && bridgeAdapter) {
-    return new FallbackSessionAdapter(runtimeAdapter, bridgeAdapter);
-  }
   if (runtimeAdapter) {
-    return runtimeAdapter;
+    return new PublicAcpSessionAdapter(runtimeAdapter, bridgeAdapter ?? undefined);
   }
-  return bridgeAdapter ?? new UnsupportedOpenClawSessionAdapter();
+  if (bridgeAdapter) {
+    return bridgeAdapter;
+  }
+  return new UnsupportedOpenClawSessionAdapter();
 }
 
 export function resolveSubagentAdapter(context?: SwarmCliContext): OpenClawSubagentAdapter {
   if (context?.subagentAdapter) {
     return context.subagentAdapter;
   }
-  const config = context?.stateStore?.config
-    ? context.stateStore.config
-    : context?.config
-      ? {
-          ...defaultSwarmPluginConfig,
-          ...context.config,
-          acp: {
-            ...defaultSwarmPluginConfig.acp,
-            ...context.config.acp,
-          },
-          bridge: {
-            ...defaultSwarmPluginConfig.bridge,
-            ...context.config.bridge,
-          },
-        }
-      : defaultSwarmPluginConfig;
+  const config = context?.stateStore?.config ?? resolveSwarmPluginConfig(context?.config);
   const bridgeAdapter = createBridgeSubagentAdapter({ bridge: config.bridge });
   return bridgeAdapter ?? new UnsupportedOpenClawSubagentAdapter();
 }

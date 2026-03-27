@@ -17,7 +17,9 @@ describe("e2e: subagent bridge lifecycle", () => {
   it("syncs subagent completion and supports cancel path", async () => {
     const projectRoot = await makeTempProject();
     const specPath = path.join(projectRoot, "SPEC-SUB-LIFE.md");
-    const stateStore = new StateStore();
+    const stateStore = new StateStore({
+      subagent: { enabled: true },
+    });
     let currentState: "running" | "completed" = "running";
     const subagentAdapter: OpenClawSubagentAdapter = {
       async spawnSubagent() {

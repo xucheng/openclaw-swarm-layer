@@ -23,7 +23,13 @@ describe("e2e: bridge failure classification", () => {
   it("surfaces backend-unavailable ACP bridge failures with remediation", async () => {
     const projectRoot = await makeTempProject("swarm-layer-bridge-failure-acp-");
     const stateStore = new StateStore({
-      bridge: { enabled: true, openclawRoot: "/opt/openclaw", versionAllow: ["2026.3.13"] },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: true,
+        subagentEnabled: false,
+        openclawRoot: "/opt/openclaw",
+        versionAllow: ["2026.3.13"],
+      },
       acp: { enabled: true, backendId: "acpx", defaultAgentId: "codex", allowedAgents: ["codex"], defaultMode: "run", allowThreadBinding: false, experimentalControlPlaneAdapter: false },
     });
     await seedProject(projectRoot, stateStore, "ACP Bridge Failure");
@@ -47,7 +53,16 @@ describe("e2e: bridge failure classification", () => {
 
   it("surfaces rejected subagent bridge failures with remediation", async () => {
     const projectRoot = await makeTempProject("swarm-layer-bridge-failure-subagent-");
-    const stateStore = new StateStore({ bridge: { enabled: true, openclawRoot: "/opt/openclaw", versionAllow: ["2026.3.13"] } });
+    const stateStore = new StateStore({
+      subagent: { enabled: true },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: false,
+        subagentEnabled: true,
+        openclawRoot: "/opt/openclaw",
+        versionAllow: ["2026.3.13"],
+      },
+    });
     await seedProject(projectRoot, stateStore, "Subagent Bridge Failure");
     const adapter = new BridgeOpenClawSubagentAdapter(
       stateStore.config,
@@ -69,7 +84,13 @@ describe("e2e: bridge failure classification", () => {
   it("surfaces timeout ACP bridge failures with remediation", async () => {
     const projectRoot = await makeTempProject("swarm-layer-bridge-failure-timeout-");
     const stateStore = new StateStore({
-      bridge: { enabled: true, openclawRoot: "/opt/openclaw", versionAllow: ["2026.3.13"] },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: true,
+        subagentEnabled: false,
+        openclawRoot: "/opt/openclaw",
+        versionAllow: ["2026.3.13"],
+      },
       acp: { enabled: true, backendId: "acpx", defaultAgentId: "codex", allowedAgents: ["codex"], defaultMode: "run", allowThreadBinding: false, experimentalControlPlaneAdapter: false },
     });
     await seedProject(projectRoot, stateStore, "ACP Bridge Timeout");
@@ -94,7 +115,13 @@ describe("e2e: bridge failure classification", () => {
   it("surfaces version drift ACP bridge failures with remediation", async () => {
     const projectRoot = await makeTempProject("swarm-layer-bridge-failure-version-");
     const stateStore = new StateStore({
-      bridge: { enabled: true, openclawRoot: "/opt/openclaw", versionAllow: ["2026.3.13"] },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: true,
+        subagentEnabled: false,
+        openclawRoot: "/opt/openclaw",
+        versionAllow: ["2026.3.13"],
+      },
       acp: { enabled: true, backendId: "acpx", defaultAgentId: "codex", allowedAgents: ["codex"], defaultMode: "run", allowThreadBinding: false, experimentalControlPlaneAdapter: false },
     });
     await seedProject(projectRoot, stateStore, "ACP Bridge Version Drift");

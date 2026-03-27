@@ -49,7 +49,7 @@ export async function runSwarmSessionClose(
         : nextSession,
     );
   }
-  const report = await writeWorkflowReport(options.project, workflow, reportConfig);
+  const report = await writeWorkflowReport(options.project, workflow, reportConfig, stateStore);
 
   return {
     ok: true,

@@ -26,6 +26,24 @@ describe("planner", () => {
     expect(tasks[2].deps).toEqual([tasks[1].taskId]);
   });
 
+  it("resolves auto default runner to ACP when the runtime supports the public ACP path", () => {
+    const tasks = planTasksFromSpec(spec, {
+      defaultRunner: "auto",
+      acp: { enabled: true },
+    } as any, { runtimeVersion: "2026.3.24" });
+
+    expect(tasks.every((task) => task.runner.type === "acp")).toBe(true);
+  });
+
+  it("resolves auto default runner to manual when ACP is disabled", () => {
+    const tasks = planTasksFromSpec(spec, {
+      defaultRunner: "auto",
+      acp: { enabled: false },
+    } as any);
+
+    expect(tasks.every((task) => task.runner.type === "manual")).toBe(true);
+  });
+
   it("returns runnable tasks based on completed dependencies", () => {
     const tasks = planTasksFromSpec(spec);
     const withCompletedFirst = tasks.map((task, index) =>
@@ -111,7 +129,6 @@ describe("planner", () => {
     const updated = upsertTaskStatuses(tasks);
     expect(updated[0]!.status).toBe("done");
     expect(updated[1]!.status).toBe("ready");
-    // t-3 stays planned because t-2 is not done yet
     expect(updated[2]!.status).toBe("planned");
   });
 

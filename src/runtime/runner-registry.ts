@@ -1,8 +1,6 @@
 import { AcpRunner } from "./acp-runner.js";
 import { ManualRunner } from "./manual-runner.js";
 import { UnsupportedOpenClawSessionAdapter } from "./openclaw-session-adapter.js";
-import { UnsupportedOpenClawSubagentAdapter } from "./openclaw-subagent-adapter.js";
-import { SubagentRunner } from "./subagent-runner.js";
 import type { TaskRunner } from "./task-runner.js";
 
 export class RunnerRegistry {
@@ -12,11 +10,14 @@ export class RunnerRegistry {
     const defaults = runners ?? [
       new ManualRunner(),
       new AcpRunner(undefined, new UnsupportedOpenClawSessionAdapter()),
-      new SubagentRunner(new UnsupportedOpenClawSubagentAdapter()),
     ];
     defaults.forEach((runner) => {
       this.runners.set(runner.kind, runner);
     });
+  }
+
+  has(kind: TaskRunner["kind"]): boolean {
+    return this.runners.has(kind);
   }
 
   resolve(kind: TaskRunner["kind"]): TaskRunner {

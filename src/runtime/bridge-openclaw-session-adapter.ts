@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import type { PluginRuntime } from "openclaw/plugin-sdk";
-import type { SwarmPluginConfig } from "../config.js";
+import { isBridgeEnabledForRunner, type SwarmPluginConfig } from "../config.js";
 import type { AcpSpawnParams } from "./acp-mapping.js";
 import { formatBridgeFailure } from "./bridge-errors.js";
 import type { AcpAcceptedSession, AcpSessionStatus, OpenClawSessionAdapter } from "./openclaw-session-adapter.js";
@@ -185,7 +185,7 @@ export function createBridgeSessionAdapter(
   _runtime: Pick<PluginRuntime, "system"> | undefined,
   config: Pick<SwarmPluginConfig, "acp" | "bridge">,
 ): OpenClawSessionAdapter | null {
-  if (!config.bridge.enabled) {
+  if (!isBridgeEnabledForRunner(config, "acp")) {
     return null;
   }
   return new BridgeOpenClawSessionAdapter(_runtime, config);

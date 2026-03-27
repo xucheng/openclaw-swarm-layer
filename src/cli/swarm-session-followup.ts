@@ -1,3 +1,4 @@
+import { getSubagentRunnerDisabledMessage } from "../config.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { createOrchestrator } from "../services/orchestrator.js";
 import { SessionStore } from "../session/session-store.js";
@@ -23,6 +24,10 @@ export async function runSwarmSessionFollowup(
   // Load workflow and find next runnable task, or inject a synthetic one
   const workflow = await stateStore.loadWorkflow(options.project);
   const runnerType = options.runner ?? session.runner;
+  const subagentDisabledMessage = runnerType === "subagent" ? getSubagentRunnerDisabledMessage(stateStore.config) : undefined;
+  if (subagentDisabledMessage) {
+    return { ok: false, error: subagentDisabledMessage };
+  }
 
   // Create a synthetic follow-up task injected into the workflow
   const followupTaskId = `followup-${Date.now()}`;
@@ -64,7 +69,7 @@ export async function runSwarmSessionFollowup(
   }
 
   const finalWorkflow = await stateStore.loadWorkflow(options.project);
-  const report = await writeWorkflowReport(options.project, finalWorkflow, stateStore.config);
+  const report = await writeWorkflowReport(options.project, finalWorkflow, stateStore.config, stateStore);
 
   return {
     ...result,

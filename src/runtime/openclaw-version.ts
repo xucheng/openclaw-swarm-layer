@@ -1,4 +1,4 @@
-const PUBLIC_ACP_RUNTIME_VERSION = "2026.3.22";
+export const ACP_BRIDGE_FREE_VERSION_FLOOR = "2026.3.22";
 const VERSION_RULE_PATTERN = /^(<=|>=|<|>|=)\s*(\S+)\s*$/;
 
 type ParsedVersion = [number, number, number] | null;
@@ -88,6 +88,6 @@ export function matchesOpenClawVersionAllowlist(version?: string | null, rules?:
 }
 
 export function supportsPublicAcpRuntime(version?: string | null): boolean {
-  const compared = compareOpenClawVersions(version, PUBLIC_ACP_RUNTIME_VERSION);
+  const compared = compareOpenClawVersions(version, ACP_BRIDGE_FREE_VERSION_FLOOR);
   return compared !== null && compared >= 0;
 }

@@ -12,12 +12,15 @@ async function makeTempProject(): Promise<string> {
 }
 
 describe("e2e: bridge-backed subagent runner path", () => {
-  it("uses the bridge-backed subagent adapter when bridge mode is enabled", async () => {
+  it("uses the bridge-backed subagent adapter when subagent bridge fallback is enabled", async () => {
     const projectRoot = await makeTempProject();
     const specPath = path.join(projectRoot, "SPEC-SUBAGENT-BRIDGE.md");
     const stateStore = new StateStore({
+      subagent: { enabled: true },
       bridge: {
         enabled: true,
+        acpFallbackEnabled: false,
+        subagentEnabled: true,
         nodePath: "/usr/bin/node",
         openclawRoot: "/opt/openclaw",
         versionAllow: ["2026.3.13"],

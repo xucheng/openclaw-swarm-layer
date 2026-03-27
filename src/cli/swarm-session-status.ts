@@ -80,7 +80,7 @@ export async function runSwarmSessionStatus(
         : nextSession,
     );
   }
-  const report = await writeWorkflowReport(options.project, nextWorkflow, reportConfig);
+  const report = await writeWorkflowReport(options.project, nextWorkflow, reportConfig, stateStore);
 
   return {
     ok: true,

@@ -69,7 +69,7 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
   });
 
   it("fails clearly when runtime sdk lacks control-plane export", async () => {
-    const adapter = new ExperimentalRealOpenClawSessionAdapter(runtime, config as any, async () => ({}));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(runtime, config as any, async () => ({}), async () => undefined);
 
     await expect(
       adapter.spawnAcpSession({
@@ -82,20 +82,20 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     ).rejects.toThrow("upstream public control-plane export");
   });
 
-  it("falls back to the resolved OpenClaw root when bare sdk imports are unavailable", async () => {
+  it("prefers the resolved host OpenClaw root before bare sdk imports", async () => {
     const openclawRoot = mkdtempSync(path.join(tmpdir(), "swarm-layer-openclaw-root-"));
     mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
     writeFileSync(path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js"), "export {};\n", "utf8");
 
     const importModule = vi.fn(async (specifier: string): Promise<any> => {
-      if (specifier.startsWith("openclaw/")) {
-        throw new Error(`missing:${specifier}`);
+      if (specifier === pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js")).href) {
+        return {
+          getAcpSessionManager() {
+            return null;
+          },
+        };
       }
-      return {
-        getAcpSessionManager() {
-          return null;
-        },
-      };
+      throw new Error(`unexpected:${specifier}`);
     });
     try {
       const sdk = await loadCompatibleAcpSdk("2026.3.22", {
@@ -104,10 +104,9 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
       });
 
       expect(sdk.getAcpSessionManager).toBeTypeOf("function");
-      expect(importModule).toHaveBeenNthCalledWith(1, "openclaw/plugin-sdk/acp-runtime");
-      expect(importModule).toHaveBeenNthCalledWith(2, "openclaw/plugin-sdk");
+      expect(importModule).toHaveBeenCalledTimes(1);
       expect(importModule).toHaveBeenNthCalledWith(
-        3,
+        1,
         pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js")).href,
       );
     } finally {
@@ -115,16 +114,38 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     }
   });
 
-  it("uses the legacy plugin-sdk index fallback for pre-2026.3.22 runtimes", async () => {
+  it("falls back to bare sdk imports when the resolved host OpenClaw root is unavailable", async () => {
     const importModule = vi.fn(async (specifier: string): Promise<any> => {
-      if (specifier === "openclaw/plugin-sdk") {
-        throw new Error("missing:openclaw/plugin-sdk");
+      if (specifier === "openclaw/plugin-sdk/acp-runtime") {
+        return {
+          getAcpSessionManager() {
+            return null;
+          },
+        };
       }
-      return {
-        getAcpSessionManager() {
-          return null;
-        },
-      };
+      throw new Error(`missing:${specifier}`);
+    });
+
+    await loadCompatibleAcpSdk("2026.3.22", {
+      importModule,
+      resolveOpenClawRoot: () => {
+        throw new Error("missing host openclaw");
+      },
+    });
+
+    expect(importModule).toHaveBeenNthCalledWith(1, "openclaw/plugin-sdk/acp-runtime");
+  });
+
+  it("uses the host plugin-sdk index fallback for pre-2026.3.22 runtimes", async () => {
+    const importModule = vi.fn(async (specifier: string): Promise<any> => {
+      if (specifier === "file:///opt/openclaw/dist/plugin-sdk/index.js") {
+        return {
+          getAcpSessionManager() {
+            return null;
+          },
+        };
+      }
+      throw new Error(`unexpected:${specifier}`);
     });
 
     await loadCompatibleAcpSdk("2026.3.13", {
@@ -132,8 +153,41 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
       resolveOpenClawRoot: () => "/opt/openclaw",
     });
 
-    expect(importModule).toHaveBeenNthCalledWith(1, "openclaw/plugin-sdk");
-    expect(importModule).toHaveBeenNthCalledWith(2, "file:///opt/openclaw/dist/plugin-sdk/index.js");
+    expect(importModule).toHaveBeenCalledTimes(1);
+    expect(importModule).toHaveBeenNthCalledWith(1, "file:///opt/openclaw/dist/plugin-sdk/index.js");
+  });
+
+  it("bootstraps the host acpx backend before reading the public ACP manager", async () => {
+    const ensureBackendRegistered = vi.fn(async () => undefined);
+    const initializeSession = vi.fn(async ({ sessionKey }) => ({
+      handle: { sessionKey, backend: "acpx" },
+    }));
+    const runTurn = vi.fn(async () => undefined);
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          runTurn,
+          getSessionStatus: vi.fn(),
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      ensureBackendRegistered,
+    );
+
+    await adapter.spawnAcpSession({
+      task: "Run tests",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+    });
+
+    expect(ensureBackendRegistered).toHaveBeenCalledTimes(1);
+    expect(ensureBackendRegistered).toHaveBeenCalledWith(expect.any(String), { acp: { enabled: true } });
   });
 
   it("spawns and queries ACP sessions through the manager", async () => {
@@ -161,6 +215,7 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
           closeSession,
         }),
       }),
+      async () => undefined,
     );
 
     const accepted = await adapter.spawnAcpSession({

@@ -34,7 +34,7 @@ export function registerSwarmCli(api: OpenClawPluginApi): void {
   api.registerCli((ctx) => {
     registerSwarmCliCommands(ctx, {
       config: resolvePluginConfigFromApi(api),
-      stateStore: new StateStore(resolvePluginConfigFromApi(api)),
+      stateStore: new StateStore(resolvePluginConfigFromApi(api), { runtimeVersion: api.runtime?.version }),
       runtime: api.runtime,
     });
   }, { commands: ["swarm"] });

@@ -202,7 +202,25 @@ function isOpenClawPackageRoot(candidate: string): boolean {
   return existsSync(path.join(candidate, "package.json")) && existsSync(path.join(candidate, "dist", "plugin-sdk"));
 }
 
+function findEnclosingOpenClawPackageRoot(candidatePath: string): string | null {
+  let cursor = path.dirname(path.resolve(candidatePath));
+  while (true) {
+    if (isOpenClawPackageRoot(cursor)) {
+      return cursor;
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) {
+      return null;
+    }
+    cursor = parent;
+  }
+}
+
 export function resolveOpenClawRootFromExecPath(execPath: string = process.execPath): string | null {
+  const enclosedRoot = findEnclosingOpenClawPackageRoot(execPath);
+  if (enclosedRoot) {
+    return enclosedRoot;
+  }
   const execDir = path.dirname(path.resolve(execPath));
   const prefixes = dedupeStrings([
     path.resolve(execDir, ".."),
@@ -231,6 +249,14 @@ export function resolveOpenClawRoot(override?: string): string {
   const envRoot = process.env.OPENCLAW_ROOT?.trim();
   if (envRoot) {
     return path.resolve(envRoot);
+  }
+  const stateDirRoot = path.join(resolveOpenClawStateDir(), "lib", "node_modules", "openclaw");
+  if (isOpenClawPackageRoot(stateDirRoot)) {
+    return stateDirRoot;
+  }
+  const argvPathRoot = process.argv[1] ? resolveOpenClawRootFromExecPath(process.argv[1]) : null;
+  if (argvPathRoot) {
+    return argvPathRoot;
   }
   const execPathRoot = resolveOpenClawRootFromExecPath();
   if (execPathRoot) {
@@ -445,7 +471,12 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
   }
 
   try {
-    const publicApi = await detectPublicApiAvailability();
+    const publicApi = await detectPublicApiAvailability({
+      rootLoader: async () =>
+        (await import(pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "index.js")).href)) as Record<string, unknown>,
+      acpRuntimeLoader: async () =>
+        (await import(pathToFileURL(resolveAcpRuntimeRegistryModulePath(openclawRoot)).href)) as Record<string, unknown>,
+    });
     report.publicApi = {
       acpControlPlaneExport: publicApi.acpControlPlaneExport,
       subagentSpawnExport: publicApi.subagentSpawnExport,
@@ -548,7 +579,7 @@ export function resolveAcpxRuntimeServiceFactory(
   };
 }
 
-async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Promise<void> {
+export async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any): Promise<void> {
   const backendId = cfg?.acp?.backend ?? "acpx";
   const registryModulePath = pathToFileURL(resolveAcpRuntimeRegistryModulePath(openclawRoot)).href;
   const registryModule = await import(registryModulePath);

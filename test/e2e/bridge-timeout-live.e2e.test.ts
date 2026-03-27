@@ -7,7 +7,7 @@ describe("e2e: live bridge timeout classification", () => {
   it("classifies a real hanging command as timeout", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-bridge-timeout-"));
     const hangScript = path.join(tempDir, "hang.mjs");
-    await fs.writeFile(hangScript, 'await new Promise(() => {});\n', "utf8");
+    await fs.writeFile(hangScript, 'setInterval(() => {}, 1_000);\n', "utf8");
 
     const result = await runBridgeCommandDirect([process.execPath, hangScript], {
       cwd: tempDir,

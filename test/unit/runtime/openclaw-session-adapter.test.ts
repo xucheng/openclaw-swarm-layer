@@ -12,21 +12,21 @@ describe("UnsupportedOpenClawSessionAdapter", () => {
         mode: "run",
         thread: false,
       }),
-    ).rejects.toThrow("ACP execution is not wired");
+    ).rejects.toThrow("ACP public control-plane execution is unavailable");
   });
 
   it("throws for status lookups before a real adapter is wired", async () => {
     const adapter = new UnsupportedOpenClawSessionAdapter();
 
     await expect(adapter.getAcpSessionStatus("agent:codex:acp:1")).rejects.toThrow(
-      "ACP session status is not wired",
+      "ACP session status is unavailable",
     );
   });
 
   it("throws for cancel and close before a real adapter is wired", async () => {
     const adapter = new UnsupportedOpenClawSessionAdapter();
 
-    await expect(adapter.cancelAcpSession("agent:codex:acp:1")).rejects.toThrow("ACP session cancel is not wired");
-    await expect(adapter.closeAcpSession("agent:codex:acp:1")).rejects.toThrow("ACP session close is not wired");
+    await expect(adapter.cancelAcpSession("agent:codex:acp:1")).rejects.toThrow("ACP session cancel is unavailable");
+    await expect(adapter.closeAcpSession("agent:codex:acp:1")).rejects.toThrow("ACP session close is unavailable");
   });
 });

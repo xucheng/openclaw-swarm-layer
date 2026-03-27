@@ -1,5 +1,5 @@
-import type { SwarmPluginConfig } from "../config.js";
-import { defaultSwarmPluginConfig } from "../config.js";
+import type { AcpAutomationResolutionHints, SwarmPluginConfig } from "../config.js";
+import { resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
 import type { SpecDoc, TaskNode } from "../types.js";
 import { injectEvaluatorTasks } from "./evaluator-injection.js";
 import { contractFromSpecCriteria } from "./sprint-contract.js";
@@ -9,8 +9,13 @@ function taskIdForPhase(phaseId: string, index: number): string {
   return `${phaseId}-task-${index + 1}`;
 }
 
-export function planTasksFromSpec(spec: SpecDoc, config?: Partial<SwarmPluginConfig>): TaskNode[] {
-  const resolvedConfig = { ...defaultSwarmPluginConfig, ...config };
+export function planTasksFromSpec(
+  spec: SpecDoc,
+  config?: Partial<SwarmPluginConfig>,
+  hints?: AcpAutomationResolutionHints,
+): TaskNode[] {
+  const resolvedConfig = resolveSwarmPluginConfig(config);
+  const defaultRunner = resolveWorkflowDefaultRunner(resolvedConfig, hints);
   const tasks: TaskNode[] = [];
 
   for (const phase of spec.phases) {
@@ -30,7 +35,7 @@ export function planTasksFromSpec(spec: SpecDoc, config?: Partial<SwarmPluginCon
           mode: resolvedConfig.defaultWorkspaceMode,
         },
         runner: {
-          type: resolvedConfig.defaultRunner,
+          type: defaultRunner,
         },
         review: {
           required: resolvedConfig.reviewRequiredByDefault,
@@ -39,7 +44,6 @@ export function planTasksFromSpec(spec: SpecDoc, config?: Partial<SwarmPluginCon
     });
   }
 
-  // Attach sprint contracts from spec acceptance criteria
   if (spec.acceptanceCriteria.length > 0 && tasks.length > 0) {
     const firstCodingTask = tasks.find((t) => t.kind === "coding");
     if (firstCodingTask) {
@@ -47,7 +51,6 @@ export function planTasksFromSpec(spec: SpecDoc, config?: Partial<SwarmPluginCon
     }
   }
 
-  // Inject evaluator tasks after coding tasks (when enabled)
   const finalTasks = resolvedConfig.evaluator.enabled
     ? injectEvaluatorTasks(tasks, resolvedConfig)
     : tasks;

@@ -1,5 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import type { OpenClawPluginService } from "openclaw/plugin-sdk/core";
+import type { RunnerType, RuntimePolicySnapshot } from "../config.js";
+import { getSubagentRunnerDisabledMessage, resolveRuntimePolicySnapshot } from "../config.js";
 import { getRunnableTasks } from "../planning/task-graph.js";
 import { enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
@@ -9,19 +11,20 @@ import { UnsupportedOpenClawSubagentAdapter, type OpenClawSubagentAdapter } from
 import { appendRetryHistory, shouldRetry } from "../runtime/retry-engine.js";
 import { RunnerRegistry } from "../runtime/runner-registry.js";
 import { SubagentRunner } from "../runtime/subagent-runner.js";
+import type { TaskRunner } from "../runtime/task-runner.js";
+import { runBootstrap } from "../session/session-bootstrap.js";
+import { buildBudgetUsageFromRun, checkBudgetExceeded } from "../session/session-budget.js";
 import { buildSessionRecordFromRun } from "../session/session-lifecycle.js";
 import { selectReusableSessionForTask } from "../session/session-selector.js";
 import { SessionStore } from "../session/session-store.js";
 import { StateStore } from "../state/state-store.js";
-import { runBootstrap } from "../session/session-bootstrap.js";
-import { buildBudgetUsageFromRun, checkBudgetExceeded } from "../session/session-budget.js";
 import type { BootstrapResult, RunRecord, SessionRecord, TaskNode, WorkflowState } from "../types.js";
 
 export type RunOnceInput = {
   projectRoot: string;
   taskId?: string;
   dryRun?: boolean;
-  runnerOverride?: "manual" | "acp" | "subagent";
+  runnerOverride?: RunnerType;
 };
 
 export type RunOnceResult = {
@@ -30,6 +33,8 @@ export type RunOnceResult = {
   taskIds?: string[];
   runIds?: string[];
   reusedSessionId?: string;
+  selectedRunner?: RunnerType;
+  runtime?: RuntimePolicySnapshot;
   message?: string;
   bootstrap?: BootstrapResult;
 };
@@ -50,16 +55,27 @@ function pickTask(tasks: TaskNode[], taskId?: string): TaskNode | undefined {
   return tasks[0];
 }
 
+function resolveRunnerUnavailableMessage(
+  runner: RunnerType,
+  stateStore: Pick<StateStore, "config">,
+): string | undefined {
+  if (runner === "subagent") {
+    return getSubagentRunnerDisabledMessage(stateStore.config);
+  }
+  return undefined;
+}
+
 export class SwarmOrchestrator {
   constructor(
     private readonly stateStore: StateStore = new StateStore(),
     private readonly sessionStore: SessionStore = new SessionStore(),
     private readonly manualRunner: ManualRunner = new ManualRunner(),
-    private readonly runnerRegistry: RunnerRegistry = new RunnerRegistry([new ManualRunner(), new AcpRunner(), new SubagentRunner()]),
+    private readonly runnerRegistry: RunnerRegistry = new RunnerRegistry([new ManualRunner(), new AcpRunner()]),
   ) {}
 
   async runOnce(input: RunOnceInput): Promise<RunOnceResult> {
-    // Bootstrap sequence (when enabled)
+    const fallbackRuntime = resolveRuntimePolicySnapshot(this.stateStore.config, undefined, { runtimeVersion: this.stateStore.runtimeVersion });
+
     if (this.stateStore.config.bootstrap.enabled) {
       const bootstrapResult = await runBootstrap(input.projectRoot, this.stateStore);
       if (!bootstrapResult.ok) {
@@ -68,11 +84,13 @@ export class SwarmOrchestrator {
           action: "noop",
           message: `Bootstrap failed: ${bootstrapResult.checks.filter((c) => !c.ok).map((c) => c.message).join("; ")}`,
           bootstrap: bootstrapResult,
+          runtime: fallbackRuntime,
         };
       }
     }
 
     const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
+    const runtime = resolveRuntimePolicySnapshot(this.stateStore.config, workflow.runtime, { runtimeVersion: this.stateStore.runtimeVersion });
     const runnableTasks = getRunnableTasks(workflow.tasks);
     const task = pickTask(runnableTasks, input.taskId);
 
@@ -81,16 +99,36 @@ export class SwarmOrchestrator {
         ok: true,
         action: "noop",
         message: "no runnable tasks",
+        runtime,
       };
     }
 
     const selectedRunner = input.runnerOverride ?? task.runner.type;
+    const unavailableRunnerMessage = resolveRunnerUnavailableMessage(selectedRunner, this.stateStore);
+    if (unavailableRunnerMessage) {
+      return {
+        ok: false,
+        action: "noop",
+        taskIds: [task.taskId],
+        selectedRunner,
+        runtime,
+        message: unavailableRunnerMessage,
+      };
+    }
+    if (selectedRunner !== "manual" && !this.runnerRegistry.has(selectedRunner)) {
+      return {
+        ok: false,
+        action: "noop",
+        taskIds: [task.taskId],
+        selectedRunner,
+        runtime,
+        message: `runner ${selectedRunner} is not registered in the current orchestrator`,
+      };
+    }
     const runner = selectedRunner === "manual" ? this.manualRunner : this.runnerRegistry.resolve(selectedRunner);
-
     const effectiveTask =
       selectedRunner === task.runner.type ? task : { ...task, runner: { ...task.runner, type: selectedRunner } };
 
-    // --- M3.1: Session reuse selection ---
     let reusedSession: SessionRecord | undefined;
     const sessionPolicy = effectiveTask.session?.policy ?? "none";
     if (sessionPolicy !== "none" && selectedRunner !== "manual") {
@@ -103,17 +141,20 @@ export class SwarmOrchestrator {
           ok: false,
           action: "session_required",
           taskIds: [effectiveTask.taskId],
+          selectedRunner,
+          runtime,
           message: `Task ${effectiveTask.taskId} requires an existing session but none is available`,
         };
       }
     }
 
-    // --- M3.2: Thread binding config enforcement ---
     if (reusedSession?.threadId && !this.stateStore.config.acp.allowThreadBinding) {
       return {
         ok: false,
         action: "noop",
         taskIds: [effectiveTask.taskId],
+        selectedRunner,
+        runtime,
         message: `Task ${effectiveTask.taskId} would bind to thread ${reusedSession.threadId} but allowThreadBinding is disabled`,
       };
     }
@@ -131,6 +172,8 @@ export class SwarmOrchestrator {
         action: "planned",
         taskIds: [effectiveTask.taskId],
         reusedSessionId: reusedSession?.sessionId,
+        selectedRunner,
+        runtime,
         message: reusedSession
           ? `${plan.summary} (would reuse session ${reusedSession.sessionId})`
           : plan.summary,
@@ -144,7 +187,6 @@ export class SwarmOrchestrator {
       reusedSession,
     });
 
-    // --- Budget tracking ---
     const runRecordWithBudget = { ...result.runRecord };
     if (effectiveTask.runner.budget) {
       const budgetUsage = buildBudgetUsageFromRun(result.runRecord, result.runRecord.budgetUsage);
@@ -197,7 +239,7 @@ export class SwarmOrchestrator {
       lastAction: {
         at: new Date().toISOString(),
         type: "run",
-        message: `ran ${task.taskId}${reusedLabel}`,
+        message: `ran ${task.taskId} via ${selectedRunner}${reusedLabel}`,
       },
     };
 
@@ -213,20 +255,22 @@ export class SwarmOrchestrator {
       taskIds: [task.taskId],
       runIds: [result.runRecord.runId],
       reusedSessionId: reusedSession?.sessionId,
+      selectedRunner,
+      runtime,
       message: result.runRecord.resultSummary,
     };
   }
 
   async evaluateRetry(input: { projectRoot: string; taskId: string; runRecord: RunRecord }): Promise<RunOnceResult> {
     const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
+    const runtime = resolveRuntimePolicySnapshot(this.stateStore.config, workflow.runtime, { runtimeVersion: this.stateStore.runtimeVersion });
     const task = workflow.tasks.find((t) => t.taskId === input.taskId);
     if (!task) {
-      return { ok: false, action: "noop", message: `Unknown task: ${input.taskId}` };
+      return { ok: false, action: "noop", message: `Unknown task: ${input.taskId}`, runtime };
     }
 
     const decision = shouldRetry(task, input.runRecord);
     if (!decision.retry) {
-      // Check if retries are exhausted → dead letter
       const policy = task.runner.retryPolicy;
       if (policy && (input.runRecord.retryHistory?.length ?? 0) + 1 >= policy.maxAttempts) {
         const deadTask: TaskNode = { ...task, status: "dead_letter" };
@@ -244,20 +288,20 @@ export class SwarmOrchestrator {
           ok: false,
           action: "dead_letter",
           taskIds: [task.taskId],
+          selectedRunner: task.runner.type,
+          runtime,
           message: decision.reason,
         };
       }
-      return { ok: false, action: "noop", taskIds: [task.taskId], message: decision.reason };
+      return { ok: false, action: "noop", taskIds: [task.taskId], selectedRunner: task.runner.type, runtime, message: decision.reason };
     }
 
-    // Record retry history in the run record
     const updatedRun: RunRecord = {
       ...input.runRecord,
       retryHistory: appendRetryHistory(input.runRecord),
     };
     await this.stateStore.writeRun(input.projectRoot, updatedRun);
 
-    // Reset task to ready and re-dispatch
     const readyTask: TaskNode = { ...task, status: "ready" };
     const readyWorkflow: WorkflowState = {
       ...workflow,
@@ -271,7 +315,6 @@ export class SwarmOrchestrator {
     };
     await this.stateStore.saveWorkflow(input.projectRoot, readyWorkflow);
 
-    // Re-dispatch
     return this.runOnce({
       projectRoot: input.projectRoot,
       taskId: task.taskId,
@@ -299,15 +342,14 @@ export function createOrchestrator(deps?: OrchestratorDeps): SwarmOrchestrator {
   const manualRunner = deps?.manualRunner ?? new ManualRunner();
   const sessionAdapter = deps?.sessionAdapter ?? new UnsupportedOpenClawSessionAdapter();
   const subagentAdapter = deps?.subagentAdapter ?? new UnsupportedOpenClawSubagentAdapter();
+  const configuredRunners: TaskRunner[] = [manualRunner, new AcpRunner(stateStore.config, sessionAdapter)];
+  if (stateStore.config.subagent.enabled) {
+    configuredRunners.push(new SubagentRunner(subagentAdapter));
+  }
   return new SwarmOrchestrator(
     stateStore,
     sessionStore,
     manualRunner,
-    deps?.runnerRegistry ??
-      new RunnerRegistry([
-        manualRunner,
-        new AcpRunner(stateStore.config, sessionAdapter),
-        new SubagentRunner(subagentAdapter),
-      ]),
+    deps?.runnerRegistry ?? new RunnerRegistry(configuredRunners),
   );
 }

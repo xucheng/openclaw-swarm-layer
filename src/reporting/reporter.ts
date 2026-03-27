@@ -1,13 +1,15 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import type { SwarmPluginConfig } from "../config.js";
+import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { ensureDir } from "../lib/json-file.js";
 import { resolveSwarmPaths } from "../lib/paths.js";
+import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes } from "../runtime/acp-bridge-exit-gate.js";
+import { summarizeSessionReuseForTask } from "../session/session-selector.js";
+import { SessionStore } from "../session/session-store.js";
+import { StateStore } from "../state/state-store.js";
 import type { RunRecord, WorkflowState } from "../types.js";
 import { buildAttentionItems, buildOperatorHighlights, buildRecommendedActions, buildReviewQueueItems } from "./operator-summary.js";
-import { SessionStore } from "../session/session-store.js";
-import { summarizeSessionReuseForTask } from "../session/session-selector.js";
-import { StateStore } from "../state/state-store.js";
-import fs from "node:fs/promises";
 
 export type ReportWriteResult = {
   report: string;
@@ -68,6 +70,34 @@ function buildSessionCandidateLines(workflow: WorkflowState, sessions: Awaited<R
   });
 }
 
+function buildRuntimePolicyLines(workflow: WorkflowState, stateStore: StateStore): string[] {
+  const runtime = resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion });
+  return [
+    `- Configured default runner: ${runtime.configuredDefaultRunner}`,
+    `- Resolved default runner: ${runtime.resolvedDefaultRunner}`,
+    `- Workflow default runner: ${runtime.workflowDefaultRunner ?? "(none)"}`,
+    `- Allowed runners: ${runtime.allowedRunners.join(", ")}`,
+    `- Default runner resolution: ${runtime.configuredDefaultRunner} -> ${runtime.resolvedDefaultRunner} on this install`,
+    `- Manual runner fallback: available`,
+    `- ACP execution posture: ${describeAcpExecutionPosture(stateStore.config)}`,
+    `- Subagent enabled: ${runtime.subagentEnabled ? "yes" : "no"}`,
+    `- Subagent posture: ${describeSubagentPosture(stateStore.config)}`,
+  ];
+}
+
+function buildAcpBridgeExitGateLines(stateStore: StateStore): string[] {
+  const gate = buildAcpBridgeExitGate(stateStore.runtimeVersion, {
+    publicControlPlaneExportReady: null,
+    evidenceMode: "runtime-version-only",
+  });
+
+  return [
+    ...formatAcpBridgeExitGateNotes(gate).map((line) => `- ${line}`),
+    `- Live smoke matrix checks: ${gate.liveSmokeMatrix.map((check) => check.id).join(", ")}`,
+    `- Remaining ACP bridge dependencies: ${gate.remainingBridgeDependencies.map((dependency) => dependency.id).join(", ")}`,
+  ];
+}
+
 export function buildWorkflowReport(workflow: WorkflowState, stateStore = new StateStore(), runs: RunRecord[] = []): string {
   const summary = stateStore.summarizeWorkflow(workflow);
   const taskLines = workflow.tasks.map(
@@ -78,6 +108,8 @@ export function buildWorkflowReport(workflow: WorkflowState, stateStore = new St
   const attentionLines = buildAttentionLines(workflow, runs);
   const highlightLines = buildHighlightLines(runs);
   const recommendedActionLines = buildRecommendedActionLines(workflow, runs);
+  const runtimePolicyLines = buildRuntimePolicyLines(workflow, stateStore);
+  const acpBridgeExitGateLines = buildAcpBridgeExitGateLines(stateStore);
 
   return [
     `# Swarm Report`,
@@ -96,6 +128,12 @@ export function buildWorkflowReport(workflow: WorkflowState, stateStore = new St
           `- Last action: ${workflow.lastAction.type}${workflow.lastAction.message ? ` - ${workflow.lastAction.message}` : ""}`,
         ]
       : []),
+    ``,
+    `## Runtime Policy`,
+    ...runtimePolicyLines,
+    ``,
+    `## ACP Bridge Exit Gate`,
+    ...acpBridgeExitGateLines,
     ``,
     `## Attention`,
     ...(attentionLines.length > 0 ? attentionLines : ["- (none)"]),
@@ -121,10 +159,11 @@ export async function writeWorkflowReport(
   projectRoot: string,
   workflow: WorkflowState,
   config?: Partial<SwarmPluginConfig>,
+  stateStore = new StateStore(config),
 ): Promise<ReportWriteResult> {
-  const paths = resolveSwarmPaths(projectRoot, config);
-  const stateStore = new StateStore(config);
-  const sessionStore = new SessionStore(config);
+  const resolvedConfig = config ?? stateStore.config;
+  const paths = resolveSwarmPaths(projectRoot, resolvedConfig);
+  const sessionStore = new SessionStore(stateStore.config);
   const runs = await stateStore.loadRuns(projectRoot);
   const sessions = await sessionStore.listSessions(projectRoot);
   const report = buildWorkflowReport(workflow, stateStore, runs);

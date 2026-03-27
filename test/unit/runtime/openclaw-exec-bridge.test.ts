@@ -12,6 +12,7 @@ import {
   resolveAcpxServiceModulePath,
   resolveAcpxRuntimeServiceFactory,
   resolveAcpRuntimeRegistryModulePath,
+  resolveOpenClawRoot,
   resolveOpenClawRootFromExecPath,
   spawnDetachedBridgeWorker,
   waitForAcpBackendHealthy,
@@ -188,6 +189,36 @@ describe("openclaw exec bridge", () => {
     fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.22" }));
 
     expect(resolveOpenClawRootFromExecPath(path.join(nodeBinDir, "node"))).toBe(openclawRoot);
+  });
+
+  it("detects the host openclaw install root from a launcher entry inside the package", () => {
+    const tmpPrefix = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-entry-"));
+    const openclawRoot = path.join(tmpPrefix, "lib", "node_modules", "openclaw");
+    const distDir = path.join(openclawRoot, "dist");
+    fs.mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.24" }));
+    fs.writeFileSync(path.join(distDir, "entry.js"), "export {};\n");
+
+    expect(resolveOpenClawRootFromExecPath(path.join(distDir, "entry.js"))).toBe(openclawRoot);
+  });
+
+  it("prefers the OpenClaw package root under the configured state dir", () => {
+    const tmpStateDir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-state-root-"));
+    const openclawRoot = path.join(tmpStateDir, "lib", "node_modules", "openclaw");
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    fs.mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.24" }));
+
+    process.env.OPENCLAW_STATE_DIR = tmpStateDir;
+    try {
+      expect(resolveOpenClawRoot()).toBe(openclawRoot);
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+    }
   });
 
   it("derives remediation for version drift and backend failures", () => {
