@@ -1,3 +1,5 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   defaultSwarmPluginConfig,
   describeAcpExecutionPosture,
@@ -14,6 +16,7 @@ import {
   type AcpBridgeExitGate,
 } from "../runtime/acp-bridge-exit-gate.js";
 import { resolveBridgeScriptPath, resolveTsxLoaderPath, runBridgeCommandDirect } from "../runtime/bridge-openclaw-subagent-adapter.js";
+import { resolveAcpRuntimeRegistryModulePath, resolveOpenClawRoot } from "../runtime/openclaw-exec-bridge.js";
 import {
   buildMigrationChecklist,
   buildReplacementPlan,
@@ -71,6 +74,22 @@ function resolveEffectiveConfig(context?: SwarmCliContext): SwarmPluginConfig {
 
 function resolveContextRuntimeVersion(context?: SwarmCliContext): string | null | undefined {
   return context?.runtime?.version ?? context?.stateStore?.runtimeVersion ?? null;
+}
+
+function buildDoctorPublicApiDetectorInput(
+  config: SwarmPluginConfig,
+): Parameters<typeof detectPublicApiAvailability>[0] | undefined {
+  try {
+    const openclawRoot = resolveOpenClawRoot(config.bridge.openclawRoot);
+    return {
+      rootLoader: async () =>
+        (await import(pathToFileURL(path.join(openclawRoot, "dist", "plugin-sdk", "index.js")).href)) as Record<string, unknown>,
+      acpRuntimeLoader: async () =>
+        (await import(pathToFileURL(resolveAcpRuntimeRegistryModulePath(openclawRoot)).href)) as Record<string, unknown>,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function pushUnique(items: string[], value: string): string[] {
@@ -276,7 +295,8 @@ export async function runSwarmDoctor(
   const subagentBridgeEnabled = config.subagent.enabled && isBridgeEnabledForRunner(config, "subagent");
 
   if (!subagentBridgeEnabled) {
-    const availability = await publicApiDetector().catch(() => ({
+    const detectorInput = buildDoctorPublicApiDetectorInput(config);
+    const availability = await publicApiDetector(detectorInput ?? {}).catch(() => ({
       acpControlPlaneExport: false,
       subagentSpawnExport: false,
       readyReplacementPoints: [],

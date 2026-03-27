@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { runSwarmDoctor } from "../../../src/cli/swarm-doctor.js";
 
 describe("swarm doctor cli", () => {
@@ -250,5 +253,42 @@ describe("swarm doctor cli", () => {
     expect(result.replacementPlan[0]?.status).toBe("complete");
     expect(result.migrationChecklist[1]).toContain("[acp] Keep real-openclaw-session-adapter");
     expect(result.acpBridgeExitGate.readyForBridgeRemoval).toBe(true);
+  });
+
+  it("detects the ACP public export from the host OpenClaw sdk when bare package imports are unavailable", async () => {
+    const openclawRoot = mkdtempSync(path.join(tmpdir(), "swarm-doctor-openclaw-root-"));
+    mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    writeFileSync(
+      path.join(openclawRoot, "dist", "plugin-sdk", "index.js"),
+      "export const registerContextEngine = () => null;\n",
+      "utf8",
+    );
+    writeFileSync(
+      path.join(openclawRoot, "dist", "plugin-sdk", "acp-runtime.js"),
+      "export function getAcpSessionManager() { return null; }\n",
+      "utf8",
+    );
+
+    try {
+      const result = await runSwarmDoctor(
+        {},
+        {
+          config: {
+            acp: { enabled: true },
+            bridge: { enabled: false, openclawRoot },
+          } as any,
+          runtime: { version: "2026.3.24" } as any,
+        },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.publicApi.acpControlPlaneExport).toBe(true);
+      expect(result.replacementPlan[0]?.status).toBe("complete");
+      expect(result.warnings).toContain("Default runner resolution: auto -> acp on this install.");
+      expect(result.acpBridgeExitGate.readyForBridgeRemoval).toBe(true);
+      expect(result.nextAction).toBe("Use the ACP public control-plane path as the supported execution path.");
+    } finally {
+      rmSync(openclawRoot, { recursive: true, force: true });
+    }
   });
 });
