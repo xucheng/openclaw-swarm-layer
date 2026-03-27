@@ -2,7 +2,7 @@
 
 ## Summary
 
-The project remains on the five-stage roadmap:
+The project follows a five-stage roadmap:
 
 - `M1` Orchestration Foundation
 - `M2` ACP Execution Beta
@@ -10,13 +10,130 @@ The project remains on the five-stage roadmap:
 - `M4` Harness Enhancement
 - `M5` ACP-Default Convergence
 
-`M1-M4` are complete. `M5` is now complete through `M5.4c`.
+Repository history does not define a formal `M0` milestone. The tracked milestone history starts at `M1`.
 
-## M5 Status
+All tracked roadmap stages `M1-M5` are now complete.
 
-Target posture after `M5` closeout:
+## Historical Stages
 
-- ACP is the default automated runner
+### M1 - Orchestration Foundation
+
+Target:
+
+- installable native plugin
+- manual-runner orchestration loop
+- stable workflow state and reporting
+- optional tools and skill wiring
+
+Scope:
+
+- schema + state-store
+- spec import + planner
+- CLI `init/status/plan/run/review/report`
+- manual runner
+- review gate
+- local report + Obsidian sync
+
+Delivery level:
+
+- single-machine orchestration prototype usable for controlled internal planning and manual execution
+
+Current status: complete via the initial `0.1.0` release baseline.
+
+### G0 - ACP Integration Decision
+
+Decision gate recorded before full ACP expansion:
+
+- treat `sessions_spawn` semantics as the orchestration contract
+- avoid private deep-imports as the intended long-term solution
+- freeze task-to-session mapping before execution scope expands
+- record upstream gaps and private-coupling risks explicitly
+
+Current status: complete and folded into the `M2` delivery history.
+
+### M2 - ACP Execution Beta
+
+Target:
+
+- real ACP oneshot execution for selected tasks
+- stable `runId <-> sessionRef` tracking
+- review-gated ACP result handling
+- operator session control
+
+Sub-milestones:
+
+- `M2.0` ACP oneshot MVP
+- `M2.1` operator control
+- `M2.2` beta hardening
+- `M2.3` public API convergence
+
+Delivery level:
+
+- single-machine, single-project internal beta for spec-driven orchestration with manual + ACP execution
+
+Final status:
+
+- bridge-backed ACP execution shipped for the beta phase
+- session status / cancel / close and operator diagnostics shipped
+- public API seam detection, compatibility metadata, replacement planning, and migration guidance shipped
+
+Current status: complete through `M2.3`.
+
+### M3 - Sessionized Swarm
+
+Target:
+
+- persistent ACP sessions
+- thread binding
+- session reuse and steer flows
+- stronger recovery and retry behavior
+
+Structure delivered:
+
+- `M3.0` Session Foundation
+- `M3.1` Persistent ACP Session Reuse
+- `M3.2` Thread Binding And Follow-up
+- `M3.3` Retry/Recovery Expansion
+
+Delivery level:
+
+- enhanced swarm runtime for longer-lived session workflows, still intentionally not a distributed control plane
+
+Final status:
+
+- persistent session reuse delivered
+- thread-bound follow-up / steer delivered
+- retry, dead-letter, orphan cleanup, and recovery behavior delivered
+
+Current status: complete through `M3.3`.
+
+### M4 - Harness Enhancement
+
+Target:
+
+- cross-session progress memory bridge
+- sprint contracts with verifiable acceptance criteria
+- evaluator task injection
+- structured quality rubrics replacing binary review
+- session budget controls
+- task field immutability
+- harness assumption metadata
+
+Delivery level:
+
+- harness-strengthening features remain backward compatible with the `M1-M3` runtime when disabled
+
+Final status:
+
+- harness enhancement package shipped and verified with backward-compatible regression coverage
+
+Current status: complete (2026-03-25).
+
+### M5 - ACP-Default Convergence
+
+Target posture after closeout:
+
+- ACP is the only default-capable automated runner
 - ACP automation uses the public control-plane path only
 - legacy ACP bridge config is ignored and surfaced as operator guidance, not runtime capability
 - `subagent` remains a legacy bridge-backed opt-in path
@@ -34,36 +151,44 @@ Sub-milestones:
 - `M5.4b` ACP Bridge Removal: complete (2026-03-27)
 - `M5.4c` Subagent Final Decision: complete (2026-03-27)
 
-## M5.4c Closeout
+Current status: complete through `M5.4c`.
 
-Delivered:
+## Assessment Timeline
 
-- removed ACP bridge execution code from runtime selection and bridge command handling
-- moved ACP diagnostics to a public-ACP baseline with `remainingBridgeDependencies = []`
-- kept subagent bridge isolated as the only remaining bridge-backed runtime path
-- finalized `subagent` as a legacy bridge-backed opt-in path instead of an experimental future default
-- required both explicit `subagent.enabled` and `bridge.subagentEnabled` before subagent is runtime-enabled
-- updated tests and operator surfaces to reflect the new subagent support boundary
-- reran build, unit regression, and e2e regression on the supported install
+- `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline
+- `G0` complete (2026-03-22): ACP integration contract and private-coupling risks documented
+- `M2.0` complete (2026-03-22): bridge-backed ACP oneshot beta path working
+- `M2.1` complete (2026-03-22): session status/cancel/close and bridge doctor shipped
+- `M2.2` complete (2026-03-22): operator visibility and normalized completion summaries shipped
+- `M2.3` complete (2026-03-22): public API convergence seams and migration checklist shipped
+- `M3.0` complete (2026-03-21): 158 unit tests, 20 e2e tests, build clean
+- `M3.1` complete (2026-03-22): 165 unit tests, 22 e2e tests, build clean
+- `M3.2` complete (2026-03-22): 176 unit tests, 22 e2e tests, build clean
+- `M3.3` complete (2026-03-22): 187 unit tests, 22 e2e tests, build clean
+- `M4` complete (2026-03-25): 283 unit tests across 51 files, 24 e2e tests across 17 files, build clean
+- `M5.0` complete (2026-03-26): 290 unit tests across 51 files, 24 e2e tests across 17 files, build clean
+- `M5.1` complete (2026-03-26): 292 unit tests across 52 files, 24 e2e tests across 17 files, build clean
+- `M5.2` complete (2026-03-26): 296 unit tests across 52 files, 25 e2e tests across 18 files, build clean
+- `M5.3` complete (2026-03-26): 301 unit tests across 52 files, 25 e2e tests across 18 files, build clean
+- `M5.3.x-1` complete (2026-03-26): 303 unit tests across 52 files, 25 e2e tests across 18 files, build clean
+- `M5.3.x-2` complete (2026-03-26): 303 unit tests across 52 files, 25 e2e tests across 18 files, build clean
+- `M5.4a` complete (2026-03-27): 306 unit tests across 53 files, 25 e2e tests across 18 files, build clean; full local smoke matrix green on `OpenClaw 2026.3.24`
+- `M5.4b` complete (2026-03-27): 300 unit tests across 51 files, 23 e2e tests across 18 files, build clean; local doctor and ACP dry-run smoke green on `OpenClaw 2026.3.24`
+- `M5.4c` complete (2026-03-27): 305 unit tests across 51 files, 23 e2e tests across 18 files, build clean; subagent retained only as a legacy bridge-backed opt-in path
 
-Verification:
+## What The Project Claims
 
-- 51 unit files, 305 unit tests passed
-- 18 e2e files, 23 e2e tests passed
-- `npm run build` clean
-- local `openclaw swarm doctor --json` reports ACP replacement plan status `complete`
-- local ACP dry-run smoke still selects `acp` on `OpenClaw 2026.3.24`
+The project claims:
 
-## What The Project Still Does Not Claim
+- ACP as the only default-capable automated runner
+- `subagent` as a legacy bridge-backed opt-in path with a documented support boundary
+- single-machine, single-project orchestration with operator-visible workflow state, reports, and session control
 
 The project still does not claim:
 
 - a public subagent execution path
-
-The project does claim:
-
-- ACP as the only default-capable automated runner
-- `subagent` as a legacy bridge-backed opt-in path with a documented support boundary
+- distributed multi-node orchestration
+- a fully autonomous unattended PR factory
 
 ## Delivery Guardrails
 
