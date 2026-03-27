@@ -1,0 +1,17 @@
+test/
+docs/
+*.tgz
+*.log
+.env
+.env.*
+coverage/
+.DS_Store
+CLAUDE.md
+CONTRIBUTING.md
+CHANGELOG.md
+.claude/
+vitest.config.ts
+tsconfig.json
+firebase-debug.log
+src/
+AGENTS.md
