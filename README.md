@@ -9,7 +9,7 @@ ACP-first orchestration for OpenClaw projects: spec import, task planning, execu
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-306%20unit%20%7C%2025%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-305%20unit%20%7C%2023%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) &bull; [Configuration](docs/configuration.md) &bull; [Bridge Exit Gate](docs/acp-bridge-exit-gate.md) &bull; [Runbook](docs/operator-runbook.md) &bull; [License](LICENSE)
 
@@ -22,8 +22,8 @@ ACP-first orchestration for OpenClaw projects: spec import, task planning, execu
 - ACP is the only default-capable automated runner.
 - `defaultRunner: "auto"` resolves to `acp` only when ACP automation is actually available on the current OpenClaw install.
 - If ACP automation is unavailable, `auto` falls back to `manual`.
-- `subagent` is experimental and disabled by default. Operators must opt in explicitly.
-- Bridge is compatibility fallback only. It is no longer the product center.
+- `subagent` is retained only as a legacy bridge-backed opt-in path. It stays disabled by default and requires explicit opt-in.
+- Bridge is retained only for the legacy subagent path. It is no longer part of ACP execution.
 - `swarm doctor`, `swarm status`, and workflow reports now surface the ACP bridge-exit gate directly.
 
 ## ACP Bridge Exit Gate
@@ -47,7 +47,7 @@ The full matrix and artifact expectations are documented in [docs/acp-bridge-exi
 - Review gates, retry policy, dead-letter tracking, and session budget controls.
 - Runtime visibility through `swarm doctor`, `swarm status`, and workflow reports.
 - Optional Obsidian report sync and local markdown journals.
-- Experimental subagent runner behind explicit opt-in.
+- Legacy subagent runner behind explicit bridge-backed opt-in.
 
 ## Prerequisites
 
@@ -123,8 +123,8 @@ openclaw swarm report --project /path/to/your/project --json
 ## Runner Model
 
 - `manual`: operator-driven safe fallback, always available.
-- `acp`: default automation path when ACP is enabled and the public path or explicit bridge fallback is available.
-- `subagent`: experimental opt-in runner; disabled by default and still bridge-backed today.
+- `acp`: default automation path when ACP is enabled and the public control-plane path is available.
+- `subagent`: legacy bridge-backed opt-in runner; disabled by default and available only when `subagent.enabled=true` and `bridge.subagentEnabled=true`.
 
 ## Development
 

@@ -155,7 +155,7 @@ function resolveBridgeConfig(input: Record<string, unknown>): SwarmBridgeConfig 
   const bridgeInput = isObject(input.bridge) ? input.bridge : undefined;
   const legacyBridgeEnabled = typeof bridgeInput?.enabled === "boolean" ? bridgeInput.enabled : false;
   const acpFallbackEnabled =
-    typeof bridgeInput?.acpFallbackEnabled === "boolean" ? bridgeInput.acpFallbackEnabled : legacyBridgeEnabled;
+    typeof bridgeInput?.acpFallbackEnabled === "boolean" ? bridgeInput.acpFallbackEnabled : defaultSwarmPluginConfig.bridge.acpFallbackEnabled;
   const subagentEnabled =
     typeof bridgeInput?.subagentEnabled === "boolean" ? bridgeInput.subagentEnabled : legacyBridgeEnabled;
 
@@ -184,9 +184,7 @@ function resolveSubagentConfig(
   if (defaultRunner === "subagent") {
     return { enabled: true };
   }
-  if (bridge.subagentEnabled) {
-    return { enabled: true };
-  }
+  void bridge;
   return defaultSwarmPluginConfig.subagent;
 }
 
@@ -195,14 +193,21 @@ export function isBridgeEnabledForRunner(
   runner: BridgeRunnerType,
 ): boolean {
   return runner === "acp"
-    ? config.bridge.acpFallbackEnabled || config.bridge.enabled
+    ? false
     : config.bridge.subagentEnabled || config.bridge.enabled;
 }
 
 export function isAcpBridgeFallbackEnabled(
   config: Pick<SwarmPluginConfig, "bridge">,
 ): boolean {
-  return isBridgeEnabledForRunner(config, "acp");
+  void config;
+  return false;
+}
+
+export function hasLegacyAcpBridgeFallbackConfig(
+  config: Pick<SwarmPluginConfig, "bridge">,
+): boolean {
+  return config.bridge.acpFallbackEnabled;
 }
 
 export function isAcpPublicPathAvailableForAutomation(
@@ -222,7 +227,7 @@ export function canUseAcpAsDefaultRunner(
   if (!config.acp.enabled) {
     return false;
   }
-  return isAcpBridgeFallbackEnabled(config) || isAcpPublicPathAvailableForAutomation(config, hints);
+  return isAcpPublicPathAvailableForAutomation(config, hints);
 }
 
 export function describeAcpExecutionPosture(
@@ -231,9 +236,7 @@ export function describeAcpExecutionPosture(
   if (!config.acp.enabled) {
     return "disabled (manual runner remains the safe fallback)";
   }
-  return isAcpBridgeFallbackEnabled(config)
-    ? "public control-plane primary with bridge compatibility fallback"
-    : "public control-plane primary without bridge fallback";
+  return "public control-plane only";
 }
 
 export function resolveWorkflowDefaultRunner(
@@ -244,38 +247,45 @@ export function resolveWorkflowDefaultRunner(
     return canUseAcpAsDefaultRunner(config, hints) ? "acp" : "manual";
   }
   if (config.defaultRunner === "subagent") {
-    return config.subagent.enabled ? "subagent" : "manual";
+    return isSubagentRunnerEnabled(config) ? "subagent" : "manual";
   }
   return config.defaultRunner;
 }
 
 export function resolveDefaultAllowedRunners(
-  config: Pick<SwarmPluginConfig, "subagent">,
+  config: Pick<SwarmPluginConfig, "subagent" | "bridge">,
 ): RunnerType[] {
-  return config.subagent.enabled ? ["manual", "acp", "subagent"] : ["manual", "acp"];
+  return isSubagentRunnerEnabled(config) ? ["manual", "acp", "subagent"] : ["manual", "acp"];
 }
 
 export function isSubagentRunnerEnabled(
-  config: Pick<SwarmPluginConfig, "subagent">,
+  config: Pick<SwarmPluginConfig, "subagent" | "bridge">,
 ): boolean {
-  return config.subagent.enabled;
+  return config.subagent.enabled && isBridgeEnabledForRunner(config, "subagent");
 }
 
 export function getSubagentRunnerDisabledMessage(
-  config: Pick<SwarmPluginConfig, "subagent">,
+  config: Pick<SwarmPluginConfig, "subagent" | "bridge">,
 ): string | undefined {
   if (isSubagentRunnerEnabled(config)) {
     return undefined;
   }
-  return "subagent runner is disabled by config; enable subagent.enabled=true to use it";
+  if (!config.subagent.enabled) {
+    return "subagent runner is retained only as a legacy bridge-backed opt-in path; enable subagent.enabled=true and bridge.subagentEnabled=true to use it";
+  }
+  return "subagent runner is retained only as a legacy bridge-backed opt-in path; enable bridge.subagentEnabled=true to use it";
 }
 
 export function describeSubagentPosture(
-  config: Pick<SwarmPluginConfig, "subagent">,
+  config: Pick<SwarmPluginConfig, "subagent" | "bridge">,
 ): string {
-  return isSubagentRunnerEnabled(config)
-    ? "experimental (enabled explicitly)"
-    : "experimental (disabled by default)";
+  if (isSubagentRunnerEnabled(config)) {
+    return "legacy bridge-backed opt-in (enabled explicitly)";
+  }
+  if (config.subagent.enabled) {
+    return "legacy bridge-backed opt-in (bridge not enabled)";
+  }
+  return "legacy bridge-backed opt-in (disabled by default)";
 }
 
 export type RuntimePolicySnapshot = {
@@ -299,7 +309,7 @@ export function resolveRuntimePolicySnapshot(
       workflowRuntime?.allowedRunners && workflowRuntime.allowedRunners.length > 0
         ? [...workflowRuntime.allowedRunners]
         : resolveDefaultAllowedRunners(config),
-    subagentEnabled: config.subagent.enabled,
+    subagentEnabled: isSubagentRunnerEnabled(config),
   };
 }
 
@@ -559,8 +569,13 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
       }
     }
 
-    if (input.defaultRunner === "subagent" && isObject(input.subagent) && input.subagent.enabled === false) {
-      errors.push('subagent.enabled must be true when defaultRunner="subagent"');
+    if (input.defaultRunner === "subagent") {
+      if (isObject(input.subagent) && input.subagent.enabled === false) {
+        errors.push('subagent.enabled must be true when defaultRunner="subagent"');
+      }
+      if (!isObject(input.bridge) || input.bridge.subagentEnabled !== true) {
+        errors.push('bridge.subagentEnabled must be true when defaultRunner="subagent"');
+      }
     }
 
     if (errors.length > 0) {

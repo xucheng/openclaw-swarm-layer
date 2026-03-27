@@ -14,7 +14,6 @@ import {
   resolveAcpRuntimeRegistryModulePath,
   resolveOpenClawRoot,
   resolveOpenClawRootFromExecPath,
-  spawnDetachedBridgeWorker,
   waitForAcpBackendHealthy,
 } from "../../../src/runtime/openclaw-exec-bridge.js";
 import { INTERNAL_MODULES_BY_VERSION, buildPatchedBridgeModuleSource } from "../../../src/runtime/bridge-manifest.js";
@@ -221,7 +220,7 @@ describe("openclaw exec bridge", () => {
     }
   });
 
-  it("derives remediation for version drift and backend failures", () => {
+  it("derives remediation for version drift and stale subagent patch failures", () => {
     const remediation = deriveDoctorRemediation({
       ok: false,
       openclawRoot: "/opt/openclaw",
@@ -242,19 +241,19 @@ describe("openclaw exec bridge", () => {
         versionMapped: false,
         versionAllowed: false,
         internalModuleResolved: false,
-        acpBackendHealthy: false,
+        acpBackendHealthy: true,
         subagentPatchable: false,
       },
       blockers: [
         "OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)",
-        "ACP runtime backend is currently unavailable. Try again in a moment. (backend: acpx)",
+        "Patched bridge module did not expose subagent helpers",
       ],
       warnings: [],
       risks: [],
     });
 
     expect(remediation.some((item) => item.includes("versionAllow"))).toBe(true);
-    expect(remediation.some((item) => item.includes("acpx plugin"))).toBe(true);
+    expect(remediation.some((item) => item.includes("subagent helpers"))).toBe(true);
   });
 
   it("derives severity and next action for doctor output", () => {
@@ -278,7 +277,7 @@ describe("openclaw exec bridge", () => {
         versionMapped: false,
         versionAllowed: false,
         internalModuleResolved: false,
-        acpBackendHealthy: false,
+        acpBackendHealthy: true,
         subagentPatchable: false,
       },
       blockers: ["OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)"],
@@ -319,38 +318,5 @@ describe("openclaw exec bridge", () => {
 
     expect(parsed).toEqual({ params: { sessionKey: "agent:qwen:acp:123" } });
     expect(stdinReader).not.toHaveBeenCalled();
-  });
-
-  it("spawns a detached acp prompt worker with encoded bridge input", () => {
-    const unref = vi.fn();
-    const spawnImpl = vi.fn(() => ({ unref }) as any);
-
-    spawnDetachedBridgeWorker(
-      "acp-prompt",
-      { params: { sessionKey: "agent:qwen:acp:123", task: "Create a file", requestId: "req-1" } },
-      {
-        spawnImpl,
-        execPath: "/opt/node",
-        execArgv: ["--import", "/opt/tsx-loader.mjs"],
-        argv: ["/opt/node", "/tmp/openclaw-exec-bridge.mjs", "acp-spawn"],
-        env: { OPENCLAW_STATE_DIR: "/tmp/state" },
-        cwd: "/tmp/swarm-layer",
-      },
-    );
-
-    expect(spawnImpl).toHaveBeenCalledWith(
-      "/opt/node",
-      ["--import", "/opt/tsx-loader.mjs", "/tmp/openclaw-exec-bridge.mjs", "acp-prompt"],
-      expect.objectContaining({
-        cwd: "/tmp/swarm-layer",
-        stdio: "ignore",
-        detached: true,
-        env: expect.objectContaining({
-          OPENCLAW_STATE_DIR: "/tmp/state",
-          OPENCLAW_SWARM_BRIDGE_INPUT_B64: expect.any(String),
-        }),
-      }),
-    );
-    expect(unref).toHaveBeenCalledTimes(1);
   });
 });

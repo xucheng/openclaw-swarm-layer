@@ -31,7 +31,7 @@ export const ACP_BRIDGE_EXIT_LIVE_SMOKE_MATRIX: AcpBridgeExitSmokeCheck[] = [
     id: "acp-backend-direct",
     label: "ACP backend direct route",
     command: "~/.openclaw/scripts/openclaw-acp-post-upgrade-smoke.sh",
-    purpose: "Validate the ACP backend, default agent wiring, and direct codex route before plugin-level ACP checks.",
+    purpose: "Validate the ACP backend, default agent wiring, and configured direct route before plugin-level ACP checks.",
   },
   {
     id: "swarm-doctor",
@@ -88,26 +88,7 @@ export const ACP_BRIDGE_EXIT_LIVE_SMOKE_MATRIX: AcpBridgeExitSmokeCheck[] = [
   },
 ];
 
-export const ACP_BRIDGE_REMOVAL_DEPENDENCIES: AcpBridgeExitDependency[] = [
-  {
-    id: "acp-bridge-session-adapter",
-    module: "src/runtime/bridge-openclaw-session-adapter.ts",
-    reason: "ACP compatibility fallback still shells through the bridge layer when bridge.acpFallbackEnabled is enabled.",
-    blocksAcpBridgeRemoval: true,
-  },
-  {
-    id: "acp-bridge-command-surface",
-    module: "src/runtime/openclaw-exec-bridge.ts",
-    reason: "ACP spawn/status/cancel/close compatibility handlers still live inside the bridge command surface.",
-    blocksAcpBridgeRemoval: true,
-  },
-  {
-    id: "acp-bridge-doctor-shellout",
-    module: "src/cli/swarm-doctor.ts",
-    reason: "Doctor still shells into the bridge layer for ACP compatibility diagnostics whenever ACP bridge fallback is enabled.",
-    blocksAcpBridgeRemoval: true,
-  },
-];
+export const ACP_BRIDGE_REMOVAL_DEPENDENCIES: AcpBridgeExitDependency[] = [];
 
 export function buildAcpBridgeExitGate(
   runtimeVersion?: string | null,

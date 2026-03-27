@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { runBridgeCommandDirect } from "../../src/runtime/bridge-openclaw-session-adapter.js";
+import { runBridgeCommandDirect } from "../../src/runtime/bridge-openclaw-subagent-adapter.js";
 
 describe("e2e: live bridge timeout classification", () => {
   it("classifies a real hanging command as timeout", async () => {

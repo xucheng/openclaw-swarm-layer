@@ -22,7 +22,7 @@ type BridgeResponse<T> = {
   result: T;
 };
 
-function resolveBridgeScriptPath() {
+export function resolveBridgeScriptPath() {
   const currentFile = fileURLToPath(import.meta.url);
   let cursor = path.dirname(currentFile);
   while (true) {
@@ -39,7 +39,7 @@ function resolveBridgeScriptPath() {
   return path.join(cursor, "scripts", "openclaw-exec-bridge.mjs");
 }
 
-function resolveTsxLoaderPath() {
+export function resolveTsxLoaderPath() {
   const currentFile = fileURLToPath(import.meta.url);
   let cursor = path.dirname(currentFile);
   while (true) {
@@ -55,7 +55,7 @@ function resolveTsxLoaderPath() {
   }
 }
 
-async function runBridgeCommandDirect(
+export async function runBridgeCommandDirect(
   argv: string[],
   options: { cwd: string; input: string; timeoutMs: number },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -69,7 +69,11 @@ async function runBridgeCommandDirect(
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const timer = setTimeout(() => child.kill("SIGTERM"), options.timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+    }, options.timeoutMs);
     child.stdout.on("data", (chunk) => {
       stdout += chunk.toString();
     });
@@ -82,11 +86,15 @@ async function runBridgeCommandDirect(
       clearTimeout(timer);
       reject(error);
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ code: code ?? 1, stdout, stderr });
+      resolve({
+        code: signal ? 1 : code ?? 1,
+        stdout,
+        stderr: timedOut && stderr.trim().length === 0 ? `bridge timed out after ${options.timeoutMs}ms` : stderr,
+      });
     });
     child.stdin.write(options.input);
     child.stdin.end();

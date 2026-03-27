@@ -32,10 +32,21 @@ describe("StateStore", () => {
     expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp"]);
   });
 
-  it("includes subagent in fresh allowed runners only when explicitly enabled", () => {
+  it("keeps subagent out of fresh allowed runners when bridge opt-in is missing", () => {
     const workflow = createEmptyWorkflowState("/tmp/project", {
       defaultRunner: "subagent",
       subagent: { enabled: true },
+    } as any);
+
+    expect(workflow.runtime?.defaultRunner).toBe("manual");
+    expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp"]);
+  });
+
+  it("includes subagent in fresh allowed runners only when subagent bridge is enabled explicitly", () => {
+    const workflow = createEmptyWorkflowState("/tmp/project", {
+      defaultRunner: "subagent",
+      subagent: { enabled: true },
+      bridge: { subagentEnabled: true },
     } as any);
 
     expect(workflow.runtime?.defaultRunner).toBe("subagent");

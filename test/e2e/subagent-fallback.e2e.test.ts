@@ -17,6 +17,12 @@ describe("e2e: subagent fallback run", () => {
     const specPath = path.join(projectRoot, "SPEC-SUBAGENT.md");
     const stateStore = new StateStore({
       subagent: { enabled: true },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: false,
+        subagentEnabled: true,
+        versionAllow: [],
+      },
     });
     const subagentAdapter: OpenClawSubagentAdapter = {
       async spawnSubagent() {

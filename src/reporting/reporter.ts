@@ -90,11 +90,15 @@ function buildAcpBridgeExitGateLines(stateStore: StateStore): string[] {
     publicControlPlaneExportReady: null,
     evidenceMode: "runtime-version-only",
   });
+  const remainingDependencies =
+    gate.remainingBridgeDependencies.length > 0
+      ? gate.remainingBridgeDependencies.map((dependency) => dependency.id).join(", ")
+      : "none";
 
   return [
     ...formatAcpBridgeExitGateNotes(gate).map((line) => `- ${line}`),
     `- Live smoke matrix checks: ${gate.liveSmokeMatrix.map((check) => check.id).join(", ")}`,
-    `- Remaining ACP bridge dependencies: ${gate.remainingBridgeDependencies.map((dependency) => dependency.id).join(", ")}`,
+    `- Remaining ACP bridge dependencies: ${remainingDependencies}`,
   ];
 }
 

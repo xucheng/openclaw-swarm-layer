@@ -1,7 +1,7 @@
 import { runSwarmDoctor } from "../../../src/cli/swarm-doctor.js";
 
 describe("swarm doctor cli", () => {
-  it("reports public-api-only status when bridge fallback is disabled", async () => {
+  it("reports public-api-only status when ACP is enabled but the public export is unavailable", async () => {
     const result = await runSwarmDoctor(
       {},
       { config: { acp: { enabled: true }, bridge: { enabled: false } } as any, runtime: { version: "2026.3.24" } as any },
@@ -16,13 +16,13 @@ describe("swarm doctor cli", () => {
 
     expect(result.ok).toBe(false);
     expect(result.severity).toBe("blocked");
-    expect(result.blockers[0]).toContain("ACP is enabled");
-    expect(result.warnings[0]).toContain("public API readiness only");
+    expect(result.blockers[0]).toContain("public ACP control-plane export is not available");
+    expect(result.warnings[0]).toContain("ACP bridge has been removed");
     expect(result.warnings).toContain("Default runner resolution: auto -> manual on this install.");
     expect(result.warnings).toContain("Manual runner remains the safe explicit fallback.");
-    expect(result.warnings).toContain("ACP execution posture: public control-plane primary without bridge fallback.");
-    expect(result.warnings).toContain("ACP bridge fallback is disabled; automated ACP execution must use the public control-plane path.");
-    expect(result.warnings).toContain("Subagent posture: experimental (disabled by default).");
+    expect(result.warnings).toContain("ACP execution posture: public control-plane only.");
+    expect(result.warnings).toContain("ACP automation is unavailable on this install until the public control-plane export is ready.");
+    expect(result.warnings).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default).");
     expect(result.warnings).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(result.warnings).toContain("OpenClaw runtime version: 2026.3.24.");
     expect(result.warnings).toContain("ACP bridge exit gate: version floor satisfied, but the public ACP export is not ready on this install.");
@@ -35,7 +35,7 @@ describe("swarm doctor cli", () => {
     expect(result.migrationChecklist[0]).toContain("swarm doctor");
   });
 
-  it("returns a warning-only report when ACP is disabled and bridge fallback is off", async () => {
+  it("returns a warning-only report when ACP is disabled and subagent bridge is off", async () => {
     const result = await runSwarmDoctor(
       {},
       { config: { acp: { enabled: false }, bridge: { enabled: false } } as any },
@@ -55,7 +55,7 @@ describe("swarm doctor cli", () => {
     expect(result.warnings).toContain("ACP is disabled in plugin config; manual runner remains the safe fallback.");
   });
 
-  it("runs the bridge doctor command when bridge mode is enabled", async () => {
+  it("runs the bridge doctor command when subagent bridge mode is enabled", async () => {
     const commandRunner = vi.fn(async () => ({
       code: 0,
       stdout: JSON.stringify({
@@ -66,8 +66,8 @@ describe("swarm doctor cli", () => {
           compatibility: {
             strategy: "internal-bundle",
             testedAt: "2026-03-21",
-            supportedRunners: ["acp", "subagent"],
-            replacementCandidates: ["getAcpSessionManager", "spawnSubagentDirect"],
+            supportedRunners: ["subagent"],
+            replacementCandidates: ["spawnSubagentDirect"],
             notes: ["tested"],
           },
           publicApi: {
@@ -102,8 +102,11 @@ describe("swarm doctor cli", () => {
           acp: {
             enabled: true,
           },
+          subagent: {
+            enabled: true,
+          },
           bridge: {
-            acpFallbackEnabled: true,
+            subagentEnabled: true,
             nodePath: "/usr/bin/node",
             openclawRoot: "/opt/openclaw",
             versionAllow: ["2026.3.13"],
@@ -118,16 +121,16 @@ describe("swarm doctor cli", () => {
     expect(result.severity).toBe("healthy");
     expect(result.warnings).toContain("Default runner resolution: auto -> acp on this install.");
     expect(result.warnings).toContain("Manual runner remains the safe explicit fallback.");
-    expect(result.warnings).toContain("ACP execution posture: public control-plane primary with bridge compatibility fallback.");
-    expect(result.warnings).toContain("ACP bridge fallback is enabled for compatibility only; keep the public ACP control-plane as the normal execution path.");
+    expect(result.warnings).toContain("ACP execution posture: public control-plane only.");
+    expect(result.warnings).toContain("ACP automation now depends on the public control-plane path only.");
     expect(result.warnings).toContain("ACP bridge exit gate: current install 2026.3.13 is below the bridge-free support floor >=2026.3.22.");
     expect(result.acpBridgeExitGate.versionSatisfied).toBe(false);
     expect(result.acpBridgeExitGate.publicControlPlaneExportReady).toBe(true);
     expect(result.acpBridgeExitGate.readyForBridgeRemoval).toBe(false);
-    expect(result.nextAction).toBe("Keep ACP public control-plane as the default path; retain bridge only for compatibility fallback.");
+    expect(result.nextAction).toBe("Use the ACP public control-plane path as the supported execution path.");
   });
 
-  it("surfaces remediation returned by the bridge doctor", async () => {
+  it("surfaces remediation returned by the subagent bridge doctor", async () => {
     const commandRunner = vi.fn(async () => ({
       code: 0,
       stdout: JSON.stringify({
@@ -151,7 +154,7 @@ describe("swarm doctor cli", () => {
             versionMapped: false,
             versionAllowed: false,
             internalModuleResolved: false,
-            acpBackendHealthy: false,
+            acpBackendHealthy: true,
             subagentPatchable: false,
           },
           blockers: ["OpenClaw version 2026.3.99 is not in bridge allowlist"],
@@ -169,8 +172,9 @@ describe("swarm doctor cli", () => {
       {},
       {
         config: {
+          subagent: { enabled: true },
           bridge: {
-            acpFallbackEnabled: true,
+            subagentEnabled: true,
             nodePath: "/usr/bin/node",
             openclawRoot: "/opt/openclaw",
             versionAllow: ["2026.3.13"],
@@ -185,7 +189,7 @@ describe("swarm doctor cli", () => {
     expect(result.nextAction).toContain("versionAllow");
   });
 
-  it("marks subagent as experimental when it is enabled explicitly", async () => {
+  it("marks subagent as legacy bridge-backed when enabled without bridge support", async () => {
     const result = await runSwarmDoctor(
       {},
       { config: { subagent: { enabled: true }, bridge: { enabled: false } } as any },
@@ -198,11 +202,11 @@ describe("swarm doctor cli", () => {
       })) as any,
     );
 
-    expect(result.warnings).toContain("Subagent posture: experimental (enabled explicitly).");
-    expect(result.compatibility.notes).toContain("Subagent posture: experimental (enabled explicitly).");
+    expect(result.warnings).toContain("Subagent posture: legacy bridge-backed opt-in (bridge not enabled).");
+    expect(result.compatibility.notes).toContain("Subagent posture: legacy bridge-backed opt-in (bridge not enabled).");
   });
 
-  it("marks ACP bridge as legacy fallback when the public export is still missing", async () => {
+  it("warns when legacy ACP bridge config is still present", async () => {
     const result = await runSwarmDoctor(
       {},
       {
@@ -211,41 +215,21 @@ describe("swarm doctor cli", () => {
           bridge: { acpFallbackEnabled: true },
         } as any,
       },
+      undefined,
       vi.fn(async () => ({
-        code: 0,
-        stdout: JSON.stringify({
-          result: {
-            ok: true,
-            openclawRoot: "/opt/openclaw",
-            compatibility: {
-              supportedRunners: ["acp"],
-              replacementCandidates: [],
-              notes: [],
-            },
-            publicApi: {
-              acpControlPlaneExport: false,
-              subagentSpawnExport: false,
-              readyReplacementPoints: [],
-            },
-            replacementPlan: [],
-            migrationChecklist: [],
-            checks: {},
-            blockers: [],
-            warnings: [],
-            risks: [],
-            remediation: [],
-            nextAction: "Bridge checks passed.",
-            severity: "healthy",
-          },
-        }),
-        stderr: "",
+        acpControlPlaneExport: false,
+        subagentSpawnExport: false,
+        readyReplacementPoints: [],
+        notes: [],
       })) as any,
     );
 
     expect(result.warnings).toContain(
-      "ACP bridge fallback is enabled as a legacy compatibility path because the public ACP control-plane export is not ready.",
+      "ACP bridge fallback config is legacy and ignored; ACP automation now requires the public control-plane path.",
     );
-    expect(result.nextAction).toBe("Use bridge only as a legacy ACP compatibility fallback until the public control-plane export is ready.");
+    expect(result.nextAction).toBe(
+      "Keep manual runner as the baseline until the public ACP control-plane export is ready on this install.",
+    );
   });
 
   it("surfaces public api replacement readiness from public-api-only mode", async () => {
@@ -257,14 +241,14 @@ describe("swarm doctor cli", () => {
         acpControlPlaneExport: true,
         subagentSpawnExport: false,
         readyReplacementPoints: ["acp:getAcpSessionManager"],
-        notes: ["Public ACP runtime SDK exposes getAcpSessionManager(); ACP bridge replacement is now technically possible."],
+        notes: ["Public ACP runtime SDK exposes getAcpSessionManager(); ACP public control-plane execution is available."],
       })) as any,
     );
 
     expect(result.ok).toBe(true);
     expect(result.publicApi.acpControlPlaneExport).toBe(true);
-    expect(result.replacementPlan[0]?.status).toBe("ready");
-    expect(result.migrationChecklist[1]).toContain("[acp] Replace");
+    expect(result.replacementPlan[0]?.status).toBe("complete");
+    expect(result.migrationChecklist[1]).toContain("[acp] Keep real-openclaw-session-adapter");
     expect(result.acpBridgeExitGate.readyForBridgeRemoval).toBe(true);
   });
 });

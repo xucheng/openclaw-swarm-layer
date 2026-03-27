@@ -12,7 +12,7 @@ export type ReplacementPlanItem = {
   runner: "acp" | "subagent";
   publicExport: string;
   available: boolean;
-  status: "ready" | "blocked";
+  status: "complete" | "ready" | "blocked";
   currentImplementation: string;
   targetImplementation: string;
   affectedModules: string[];
@@ -25,7 +25,11 @@ export function buildMigrationChecklist(plan: ReplacementPlanItem[]): string[] {
   ];
 
   for (const item of plan) {
-    if (item.available) {
+    if (item.status === "complete") {
+      steps.push(
+        `[${item.runner}] Keep ${item.currentImplementation}. Review modules: ${item.affectedModules.join(", ")}.`,
+      );
+    } else if (item.available) {
       steps.push(
         `[${item.runner}] Replace ${item.currentImplementation} with ${item.targetImplementation}. Update modules: ${item.affectedModules.join(", ")}.`,
       );
@@ -37,7 +41,7 @@ export function buildMigrationChecklist(plan: ReplacementPlanItem[]): string[] {
   }
 
   steps.push(
-    "After any replacement, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
+    "After ACP or subagent runtime changes, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
   );
 
   return steps;
@@ -87,7 +91,7 @@ export async function detectPublicApiAvailability(
     notes.push(`Public ACP runtime SDK does not expose ${ACP_PUBLIC_REPLACEMENT_EXPORT}().`);
   } else {
     readyReplacementPoints.push(`acp:${ACP_PUBLIC_REPLACEMENT_EXPORT}`);
-    notes.push(`Public ACP runtime SDK exposes ${ACP_PUBLIC_REPLACEMENT_EXPORT}(); ACP bridge replacement is now technically possible.`);
+    notes.push(`Public ACP runtime SDK exposes ${ACP_PUBLIC_REPLACEMENT_EXPORT}(); ACP public control-plane execution is available.`);
   }
   if (!subagentSpawnExport) {
     notes.push(`Public plugin SDK does not expose ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}().`);
@@ -110,17 +114,16 @@ export function buildReplacementPlan(availability: PublicApiAvailability): Repla
       runner: "acp",
       publicExport: ACP_PUBLIC_REPLACEMENT_EXPORT,
       available: availability.acpControlPlaneExport,
-      status: availability.acpControlPlaneExport ? "ready" : "blocked",
-      currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-      targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+      status: availability.acpControlPlaneExport ? "complete" : "blocked",
+      currentImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+      targetImplementation: "public ACP control-plane as the supported execution path",
       affectedModules: [
-        "src/runtime/bridge-openclaw-session-adapter.ts",
-        "src/runtime/openclaw-exec-bridge.ts",
+        "src/cli/context.ts",
         "src/runtime/real-openclaw-session-adapter.ts",
       ],
       nextStep: availability.acpControlPlaneExport
-        ? "Prototype replacing the ACP bridge control-plane path with the public export."
-        : "Keep using the bridge-backed ACP adapter until a public control-plane export is available.",
+        ? "Keep ACP on the public control-plane path and avoid reintroducing bridge fallbacks."
+        : "Keep using manual runner until a public control-plane export is available.",
     },
     {
       runner: "subagent",

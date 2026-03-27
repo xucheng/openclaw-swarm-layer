@@ -4,69 +4,45 @@ import path from "node:path";
 import { runSwarmInit } from "../../src/cli/swarm-init.js";
 import { runSwarmPlan } from "../../src/cli/swarm-plan.js";
 import { runSwarmRun } from "../../src/cli/swarm-run.js";
-import { BridgeOpenClawSessionAdapter } from "../../src/runtime/bridge-openclaw-session-adapter.js";
 import { StateStore } from "../../src/state/state-store.js";
 
 async function makeTempProject(): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-acp-bridge-"));
+  return fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-acp-legacy-bridge-"));
 }
 
-describe("e2e: bridge-backed ACP runner path", () => {
-  it("uses the bridge-backed session adapter when ACP bridge fallback is enabled", async () => {
+describe("e2e: ACP legacy bridge config", () => {
+  it("ignores legacy ACP bridge config and keeps auto on manual when the public path is unavailable", async () => {
     const projectRoot = await makeTempProject();
-    const specPath = path.join(projectRoot, "SPEC-BRIDGE.md");
-    const stateStore = new StateStore({
-      bridge: {
-        enabled: true,
-        acpFallbackEnabled: true,
-        subagentEnabled: false,
-        openclawRoot: "/opt/openclaw",
-        versionAllow: ["2026.2.26"],
-      },
-      acp: {
-        enabled: true,
-        backendId: "acpx",
-        defaultAgentId: "codex",
-        allowedAgents: ["codex"],
-        defaultMode: "run",
-        allowThreadBinding: false,
-        defaultTimeoutSeconds: 60,
-        experimentalControlPlaneAdapter: false,
-      },
-    });
-    const bridgeRunner = vi.fn(async () => ({
-      code: 0,
-      stdout: JSON.stringify({
-        ok: true,
-        version: "2026.2.26",
-        result: {
-          sessionKey: "agent:codex:acp:bridge",
-          backend: "acpx",
-          acceptedAt: "2026-03-21T00:00:00.000Z",
+    const specPath = path.join(projectRoot, "SPEC-LEGACY-ACP-BRIDGE.md");
+    const stateStore = new StateStore(
+      {
+        bridge: {
+          enabled: false,
+          acpFallbackEnabled: true,
+          subagentEnabled: false,
+          openclawRoot: "/opt/openclaw",
+          versionAllow: ["2026.3.13"],
         },
-      }),
-      stderr: "",
-      pid: 1,
-      signal: null,
-      killed: false,
-    }));
-    const sessionAdapter = new BridgeOpenClawSessionAdapter(
-      undefined,
-      stateStore.config,
-      "/usr/bin/node",
-      "/tmp/openclaw-exec-bridge.mjs",
-      "/tmp/tsx-loader.mjs",
-      bridgeRunner,
+        acp: {
+          enabled: true,
+          backendId: "acpx",
+          defaultAgentId: "codex",
+          allowedAgents: ["codex"],
+          defaultMode: "run",
+          allowThreadBinding: false,
+          defaultTimeoutSeconds: 60,
+          experimentalControlPlaneAdapter: false,
+        },
+      },
+      { runtimeVersion: "2026.3.13" },
     );
-    await fs.writeFile(specPath, "# Bridge Spec\n\n## Goals\n- use ACP bridge\n\n## Phases\n### Execute\n- Use bridge\n", "utf8");
+    await fs.writeFile(specPath, "# Legacy ACP Bridge Spec\n\n## Goals\n- stay manual\n", "utf8");
 
     await runSwarmInit({ project: projectRoot }, { stateStore });
-    await runSwarmPlan({ project: projectRoot, spec: specPath }, { stateStore });
-    const result = await runSwarmRun({ project: projectRoot, runner: "acp" }, { stateStore, sessionAdapter });
-    const runs = await stateStore.loadRuns(projectRoot);
+    const planResult = await runSwarmPlan({ project: projectRoot, spec: specPath }, { stateStore });
+    const result = await runSwarmRun({ project: projectRoot, dryRun: true }, { stateStore });
 
-    expect((result as any).action).toBe("dispatched");
-    expect(runs[0]?.sessionRef?.sessionKey).toBe("agent:codex:acp:bridge");
-    expect(bridgeRunner).toHaveBeenCalledTimes(1);
+    expect(planResult.runtime.resolvedDefaultRunner).toBe("manual");
+    expect((result as any).runtime.resolvedDefaultRunner).toBe("manual");
   });
 });

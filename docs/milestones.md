@@ -12,9 +12,8 @@
 ### M5 Overall DoD
 
 - ACP is the only default-capable automated runner
-- `subagent` is opt-in and disabled by default
-- bridge is scoped to compatibility fallback by runner
-- supported OpenClaw versions use the public ACP path as the normal path
+- ACP automation uses the public control-plane path as the supported path
+- `subagent` is retained only as a legacy bridge-backed opt-in path
 - historical workflows, runs, and sessions remain readable
 
 ### M5.4a DoD
@@ -27,27 +26,25 @@
 
 Current status: complete (2026-03-27).
 
-Completion evidence:
-
-- version floor fixed at `>=2026.3.22`
-- doctor, status, and report surfaces implemented
-- unit, e2e, and build gates green
-- full local smoke matrix rerun successfully on `OpenClaw 2026.3.24`
-- direct smoke, dry-run, live run, session lifecycle, and review/report/journal sync all verified with `opencode` as the local ACP default agent
-
-Operational note:
-
-- the previously observed `openclaw swarm doctor --json` hang was sandbox-specific; outside the sandbox the command exits normally
-
-Exit rule: satisfied on 2026-03-27.
-
 ### M5.4b DoD
 
 - ACP bridge code can be removed without breaking the default path on supported installs
 - bridge-specific ACP compatibility logic is deleted or isolated behind legacy-only guards
 - operator guidance no longer depends on ACP bridge as a supported runtime path
 
-Current status: planned.
+Current status: complete (2026-03-27).
+
+Completion evidence:
+
+- `resolveSessionAdapter()` now resolves only the public ACP adapter or the unsupported adapter
+- ACP bridge command handlers are removed from `openclaw-exec-bridge.ts`
+- doctor, status, and report surfaces now show `remainingBridgeDependencies = []`
+- legacy `bridge.acpFallbackEnabled` no longer grants ACP capability and is surfaced only as guidance
+- unit, e2e, and build gates are green
+- local `openclaw swarm doctor --json` is green on `OpenClaw 2026.3.24`
+- local ACP dry-run smoke still resolves and selects `acp` after bridge removal
+
+Exit rule: satisfied on 2026-03-27.
 
 ### M5.4c DoD
 
@@ -55,7 +52,17 @@ Current status: planned.
 - if retained, `subagent` has a justified posture and documented support boundary
 - if removed, historical reads remain intact and migration guidance is documented
 
-Current status: planned.
+Current status: complete (2026-03-27).
+
+Completion evidence:
+
+- runtime policy now treats `subagent` as enabled only when both `subagent.enabled=true` and `bridge.subagentEnabled=true`
+- `defaultRunner="subagent"` is rejected unless the subagent bridge flag is also enabled
+- doctor, status, workflow reports, and session follow-up surfaces now describe subagent as `legacy bridge-backed opt-in`
+- live subagent bridge tests still pass when the opt-in flags are present
+- historical workflow, run, and session reads remain unchanged
+
+Exit rule: satisfied on 2026-03-27.
 
 ## Assessment History
 
@@ -66,3 +73,5 @@ Current status: planned.
 - `M5.3.x-1` complete (2026-03-26): 303 unit tests across 52 files, 25 e2e tests across 18 files, build clean
 - `M5.3.x-2` complete (2026-03-26): 303 unit tests across 52 files, 25 e2e tests across 18 files, build clean
 - `M5.4a` complete (2026-03-27): 306 unit tests across 53 files, 25 e2e tests across 18 files, build clean; full local smoke matrix green on `OpenClaw 2026.3.24`
+- `M5.4b` complete (2026-03-27): 300 unit tests across 51 files, 23 e2e tests across 18 files, build clean; local doctor and ACP dry-run smoke green on `OpenClaw 2026.3.24`
+- `M5.4c` complete (2026-03-27): 305 unit tests across 51 files, 23 e2e tests across 18 files, build clean; subagent retained only as a legacy bridge-backed opt-in path

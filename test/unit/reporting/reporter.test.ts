@@ -90,18 +90,16 @@ describe("reporter", () => {
     expect(report).toContain("Allowed runners: manual, acp");
     expect(report).toContain("Default runner resolution: auto -> acp on this install");
     expect(report).toContain("Manual runner fallback: available");
-    expect(report).toContain("ACP execution posture: public control-plane primary without bridge fallback");
+    expect(report).toContain("ACP execution posture: public control-plane only");
     expect(report).toContain("Subagent enabled: no");
-    expect(report).toContain("Subagent posture: experimental (disabled by default)");
+    expect(report).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(report).toContain("## ACP Bridge Exit Gate");
     expect(report).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(report).toContain("OpenClaw runtime version: 2026.3.24.");
     expect(report).toContain(
       "Live smoke matrix checks: acp-backend-direct, swarm-doctor, swarm-init-plan-status, swarm-dry-run, swarm-live-run, swarm-session-lifecycle, swarm-review-report-journal",
     );
-    expect(report).toContain(
-      "Remaining ACP bridge dependencies: acp-bridge-session-adapter, acp-bridge-command-surface, acp-bridge-doctor-shellout",
-    );
+    expect(report).toContain("Remaining ACP bridge dependencies: none");
     expect(report).toContain("## Recent Runs");
     expect(report).toContain("subagent finished cleanly");
     expect(report).toContain("## Review Queue");
@@ -172,8 +170,8 @@ describe("reporter", () => {
     expect(localContent).toContain("Resolved default runner: acp");
     expect(localContent).toContain("Default runner resolution: auto -> acp on this install");
     expect(localContent).toContain("Manual runner fallback: available");
-    expect(localContent).toContain("ACP execution posture: public control-plane primary without bridge fallback");
-    expect(localContent).toContain("Subagent posture: experimental (disabled by default)");
+    expect(localContent).toContain("ACP execution posture: public control-plane only");
+    expect(localContent).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(localContent).toContain("## ACP Bridge Exit Gate");
     expect(localContent).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(localContent).toContain("## Sessions");

@@ -9,8 +9,8 @@ The plugin now ships with an ACP-first posture:
 - `defaultRunner` defaults to `"auto"`.
 - `"auto"` resolves to `acp` only when ACP automation is actually available on the current install.
 - If ACP automation is unavailable, `"auto"` resolves to `manual`.
-- `subagent` is experimental and disabled by default.
-- Bridge is compatibility fallback only.
+- `subagent` is a legacy bridge-backed opt-in path and is disabled by default.
+- Bridge is retained only for the legacy subagent path.
 
 ## Top-Level Options
 
@@ -46,21 +46,21 @@ Controls the primary automation path.
 
 ## Subagent Configuration (`subagent`)
 
-Controls the experimental subagent runner.
+Controls the legacy bridge-backed subagent runner.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Explicitly opt in to experimental subagent dispatch |
+| `enabled` | boolean | `false` | Explicitly opt in to legacy bridge-backed subagent dispatch |
 
 ## Bridge Configuration (`bridge`)
 
-Controls compatibility fallback for ACP and subagent.
+Controls legacy bridge compatibility settings.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Legacy umbrella alias. Still readable, but prefer runner-scoped flags below |
-| `acpFallbackEnabled` | boolean | `false` | Enable ACP bridge fallback for compatibility |
-| `subagentEnabled` | boolean | `false` | Enable subagent bridge-backed execution |
+| `enabled` | boolean | `false` | Legacy umbrella alias. Still readable, but prefer `subagentEnabled` below |
+| `acpFallbackEnabled` | boolean | `false` | Legacy ACP bridge flag. Ignored for runtime capability |
+| `subagentEnabled` | boolean | `false` | Enable legacy bridge-backed subagent execution |
 | `nodePath` | string | - | Path to Node.js binary. Usually `$(which node)` |
 | `openclawRoot` | string | - | Path to OpenClaw installation root |
 | `versionAllow` | string[] | `[]` | Allowed OpenClaw versions for bridge compatibility |
@@ -68,8 +68,9 @@ Controls compatibility fallback for ACP and subagent.
 Notes:
 
 - `bridge.enabled=true` is still accepted as a deprecated umbrella alias.
-- New configs should prefer `bridge.acpFallbackEnabled` and `bridge.subagentEnabled`.
-- Bridge should be enabled only when doctor output says public ACP is unavailable or incomplete and you deliberately want compatibility fallback.
+- New configs should not rely on `bridge.acpFallbackEnabled`; it is guidance-only after ACP bridge removal.
+- New configs should prefer `bridge.subagentEnabled` only when they intentionally retain the legacy subagent path.
+- `defaultRunner="subagent"` requires both `subagent.enabled=true` and `bridge.subagentEnabled=true`.
 
 ## Journal Configuration (`journal`)
 
@@ -137,7 +138,7 @@ This enables CLI and tools with the default `auto` runner policy. Because ACP is
 
 Use this on OpenClaw builds where the public ACP control-plane path is available. On supported installs, `auto` resolves to `acp`.
 
-## ACP Compatibility Fallback Configuration
+## Legacy ACP Bridge Config (Ignored)
 
 ```json
 {
@@ -165,9 +166,9 @@ Use this on OpenClaw builds where the public ACP control-plane path is available
 }
 ```
 
-Use this only when `swarm doctor` says public ACP is unavailable or incomplete and you intentionally want bridge compatibility fallback.
+This config is still readable, but it no longer enables ACP automation. Keep it only until you clean up stale config.
 
-## Subagent Experimental Configuration
+## Subagent Legacy Opt-In Configuration
 
 ```json
 {
@@ -191,7 +192,7 @@ Use this only when `swarm doctor` says public ACP is unavailable or incomplete a
 }
 ```
 
-`subagent` is still experimental. Keep it opt-in and do not treat it as the normal default path.
+`subagent` remains a legacy bridge-backed opt-in path. Keep it opt-in and do not treat it as the normal default path.
 
 ## Journaling Example
 

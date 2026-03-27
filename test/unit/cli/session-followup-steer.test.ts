@@ -147,7 +147,7 @@ describe("session follow-up and steer", () => {
     )) as any;
 
     expect(result.ok).toBe(false);
-    expect(result.error).toContain("subagent runner is disabled by config");
+    expect(result.error).toContain("legacy bridge-backed opt-in path");
   });
 
   it("steer sends a message to an active session", async () => {

@@ -19,6 +19,12 @@ describe("e2e: subagent bridge lifecycle", () => {
     const specPath = path.join(projectRoot, "SPEC-SUB-LIFE.md");
     const stateStore = new StateStore({
       subagent: { enabled: true },
+      bridge: {
+        enabled: true,
+        acpFallbackEnabled: false,
+        subagentEnabled: true,
+        versionAllow: [],
+      },
     });
     let currentState: "running" | "completed" = "running";
     const subagentAdapter: OpenClawSubagentAdapter = {

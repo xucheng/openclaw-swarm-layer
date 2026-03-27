@@ -26,7 +26,7 @@ describe("e2e: subagent dark mode", () => {
     expect((result as any).ok).toBe(false);
     expect((result as any).action).toBe("noop");
     expect((result as any).selectedRunner).toBe("subagent");
-    expect((result as any).message).toContain("subagent runner is disabled by config");
+    expect((result as any).message).toContain("legacy bridge-backed opt-in path");
     expect(runs).toEqual([]);
   });
 });

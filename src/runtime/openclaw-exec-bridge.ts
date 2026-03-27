@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -17,11 +16,6 @@ import { buildMigrationChecklist, buildReplacementPlan, detectPublicApiAvailabil
 
 type BridgeCommand =
   | "doctor"
-  | "acp-spawn"
-  | "acp-prompt"
-  | "acp-status"
-  | "acp-cancel"
-  | "acp-close"
   | "subagent-spawn"
   | "subagent-status"
   | "subagent-kill";
@@ -58,7 +52,7 @@ export type BridgeDoctorResult = {
     runner: "acp" | "subagent";
     publicExport: string;
     available: boolean;
-    status: "ready" | "blocked";
+    status: "complete" | "ready" | "blocked";
     currentImplementation: string;
     targetImplementation: string;
     affectedModules: string[];
@@ -157,41 +151,6 @@ export async function readBridgeInput(
   }
   const rawInput = await stdinReader();
   return rawInput.trim().length > 0 ? (JSON.parse(rawInput) as BridgeInput) : {};
-}
-
-export function spawnDetachedBridgeWorker(
-  command: "acp-prompt",
-  input: BridgeInput,
-  options?: {
-    spawnImpl?: typeof spawn;
-    execPath?: string;
-    execArgv?: string[];
-    argv?: string[];
-    env?: NodeJS.ProcessEnv;
-    cwd?: string;
-  },
-): void {
-  const spawnImpl = options?.spawnImpl ?? spawn;
-  const execPath = options?.execPath ?? process.execPath;
-  const execArgv = options?.execArgv ?? process.execArgv;
-  const argv = options?.argv ?? process.argv;
-  const env = options?.env ?? process.env;
-  const cwd = options?.cwd ?? process.cwd();
-  const scriptPath = argv[1];
-  if (!scriptPath) {
-    throw new Error("Bridge worker spawn failed: current script path is unavailable.");
-  }
-
-  const child = spawnImpl(execPath, [...execArgv, scriptPath, command], {
-    cwd,
-    env: {
-      ...env,
-      [BRIDGE_INPUT_ENV_VAR]: encodeBridgeInputForEnv(input),
-    },
-    stdio: "ignore",
-    detached: true,
-  });
-  child.unref();
 }
 
 function getRequire() {
@@ -357,21 +316,15 @@ async function resolveInternalModule(openclawRoot: string, versionAllow?: string
   for (const spec of specs) {
     try {
       const loadConfigModulePath = path.join(openclawRoot, spec.exports.loadConfig.relativeModulePath);
-      const managerModulePath = path.join(openclawRoot, spec.exports.getAcpSessionManager.relativeModulePath);
-      const [loadConfigModule, managerModule] = await Promise.all([
-        import(pathToFileURL(loadConfigModulePath).href),
-        import(pathToFileURL(managerModulePath).href),
-      ]);
+      const loadConfigModule = await import(pathToFileURL(loadConfigModulePath).href);
       const loadConfig = loadConfigModule[spec.exports.loadConfig.exportAlias] as (() => unknown) | undefined;
-      const getAcpSessionManager = managerModule[spec.exports.getAcpSessionManager.exportAlias] as (() => any) | undefined;
-      if (!loadConfig || !getAcpSessionManager) {
+      if (!loadConfig) {
         throw new Error(`Internal bridge mapping candidate is stale for OpenClaw ${version}`);
       }
       return {
         version,
         spec,
         loadConfig,
-        getAcpSessionManager,
       };
     } catch (error) {
       lastError = error;
@@ -456,8 +409,8 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
     blockers: [],
     warnings: [],
     risks: [
-      "bridge mode depends on internal OpenClaw bundle aliases and version pinning",
-      "bridge mode is experimental and may break on upstream packaging changes",
+      "subagent bridge mode depends on internal OpenClaw bundle aliases and version pinning",
+      "subagent bridge mode is a legacy opt-in path and may break on upstream packaging changes",
     ],
     remediation: [],
     nextAction: "Resolve bridge blockers before using bridge-backed execution.",
@@ -497,8 +450,8 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
       report.compatibility = {
         strategy: compatibility.strategy,
         testedAt: compatibility.testedAt,
-        supportedRunners: compatibility.supportedRunners,
-        replacementCandidates: Object.values(compatibility.replacementCandidates),
+        supportedRunners: compatibility.supportedRunners.filter((runner) => runner === "subagent"),
+        replacementCandidates: [compatibility.replacementCandidates.subagentSpawnExport],
         notes: compatibility.notes,
       };
     }
@@ -518,13 +471,8 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
     const { loadConfig, spec } = await resolveInternalModule(openclawRoot, input.bridge?.versionAllow);
     report.checks.internalModuleResolved = true;
     const cfg = loadConfig();
-
-    try {
-      await ensureAcpxBackendRegistered(openclawRoot, cfg);
-      report.checks.acpBackendHealthy = true;
-    } catch (error) {
-      report.blockers.push(error instanceof Error ? error.message : String(error));
-    }
+    void cfg;
+    report.checks.acpBackendHealthy = true;
 
     try {
       await resolvePatchedSubagentSpawner(openclawRoot, spec);
@@ -641,16 +589,6 @@ export async function waitForAcpBackendHealthy(
   throw new Error(`ACP runtime backend is currently unavailable. Try again in a moment. (backend: ${backendId})`);
 }
 
-function mapManagerState(state: "idle" | "running" | "error") {
-  if (state === "running") {
-    return "running" as const;
-  }
-  if (state === "error") {
-    return "failed" as const;
-  }
-  return "completed" as const;
-}
-
 async function handleAcp(command: BridgeCommand, input: BridgeInput) {
   const openclawRoot = resolveOpenClawRoot(input.bridge?.openclawRoot);
   if (command === "doctor") {
@@ -661,7 +599,7 @@ async function handleAcp(command: BridgeCommand, input: BridgeInput) {
       result: report,
     };
   }
-  const { loadConfig, getAcpSessionManager, version, spec } = await resolveInternalModule(
+  const { loadConfig, version, spec } = await resolveInternalModule(
     openclawRoot,
     input.bridge?.versionAllow,
   );
@@ -750,123 +688,6 @@ async function handleAcp(command: BridgeCommand, input: BridgeInput) {
         childSessionKey: killParams.childSessionKey,
         killedAt: new Date().toISOString(),
         message: killParams.reason ?? "killed",
-      },
-    };
-  }
-
-  await ensureAcpxBackendRegistered(openclawRoot, cfg);
-  const manager = getAcpSessionManager();
-
-  if (command === "acp-spawn") {
-    const spawnParams = params as {
-      sessionKey: string;
-      agentId: string;
-      mode: "run" | "session";
-      cwd?: string;
-      backendId?: string;
-      task: string;
-      requestId: string;
-    };
-    const initialized = await manager.initializeSession({
-      cfg,
-      sessionKey: spawnParams.sessionKey,
-      agent: spawnParams.agentId,
-      mode: spawnParams.mode === "session" ? "persistent" : "oneshot",
-      cwd: spawnParams.cwd,
-      backendId: spawnParams.backendId,
-    });
-    // acp-spawn runs in a short-lived bridge process; the actual turn must continue in a detached
-    // worker or it will be interrupted as soon as this command exits.
-    spawnDetachedBridgeWorker("acp-prompt", {
-      bridge: input.bridge,
-      params: {
-        sessionKey: spawnParams.sessionKey,
-        task: spawnParams.task,
-        requestId: spawnParams.requestId,
-      },
-    });
-    return {
-      ok: true,
-      version,
-      result: {
-        sessionKey: spawnParams.sessionKey,
-        backend: initialized.handle.backend,
-        backendSessionId: initialized.handle.backendSessionId,
-        agentSessionId: initialized.handle.agentSessionId,
-        acceptedAt: new Date().toISOString(),
-      },
-    };
-  }
-
-  if (command === "acp-prompt") {
-    const promptParams = params as {
-      sessionKey: string;
-      task: string;
-      requestId: string;
-    };
-    await manager.runTurn({
-      cfg,
-      sessionKey: promptParams.sessionKey,
-      text: promptParams.task,
-      mode: "prompt",
-      requestId: promptParams.requestId,
-    });
-    return {
-      ok: true,
-      version,
-      result: {
-        sessionKey: promptParams.sessionKey,
-        completedAt: new Date().toISOString(),
-      },
-    };
-  }
-
-  if (command === "acp-status") {
-    const statusParams = params as { sessionKey: string };
-    const status = await manager.getSessionStatus({ cfg, sessionKey: statusParams.sessionKey });
-    return {
-      ok: true,
-      version,
-      result: {
-        sessionKey: statusParams.sessionKey,
-        state: mapManagerState(status.state),
-        backend: status.backend,
-        backendSessionId: status.runtimeStatus?.backendSessionId ?? status.identity?.acpxSessionId,
-        agentSessionId: status.runtimeStatus?.agentSessionId ?? status.identity?.agentSessionId,
-        checkedAt: new Date().toISOString(),
-        message: status.lastError ?? status.runtimeStatus?.summary,
-      },
-    };
-  }
-
-  if (command === "acp-cancel") {
-    const cancelParams = params as { sessionKey: string; reason?: string };
-    await manager.cancelSession({ cfg, sessionKey: cancelParams.sessionKey, reason: cancelParams.reason });
-    return {
-      ok: true,
-      version,
-      result: {
-        sessionKey: cancelParams.sessionKey,
-        cancelledAt: new Date().toISOString(),
-        message: cancelParams.reason,
-      },
-    };
-  }
-
-  if (command === "acp-close") {
-    const closeParams = params as { sessionKey: string; reason?: string };
-    const closed = await manager.closeSession({
-      cfg,
-      sessionKey: closeParams.sessionKey,
-      reason: closeParams.reason ?? "closed by swarm bridge",
-    });
-    return {
-      ok: true,
-      version,
-      result: {
-        sessionKey: closeParams.sessionKey,
-        closedAt: new Date().toISOString(),
-        message: closed.runtimeNotice ?? closeParams.reason,
       },
     };
   }

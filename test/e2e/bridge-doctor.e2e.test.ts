@@ -1,13 +1,17 @@
 import { runSwarmDoctor } from "../../src/cli/swarm-doctor.js";
 
 describe("e2e: bridge doctor", () => {
-  it("returns a structured doctor result via bridge runner", async () => {
+  it("returns a structured doctor result via subagent bridge runner", async () => {
     const result = await runSwarmDoctor(
       {},
       {
         config: {
+          subagent: {
+            enabled: true,
+          },
           bridge: {
             enabled: true,
+            subagentEnabled: true,
             nodePath: "/usr/bin/node",
             openclawRoot: "/opt/openclaw",
             versionAllow: ["2026.3.13"],
@@ -24,8 +28,8 @@ describe("e2e: bridge doctor", () => {
             compatibility: {
               strategy: "internal-bundle",
               testedAt: "2026-03-21",
-              supportedRunners: ["acp", "subagent"],
-              replacementCandidates: ["getAcpSessionManager", "spawnSubagentDirect"],
+              supportedRunners: ["subagent"],
+              replacementCandidates: ["spawnSubagentDirect"],
               notes: ["tested"],
             },
             publicApi: {
@@ -39,14 +43,13 @@ describe("e2e: bridge doctor", () => {
                 publicExport: "getAcpSessionManager",
                 available: false,
                 status: "blocked",
-                currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-                targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+                currentImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+                targetImplementation: "public ACP control-plane as the supported execution path",
                 affectedModules: [
-                  "src/runtime/bridge-openclaw-session-adapter.ts",
-                  "src/runtime/openclaw-exec-bridge.ts",
+                  "src/cli/context.ts",
                   "src/runtime/real-openclaw-session-adapter.ts",
                 ],
-                nextStep: "Keep using the bridge-backed ACP adapter until a public control-plane export is available.",
+                nextStep: "Keep using manual runner until a public control-plane export is available.",
               },
               {
                 runner: "subagent",
@@ -63,10 +66,10 @@ describe("e2e: bridge doctor", () => {
               },
             ],
             migrationChecklist: [
-              "Run openclaw swarm doctor --json before changing bridge or public API integration code.",
-              "[acp] Keep the current bridge path until the public export getAcpSessionManager is available.",
+              "Run `openclaw swarm doctor --json` before changing bridge or public API integration code.",
+              "[acp] Keep real-openclaw-session-adapter via public acp-runtime export. Review modules: src/cli/context.ts, src/runtime/real-openclaw-session-adapter.ts.",
               "[subagent] Keep the current bridge path until the public export spawnSubagentDirect is available.",
-              "After any replacement, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
+              "After ACP or subagent runtime changes, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
             ],
             checks: {
               versionMapped: true,
@@ -102,8 +105,12 @@ describe("e2e: bridge doctor", () => {
       {},
       {
         config: {
+          subagent: {
+            enabled: true,
+          },
           bridge: {
             enabled: true,
+            subagentEnabled: true,
             nodePath: "/usr/bin/node",
             openclawRoot: "/opt/openclaw",
             versionAllow: ["2026.3.13"],
@@ -133,7 +140,7 @@ describe("e2e: bridge doctor", () => {
               versionMapped: false,
               versionAllowed: false,
               internalModuleResolved: false,
-              acpBackendHealthy: false,
+              acpBackendHealthy: true,
               subagentPatchable: false,
             },
             blockers: ["OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)"],

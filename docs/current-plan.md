@@ -19,10 +19,10 @@
 - `M5.3.x-1`: complete (2026-03-26)
 - `M5.3.x-2`: complete (2026-03-26)
 - `M5.4a`: complete (2026-03-27)
-- `M5.4b`: planned
-- `M5.4c`: planned
+- `M5.4b`: complete (2026-03-27)
+- `M5.4c`: complete (2026-03-27)
 
-The active frontier now moves to `M5.4b ACP Bridge Removal`. `M5.4a ACP Version Floor Gate` is closed after the local `OpenClaw 2026.3.24` install passed the full smoke matrix.
+The five-stage roadmap is now complete. `M5.4c Subagent Final Decision` closed with `subagent` retained only as a legacy bridge-backed opt-in path, while ACP stays public-only.
 
 ## M5 Delivery Matrix
 
@@ -35,45 +35,35 @@ The active frontier now moves to `M5.4b ACP Bridge Removal`. `M5.4a ACP Version 
 | `M5.3.x-1` | Capability-aware auto resolution | Complete | Closed 2026-03-26 |
 | `M5.3.x-2` | Docs and operator surface alignment | Complete | Closed 2026-03-26 |
 | `M5.4a` | ACP version floor gate | Complete | Closed 2026-03-27 after full local smoke matrix rerun |
-| `M5.4b` | ACP bridge removal | Planned | Next slice; start from the remaining ACP bridge dependencies already enumerated in gate metadata |
-| `M5.4c` | Subagent final decision | Planned | Independent of ACP bridge exit |
+| `M5.4b` | ACP bridge removal | Complete | Closed 2026-03-27 after code removal, regression, and local smoke rerun |
+| `M5.4c` | Subagent final decision | Complete | Closed 2026-03-27 with subagent retained as a legacy bridge-backed opt-in path |
 
-## M5.4a Closeout
+## M5.4c Closeout
 
-- exported the bridge-free ACP floor as `ACP_BRIDGE_FREE_VERSION_FLOOR = 2026.3.22`
-- added `acpBridgeExitGate` to `swarm doctor`, `swarm status`, and workflow reports
-- codified the live smoke matrix and remaining ACP bridge dependencies in runtime metadata
-- updated the ACP backend direct smoke script so it follows the configured default agent and validates the current local direct route (`opencode` on `qwen3.5-plus`)
-- reran the full local smoke matrix with `opencode` as the effective ACP default agent
-- confirmed the complete report and journal artifact structure with real smoke projects
+- removed the ACP bridge session adapter and the ACP bridge command surface
+- made `resolveSessionAdapter()` public-ACP-only; unsupported installs now fall back to `manual`, not ACP bridge
+- stopped `auto` runner resolution from treating `bridge.acpFallbackEnabled` as ACP capability
+- changed `swarm doctor`, `swarm status`, and reports to treat ACP bridge as removed and to track `0` remaining ACP bridge blockers
+- finalized `subagent` posture as legacy bridge-backed opt-in instead of experimental/default-capable
+- required both `subagent.enabled=true` and `bridge.subagentEnabled=true` before `subagent` is treated as enabled or default-capable
+- updated doctor, status, workflow reports, and session follow-up errors to surface the legacy support boundary
+- kept historical workflows, runs, and sessions readable while leaving the live subagent path opt-in only
 
 ## Verification
 
-Implementation gates remain green:
+Implementation gates are green:
 
-- unit regression: `vitest run test/unit` -> 53 files, 306 tests passed
-- milestone regression: `vitest run test/e2e` -> 18 files, 25 tests passed
+- unit regression: `vitest run test/unit` -> 51 files, 305 tests passed
+- milestone regression: `vitest run test/e2e` -> 18 files, 23 tests passed
 - compile gate: `npm run build` -> clean
 
-Live smoke matrix on the local `2026.3.24` install is now green:
+Outcome posture:
 
-- pass: `~/.openclaw/scripts/openclaw-acp-post-upgrade-smoke.sh`
-- pass: `openclaw swarm doctor --json`
-- pass: `openclaw swarm init --project <path>`
-- pass: `openclaw swarm plan --project <path> --spec <spec> --json`
-- pass: `openclaw swarm status --project <path> --json`
-- pass: `openclaw swarm run --project <path> --dry-run --json`
-- pass: `openclaw swarm run --project <path> --json` via `agent:opencode:acp:...`
-- pass: `openclaw swarm session status --project <path> --run <runId> --json`
-- pass: `openclaw swarm session cancel --project <path> --run <runId> --json`
-- pass: `openclaw swarm session close --project <path> --run <runId> --json`
-- pass: `openclaw swarm review --project <path> --task <taskId> --approve --json`
-- pass: `openclaw swarm report --project <path> --json`
-
-Operational note:
-
-- the earlier `openclaw swarm doctor --json` “hang” reproduced only inside the Codex sandbox; outside the sandbox the command exits normally, so it is not currently treated as a swarm-layer product blocker
+- ACP remains the only default-capable automated runner and uses the public control-plane path only
+- `subagent` remains available only as a legacy bridge-backed opt-in path
+- `subagent` is not default-capable unless both the explicit subagent flag and bridge flag are enabled
+- any future public subagent path should be treated as a new follow-on milestone, not implied by M5
 
 ## Next Slice
 
-Advance to `M5.4b ACP Bridge Removal`, using the enumerated bridge dependencies as the deletion boundary and keeping `subagent` decisions isolated to `M5.4c`.
+No further M5 convergence slice is open. Future work should either stay in post-M5 maintenance/release hardening or start a new milestone only if upstream exposes a public subagent spawn API.

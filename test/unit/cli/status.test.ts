@@ -111,8 +111,8 @@ describe("swarm status cli", () => {
     });
     expect(result.notes).toContain("Default runner resolution: auto -> acp on this install.");
     expect(result.notes).toContain("Manual runner remains the safe explicit fallback.");
-    expect(result.notes).toContain("ACP execution posture: public control-plane primary without bridge fallback.");
-    expect(result.notes).toContain("Subagent posture: experimental (disabled by default).");
+    expect(result.notes).toContain("ACP execution posture: public control-plane only.");
+    expect(result.notes).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default).");
     expect(result.notes).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(result.notes).toContain("OpenClaw runtime version: 2026.3.24.");
     expect(result.notes).toContain(

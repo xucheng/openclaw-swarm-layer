@@ -41,13 +41,16 @@ describe("swarm plugin config", () => {
     expect(resolved.defaultRunner).toBe("auto");
   });
 
-  it("keeps legacy subagent-default configs working", () => {
-    const resolved = resolveSwarmPluginConfig({ defaultRunner: "subagent" });
+  it("keeps subagent default configs opt-in", () => {
+    const resolved = resolveSwarmPluginConfig({
+      defaultRunner: "subagent",
+      bridge: { subagentEnabled: true },
+    });
     expect(resolved.defaultRunner).toBe("subagent");
     expect(resolved.subagent.enabled).toBe(true);
   });
 
-  it("accepts bridge config and expands legacy enabled alias into runner fallbacks", () => {
+  it("accepts bridge config and expands legacy enabled alias into subagent fallback only", () => {
     const resolved = resolveSwarmPluginConfig({
       bridge: {
         enabled: true,
@@ -58,7 +61,7 @@ describe("swarm plugin config", () => {
 
     expect(resolved.bridge).toEqual({
       enabled: true,
-      acpFallbackEnabled: true,
+      acpFallbackEnabled: false,
       subagentEnabled: true,
       nodePath: undefined,
       openclawRoot: "/opt/openclaw",
@@ -110,10 +113,10 @@ describe("swarm plugin config", () => {
       },
     });
 
-    expect(describeAcpExecutionPosture(resolved)).toBe("public control-plane primary without bridge fallback");
+    expect(describeAcpExecutionPosture(resolved)).toBe("public control-plane only");
   });
 
-  it("describes ACP bridge as compatibility fallback when enabled explicitly", () => {
+  it("keeps ACP posture public-only even when legacy ACP bridge config is present", () => {
     const resolved = resolveSwarmPluginConfig({
       acp: {
         enabled: true,
@@ -123,10 +126,10 @@ describe("swarm plugin config", () => {
       },
     });
 
-    expect(describeAcpExecutionPosture(resolved)).toBe("public control-plane primary with bridge compatibility fallback");
+    expect(describeAcpExecutionPosture(resolved)).toBe("public control-plane only");
   });
 
-  it("resolves auto to manual when ACP is enabled but no public capability or bridge fallback is available", () => {
+  it("resolves auto to manual when ACP is enabled but no public capability is available", () => {
     const resolved = resolveSwarmPluginConfig({
       acp: {
         enabled: true,
@@ -144,6 +147,43 @@ describe("swarm plugin config", () => {
     });
 
     expect(resolveWorkflowDefaultRunner(resolved, { runtimeVersion: "2026.3.24" })).toBe("acp");
+  });
+
+  it("keeps auto on manual when only legacy ACP bridge config is present", () => {
+    const resolved = resolveSwarmPluginConfig({
+      acp: {
+        enabled: true,
+      },
+      bridge: {
+        acpFallbackEnabled: true,
+      },
+    });
+
+    expect(resolveWorkflowDefaultRunner(resolved)).toBe("manual");
+  });
+
+  it("keeps subagent out of allowed runners when bridge support is not enabled", () => {
+    const resolved = resolveSwarmPluginConfig({
+      subagent: {
+        enabled: true,
+      },
+    });
+
+    expect(resolveWorkflowDefaultRunner(resolved)).toBe("manual");
+  });
+
+  it("includes subagent only when both subagent and bridge opt-in are enabled", () => {
+    const resolved = resolveSwarmPluginConfig({
+      defaultRunner: "subagent",
+      subagent: {
+        enabled: true,
+      },
+      bridge: {
+        subagentEnabled: true,
+      },
+    });
+
+    expect(resolveWorkflowDefaultRunner(resolved)).toBe("subagent");
   });
 
   it("rejects unknown keys in plugin schema validation", () => {
@@ -167,6 +207,22 @@ describe("swarm plugin config", () => {
       subagent: { enabled: false },
     });
 
-    expect(result).toEqual({ ok: false, errors: ['subagent.enabled must be true when defaultRunner="subagent"'] });
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        'subagent.enabled must be true when defaultRunner="subagent"',
+        'bridge.subagentEnabled must be true when defaultRunner="subagent"',
+      ],
+    });
+  });
+
+  it("rejects subagent default runner when subagent bridge is not enabled", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      defaultRunner: "subagent",
+      subagent: { enabled: true },
+      bridge: { subagentEnabled: false },
+    });
+
+    expect(result).toEqual({ ok: false, errors: ['bridge.subagentEnabled must be true when defaultRunner="subagent"'] });
   });
 });

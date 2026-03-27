@@ -90,8 +90,11 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
         {},
         {
           config: {
-            bridge: {
+            subagent: {
               enabled: true,
+            },
+            bridge: {
+              subagentEnabled: true,
               openclawRoot: resolveOpenClawRoot(),
               versionAllow: [],
             },
@@ -113,8 +116,11 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
         {},
         {
           config: {
-            bridge: {
+            subagent: {
               enabled: true,
+            },
+            bridge: {
+              subagentEnabled: true,
               openclawRoot: resolveOpenClawRoot(),
               versionAllow: ["0.0.0-test"],
             },

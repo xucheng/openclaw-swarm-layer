@@ -31,25 +31,25 @@ export interface OpenClawSessionAdapter {
 export class UnsupportedOpenClawSessionAdapter implements OpenClawSessionAdapter {
   async spawnAcpSession(_params: AcpSpawnParams): Promise<AcpAcceptedSession> {
     throw new Error(
-      "ACP public control-plane execution is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback, upgrade OpenClaw to a public-ACP-capable build, or enable bridge.acpFallbackEnabled for legacy compatibility.",
+      "ACP public control-plane execution is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback or upgrade OpenClaw to a public-ACP-capable build.",
     );
   }
 
   async getAcpSessionStatus(_sessionKey: string): Promise<AcpSessionStatus> {
     throw new Error(
-      "ACP session status is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback, upgrade OpenClaw to a public-ACP-capable build, or enable bridge.acpFallbackEnabled for legacy compatibility.",
+      "ACP session status is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback or upgrade OpenClaw to a public-ACP-capable build.",
     );
   }
 
   async cancelAcpSession(_sessionKey: string, _reason?: string): Promise<{ sessionKey: string; cancelledAt?: string; message?: string }> {
     throw new Error(
-      "ACP session cancel is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback, upgrade OpenClaw to a public-ACP-capable build, or enable bridge.acpFallbackEnabled for legacy compatibility.",
+      "ACP session cancel is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback or upgrade OpenClaw to a public-ACP-capable build.",
     );
   }
 
   async closeAcpSession(_sessionKey: string, _reason?: string): Promise<{ sessionKey: string; closedAt?: string; message?: string }> {
     throw new Error(
-      "ACP session close is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback, upgrade OpenClaw to a public-ACP-capable build, or enable bridge.acpFallbackEnabled for legacy compatibility.",
+      "ACP session close is unavailable for the current OpenClaw/runtime configuration. Keep manual runner as the safe fallback or upgrade OpenClaw to a public-ACP-capable build.",
     );
   }
 }

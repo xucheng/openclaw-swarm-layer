@@ -2,12 +2,13 @@
 
 ## Purpose
 
-`M5.4a` defines the bridge-free ACP baseline that must hold before `M5.4b` can remove ACP bridge logic.
+`M5.4a` defined the bridge-free ACP baseline. `M5.4b` consumed that gate and removed ACP bridge runtime dependence.
 
 Current status:
 
 - gate satisfied on the local `OpenClaw 2026.3.24` install as of 2026-03-27
-- the earlier `swarm doctor` hang only reproduced inside the Codex sandbox; outside the sandbox the command exits normally
+- ACP bridge removal is complete for the ACP runner
+- `remainingBridgeDependencies` is now `[]` for ACP
 
 The gate is surfaced in:
 
@@ -22,6 +23,15 @@ Bridge-free ACP expectations are fixed at:
 - OpenClaw `>=2026.3.22`
 
 This floor is exported in code as `ACP_BRIDGE_FREE_VERSION_FLOOR` and used by both runtime helpers and operator surfaces.
+
+## Post-M5.4b Interpretation
+
+After `M5.4b`:
+
+- ACP automation must use the public control-plane path
+- `replacementPlan[acp].status` should read `complete` on supported installs
+- `remainingBridgeDependencies` should remain empty for ACP
+- any future ACP bridge-specific blocker is treated as a regression
 
 ## Live Smoke Matrix
 
@@ -55,7 +65,12 @@ Purpose:
 
 - confirm public ACP export readiness
 - confirm current-install default-runner resolution
-- confirm bridge-exit gate status and remaining blockers
+- confirm `remainingBridgeDependencies = []` for ACP
+
+Current local evidence:
+
+- `replacementPlan[acp].status = "complete"`
+- `supportedRunners = ["subagent"]` inside bridge diagnostics, reflecting ACP bridge removal
 
 ### 3. Swarm init / plan / status
 
@@ -94,7 +109,11 @@ openclaw swarm run --project <path> --dry-run --json
 
 Purpose:
 
-- confirm the resolved default runner selects ACP without requiring bridge fallback
+- confirm the resolved default runner still selects ACP after ACP bridge removal
+
+Current local evidence:
+
+- a real smoke spec still resolves `selectedRunner = "acp"` on `OpenClaw 2026.3.24`
 
 ### 5. Swarm live ACP run
 
@@ -128,7 +147,7 @@ openclaw swarm session close --project <path> --run <runId> --json
 
 Purpose:
 
-- validate ACP session status, cancel, and close on the public path before ACP bridge removal
+- validate ACP session status, cancel, and close on the public path
 
 ### 7. Swarm review / report / journal sync
 

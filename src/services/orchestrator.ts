@@ -1,7 +1,7 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import type { OpenClawPluginService } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot } from "../config.js";
-import { getSubagentRunnerDisabledMessage, resolveRuntimePolicySnapshot } from "../config.js";
+import { getSubagentRunnerDisabledMessage, isSubagentRunnerEnabled, resolveRuntimePolicySnapshot } from "../config.js";
 import { getRunnableTasks } from "../planning/task-graph.js";
 import { enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
@@ -343,7 +343,7 @@ export function createOrchestrator(deps?: OrchestratorDeps): SwarmOrchestrator {
   const sessionAdapter = deps?.sessionAdapter ?? new UnsupportedOpenClawSessionAdapter();
   const subagentAdapter = deps?.subagentAdapter ?? new UnsupportedOpenClawSubagentAdapter();
   const configuredRunners: TaskRunner[] = [manualRunner, new AcpRunner(stateStore.config, sessionAdapter)];
-  if (stateStore.config.subagent.enabled) {
+  if (isSubagentRunnerEnabled(stateStore.config)) {
     configuredRunners.push(new SubagentRunner(subagentAdapter));
   }
   return new SwarmOrchestrator(

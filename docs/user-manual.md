@@ -11,8 +11,8 @@
 - 默认 `defaultRunner = "auto"`
 - `auto` 只会在 ACP 自动化真实可用时解析为 `acp`
 - 如果 ACP 当前不可用，`auto` 会安全回退到 `manual`
-- `subagent` 是实验性能力，默认关闭，必须显式开启
-- bridge 只用于兼容兜底，不再是默认执行层
+- `subagent` 是 legacy bridge-backed opt-in 能力，默认关闭，必须显式开启
+- bridge 只保留给 legacy subagent 路径，不再参与 ACP 默认执行层
 
 ---
 
@@ -92,7 +92,7 @@ openclaw swarm --help
 
 适用场景：OpenClaw 当前版本已经支持 public ACP control-plane，`auto` 会直接解析到 `acp`。
 
-### 3.3 ACP 兼容兜底配置
+### 3.3 ACP 旧桥接配置（仅保留兼容读取）
 
 ```json
 {
@@ -120,9 +120,9 @@ openclaw swarm --help
 }
 ```
 
-只在 `swarm doctor` 判断 public ACP 暂不可用时使用。
+这个配置现在不会再提供 ACP 执行能力，只是兼容读取旧配置时不报错。建议后续清理掉。
 
-### 3.4 Subagent 实验性配置
+### 3.4 Subagent Legacy Opt-In 配置
 
 ```json
 {
@@ -146,7 +146,7 @@ openclaw swarm --help
 }
 ```
 
-注意：`subagent` 仍然是实验性路径，不建议作为默认执行面。
+注意：`subagent` 现在被定义为 legacy bridge-backed opt-in 路径，不建议作为默认执行面；只有 `subagent.enabled=true` 且 `bridge.subagentEnabled=true` 时才可用。
 
 ### 3.5 文档沉淀配置
 
@@ -289,8 +289,8 @@ openclaw swarm doctor --json
 判断方式：
 
 - 如果看到 `auto -> manual`，说明当前 install 上 ACP 自动化还不可用，系统在安全回退
-- 如果看到 `ACP bridge fallback is disabled`，说明当前没有启用兼容兜底
-- 如果需要临时兼容兜底，显式打开 `bridge.acpFallbackEnabled`
+- 如果看到 `ACP automation is unavailable on this install until the public control-plane export is ready`，说明当前 install 上还不满足 ACP public path
+- 如果配置里还保留 `bridge.acpFallbackEnabled`，它现在只会被当作 legacy config 告警，不会恢复 ACP 能力
 
 ### 7.2 bridge 版本不匹配
 
@@ -315,7 +315,7 @@ openclaw swarm doctor --json
 1. `openclaw swarm doctor --json`
 2. 看 default runner resolution 是否变化
 3. 看 ACP posture 是否仍然是 public-primary
-4. 如果 bridge fallback 在用，检查 `versionAllow`
+4. 如果 subagent legacy bridge 在用，检查 `versionAllow`
 5. 必要时先退回 `manual`
 
 ---
@@ -324,7 +324,7 @@ openclaw swarm doctor --json
 
 | 命令 | 用途 |
 |------|------|
-| `swarm doctor` | 诊断 ACP readiness、默认 runner 解析和 bridge 兼容兜底 |
+| `swarm doctor` | 诊断 ACP readiness、默认 runner 解析和 subagent legacy bridge 状态 |
 | `swarm status` | 查看 workflow 状态、运行姿态和推荐动作 |
 | `swarm plan` | 导入 spec 并生成任务图 |
 | `swarm run` | 执行下一个可运行任务 |

@@ -2,11 +2,13 @@
 
 ## Runtime Posture
 
-- ACP public control-plane is the normal execution path on supported OpenClaw versions.
-- `defaultRunner: "auto"` resolves to `acp` only when ACP automation is available on the current install.
+- ACP public control-plane is the only supported ACP execution path.
+- `defaultRunner: "auto"` resolves to `acp` only when the public ACP path is available on the current install.
 - If ACP automation is unavailable, `auto` falls back to `manual`.
-- Bridge is compatibility fallback only.
-- `subagent` is experimental and disabled by default.
+- `bridge.acpFallbackEnabled` is now legacy config; it is ignored for runtime capability.
+- `subagent` remains a legacy bridge-backed opt-in path and is disabled by default.
+- subagent requires both `subagent.enabled=true` and `bridge.subagentEnabled=true`.
+- bridge remains only for the legacy subagent path.
 
 ## Install
 
@@ -37,7 +39,7 @@ Read them as follows:
 - `acpBridgeExitGate.versionSatisfied`: whether the current install meets that floor
 - `acpBridgeExitGate.publicControlPlaneExportReady`: whether doctor has confirmed the public ACP export on this install
 - `acpBridgeExitGate.readyForBridgeRemoval`: whether version floor and export readiness are both satisfied
-- `remainingBridgeDependencies`: ACP bridge blockers that still need deletion before `M5.4b`
+- `remainingBridgeDependencies`: should now stay empty for ACP; any non-empty value is a regression signal
 
 ## Basic Smoke
 
@@ -51,7 +53,7 @@ openclaw swarm run --project <path> --dry-run --json
 
 Expect:
 
-- doctor reports the bridge-exit gate and remaining blockers
+- doctor reports ACP public path readiness and `remainingBridgeDependencies = []`
 - plan creates workflow state and a local report
 - status shows configured default, resolved default, and gate notes
 - dry-run selects ACP when ACP is actually available on the install
@@ -107,44 +109,21 @@ Stage-dependent partial output is expected:
 - `review` writes `review-log.md`
 - full completion writes `completion-summary.md`
 
-## ACP Compatibility Fallback
+## Legacy ACP Bridge Config
 
-Use bridge only when public ACP is unavailable or incomplete and you deliberately want compatibility fallback.
-
-Recommended config:
+Legacy config such as:
 
 ```json
 {
-  "plugins": {
-    "entries": {
-      "openclaw-swarm-layer": {
-        "config": {
-          "acp": {
-            "enabled": true,
-            "defaultAgentId": "codex",
-            "allowedAgents": ["codex"],
-            "defaultMode": "run"
-          },
-          "bridge": {
-            "acpFallbackEnabled": true,
-            "nodePath": "$(which node)",
-            "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": [">=2026.3.22"]
-          }
-        }
-      }
-    }
+  "bridge": {
+    "acpFallbackEnabled": true
   }
 }
 ```
 
-Operator rules:
+no longer enables ACP automation. It should be removed during routine config cleanup. If it remains, doctor surfaces it as guidance only.
 
-- keep bridge fallback explicit and narrow
-- keep `versionAllow` tight to tested builds
-- prefer returning to public ACP once doctor reports it ready
-
-## Subagent Experimental Smoke
+## Subagent Legacy Opt-In Smoke
 
 Use this only when you explicitly opt in to `subagent`.
 
@@ -160,31 +139,35 @@ Do not treat subagent as the normal default path.
 
 Before upgrading OpenClaw:
 
-1. Check whether bridge fallback is enabled for ACP or subagent.
-2. If bridge fallback is enabled, note `bridge.versionAllow`.
-3. Upgrade OpenClaw in a non-critical session first.
-4. Run `openclaw swarm doctor --json`.
-5. If doctor reports public ACP ready and no compatibility blockers:
+1. Record the installed OpenClaw version.
+2. Upgrade OpenClaw in a non-critical session first.
+3. Run `openclaw swarm doctor --json`.
+4. If doctor reports public ACP ready and `remainingBridgeDependencies = []`:
    - keep ACP on the public path
-   - remove unnecessary bridge fallback only after the smoke matrix is green
-6. If doctor reports version drift or missing exports:
-   - update bridge mappings in the plugin repo
+   - rerun the smoke matrix if the install changed materially
+5. If doctor reports missing ACP public exports:
+   - keep `manual` as the fallback
+   - do not try to re-enable ACP bridge
+6. If subagent bridge is in use and doctor reports version drift:
    - update `bridge.versionAllow`
+   - refresh subagent bridge mappings
    - rerun unit, e2e, and smoke verification
 
 ## Failure Remediation Quick Guide
 
 - ACP backend direct smoke fails
-  - verify the local `acpx` tooling path or replace the smoke probe with the supported backend check for the current install
+  - verify the local direct-route wrapper or backend tooling for the configured default agent
 - doctor green but live ACP run fails
-  - treat that as an environment blocker, not bridge-removal proof
-  - fix runtime backend configuration and rerun the matrix
-- version drift
+  - treat that as an environment blocker, not a reason to reintroduce ACP bridge
+- legacy ACP bridge config warning
+  - remove `bridge.acpFallbackEnabled`
+- version drift on subagent bridge
   - compare installed OpenClaw version with `bridge.versionAllow`
-  - update mappings and allowlist together
+  - update subagent mappings and allowlist together
 - subagent blocked
   - confirm `subagent.enabled=true`
-  - keep `bridge.subagentEnabled=true` until a public spawn export exists
+  - confirm `bridge.subagentEnabled=true`
+  - keep subagent on the bridge-backed path until a public spawn export exists
 
 ## Rollback
 

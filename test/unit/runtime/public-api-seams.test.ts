@@ -39,7 +39,7 @@ describe("public API seams", () => {
       `acp:${ACP_PUBLIC_REPLACEMENT_EXPORT}`,
       `subagent:${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}`,
     ]);
-    expect(availability.notes.some((note) => note.includes("replacement is now technically possible"))).toBe(true);
+    expect(availability.notes.some((note) => note.includes("public control-plane execution is available"))).toBe(true);
   });
 
   it("builds a replacement plan from detected public availability", async () => {
@@ -59,15 +59,14 @@ describe("public API seams", () => {
         runner: "acp",
         publicExport: ACP_PUBLIC_REPLACEMENT_EXPORT,
         available: true,
-        status: "ready",
-        currentImplementation: "bridge-openclaw-session-adapter -> openclaw-exec-bridge",
-        targetImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+        status: "complete",
+        currentImplementation: "real-openclaw-session-adapter via public acp-runtime export",
+        targetImplementation: "public ACP control-plane as the supported execution path",
         affectedModules: [
-          "src/runtime/bridge-openclaw-session-adapter.ts",
-          "src/runtime/openclaw-exec-bridge.ts",
+          "src/cli/context.ts",
           "src/runtime/real-openclaw-session-adapter.ts",
         ],
-        nextStep: "Prototype replacing the ACP bridge control-plane path with the public export.",
+        nextStep: "Keep ACP on the public control-plane path and avoid reintroducing bridge fallbacks.",
       },
       {
         runner: "subagent",
@@ -98,7 +97,7 @@ describe("public API seams", () => {
     const checklist = buildMigrationChecklist(buildReplacementPlan(availability));
 
     expect(checklist[0]).toContain("swarm doctor");
-    expect(checklist.some((item) => item.includes("[acp] Replace"))).toBe(true);
+    expect(checklist.some((item) => item.includes("[acp] Keep real-openclaw-session-adapter"))).toBe(true);
     expect(checklist.some((item) => item.includes("[subagent] Keep the current bridge path"))).toBe(true);
   });
 });

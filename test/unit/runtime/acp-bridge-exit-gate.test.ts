@@ -28,11 +28,7 @@ describe("acp bridge exit gate", () => {
       "<obsidianRoot>/<project>/completion-summary.md",
       "<obsidianRoot>/<project>/specs/<specId>.md",
     ]);
-    expect(gate.remainingBridgeDependencies.map((dependency) => dependency.id)).toEqual([
-      "acp-bridge-session-adapter",
-      "acp-bridge-command-surface",
-      "acp-bridge-doctor-shellout",
-    ]);
+    expect(gate.remainingBridgeDependencies).toEqual([]);
   });
 
   it("formats runtime-version-only guidance when export readiness has not been probed", () => {
@@ -44,6 +40,6 @@ describe("acp bridge exit gate", () => {
     expect(notes).toContain(
       "ACP bridge exit gate: version floor satisfied; verify public ACP export readiness with swarm doctor before removing ACP bridge.",
     );
-    expect(notes).toContain("ACP bridge removal blockers tracked: 3.");
+    expect(notes).toContain("ACP bridge removal blockers tracked: 0.");
   });
 });
