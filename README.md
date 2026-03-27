@@ -105,7 +105,7 @@ openclaw swarm report --project /path/to/your/project --json
 | `swarm run --project <path> [--runner acp\|manual\|subagent] [--dry-run]` | Execute the next runnable task with resolved default policy or explicit override |
 | `swarm review --project <path> --task <id> --approve\|--reject` | Approve or reject a task |
 | `swarm report --project <path>` | Generate a workflow report |
-| `swarm doctor` | Diagnose ACP readiness, bridge-exit gate status, and compatibility fallback posture |
+| `swarm doctor` | Diagnose ACP readiness, bridge-exit gate status, and legacy subagent bridge posture |
 
 ### Session Management
 
@@ -145,7 +145,7 @@ npm run test:watch     # Watch mode
 
 **Operations:**
 - [ACP Bridge Exit Gate](docs/acp-bridge-exit-gate.md) — bridge-free ACP floor, live smoke matrix, and artifact expectations
-- [Operator Runbook](docs/operator-runbook.md) — install, smoke, upgrade, rollback, and compatibility fallback guidance
+- [Operator Runbook](docs/operator-runbook.md) — install, smoke, upgrade, rollback, and legacy bridge guidance
 - [Migration Checklist](docs/migration-checklist.md) — staged bridge replacement planning
 - [Testing Strategy](docs/testing-strategy.md) — unit, e2e, and smoke verification rules
 

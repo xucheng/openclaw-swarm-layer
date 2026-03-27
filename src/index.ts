@@ -8,7 +8,7 @@ const plugin = {
   id: "openclaw-swarm-layer",
   name: "OpenClaw Swarm Layer",
   description: "Spec-driven workflow orchestrator for OpenClaw.",
-  version: "0.2.1",
+  version: "0.3.0",
   configSchema: swarmPluginConfigSchema,
   register(api: OpenClawPluginApi) {
     const config = resolvePluginConfigFromApi(api);

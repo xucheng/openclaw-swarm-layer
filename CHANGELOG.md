@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 (2026-03-27)
+
+ACP convergence release for OpenClaw `2026.3.24`.
+
+- Removed ACP bridge runtime dependence and finalized ACP as the only default-capable automated runner
+- Locked the bridge-free ACP floor at OpenClaw `>=2026.3.22` and shipped the ACP bridge-exit gate across doctor, status, and reports
+- Finalized `subagent` as a legacy bridge-backed opt-in path that requires both `subagent.enabled=true` and `bridge.subagentEnabled=true`
+- Synced public-facing docs, plugin manifest metadata, and ClawHub skill content to the ACP-first / legacy-subagent posture
+- Closed the `M5` roadmap through `M5.4c` with regression green: 305 unit tests across 51 files, 23 e2e tests across 18 files, build clean
+
 ## 0.2.1 (2026-03-26)
 
 Bridge compatibility and release hygiene update for OpenClaw `2026.3.24`.

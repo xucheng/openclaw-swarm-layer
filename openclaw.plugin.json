@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
@@ -45,8 +45,8 @@
       },
       "defaultRunner": {
         "type": "string",
-        "enum": ["manual", "acp", "subagent"],
-        "default": "manual"
+        "enum": ["auto", "manual", "acp", "subagent"],
+        "default": "auto"
       },
       "maxParallelTasks": {
         "type": "integer",
@@ -56,6 +56,47 @@
       "reviewRequiredByDefault": {
         "type": "boolean",
         "default": true
+      },
+      "enforceTaskImmutability": {
+        "type": "boolean",
+        "default": false
+      },
+      "evaluator": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "autoInjectAfter": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": ["coding"]
+          }
+        }
+      },
+      "journal": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enableRunLog": {
+            "type": "boolean",
+            "default": true
+          },
+          "enableReviewLog": {
+            "type": "boolean",
+            "default": true
+          },
+          "enableSpecArchive": {
+            "type": "boolean",
+            "default": true
+          },
+          "enableCompletionSummary": {
+            "type": "boolean",
+            "default": true
+          }
+        }
       },
       "acp": {
         "type": "object",
@@ -95,11 +136,29 @@
           }
         }
       },
+      "subagent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "bridge": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "acpFallbackEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "subagentEnabled": {
             "type": "boolean",
             "default": false
           },
@@ -114,6 +173,16 @@
             "items": { "type": "string" },
             "default": [],
             "description": "Accepts exact versions or comparator rules such as \">=2026.3.22\"."
+          }
+        }
+      },
+      "bootstrap": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       }

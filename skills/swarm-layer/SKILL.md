@@ -1,16 +1,16 @@
 ---
 name: swarm-layer
-description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP/subagent execution, persistent sessions, review gates, automatic retry, GAN-inspired harness patterns (sprint contracts, evaluator injection, quality rubrics), cross-session continuity, and protective guardrails. Covers setup, operation, diagnosis, and reporting."
+description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-first execution, legacy bridge-backed subagent opt-in, persistent sessions, review gates, automatic retry, harness patterns, cross-session continuity, and operator reporting. Covers setup, operation, diagnosis, and reporting."
 ---
 
 # OpenClaw Swarm Layer
 
-Turn workflow specifications into executable task graphs. Dispatch tasks through manual, ACP (Codex/Claude Code), or subagent runners. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
+Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback, ACP automation, or the legacy bridge-backed subagent path. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
 ## What It Does
 
 - **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
-- **Multi-runner execution** — Manual (operator-driven), ACP (delegate to Codex/Claude Code/Gemini), Subagent (OpenClaw-native child agents)
+- **Multi-runner execution** — Manual (operator-driven safe fallback), ACP (default-capable automation path), Subagent (legacy bridge-backed opt-in child-agent path)
 - **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
 - **Review gates** — Tasks require explicit approve/reject; structured quality rubrics for weighted multi-dimension scoring
 - **Sprint contracts** — Negotiated verifiable acceptance criteria per task with automated evaluator injection (GAN-inspired pattern)
@@ -31,7 +31,7 @@ Three installation paths:
 
 **ClawHub** (skill only):
 ```bash
-clawhub install swarm-layer
+openclaw skills install swarm-layer
 ```
 
 **npm** (full plugin):
@@ -124,7 +124,7 @@ First-time install, bridge configuration, project initialization, or config trou
 ### 1. Prerequisites
 ```bash
 node --version     # >= 22
-openclaw --version # >= 2026.2.24
+openclaw --version # >= 2026.3.22
 ```
 
 ### 2. Install Plugin
@@ -133,18 +133,30 @@ openclaw plugins install -l /path/to/openclaw-swarm-layer
 openclaw plugins info openclaw-swarm-layer   # Should show Status: loaded
 ```
 
-### 3. Configure Bridge (for ACP/subagent execution)
+### 3. Configure ACP Public Path
 ```json
 {
   "plugins": { "entries": { "openclaw-swarm-layer": { "config": {
+    "defaultRunner": "auto",
     "acp": {
       "enabled": true,
       "defaultAgentId": "codex",
       "allowedAgents": ["codex"],
       "defaultMode": "run"
+    }
+  }}}}
+}
+```
+
+### 3b. Optional: Enable Legacy Subagent Path
+```json
+{
+  "plugins": { "entries": { "openclaw-swarm-layer": { "config": {
+    "subagent": {
+      "enabled": true
     },
     "bridge": {
-      "enabled": true,
+      "subagentEnabled": true,
       "nodePath": "$(which node)",
       "openclawRoot": "$(npm root -g)/openclaw",
       "versionAllow": ["CURRENT_VERSION"]
@@ -168,7 +180,7 @@ openclaw swarm init --project .
 ```json
 {
   "obsidianRoot": "/path/to/vault/reports",
-  "obsidianJournal": {
+  "journal": {
     "enableRunLog": true,
     "enableReviewLog": true,
     "enableSpecArchive": true,
@@ -179,8 +191,9 @@ openclaw swarm init --project .
 
 ### Setup Troubleshooting
 - **Plugin not loading** → `openclaw plugins info openclaw-swarm-layer`
-- **Bridge blocked** → `openclaw swarm doctor --json`, follow `remediation`
-- **Version mismatch** → update `bridge.versionAllow`
+- **ACP unavailable** → `openclaw swarm doctor --json`, confirm public ACP export readiness and runner resolution
+- **Legacy subagent blocked** → confirm both `subagent.enabled=true` and `bridge.subagentEnabled=true`
+- **Version mismatch** → if using legacy subagent bridge, update `bridge.versionAllow`
 
 ---
 
@@ -219,9 +232,9 @@ openclaw swarm review --project . --task <id> --approve
 ### Runner Selection
 | Runner | Use When |
 |--------|----------|
-| `manual` | Operator executes and records manually (default) |
-| `acp` | Delegate to external harness (Codex, Claude Code) |
-| `subagent` | OpenClaw-native child agent delegation |
+| `manual` | Safe explicit fallback when ACP automation is unavailable or not desired |
+| `acp` | Default-capable automation path through the public ACP control-plane |
+| `subagent` | Legacy bridge-backed child-agent path; only when explicitly enabled |
 
 ### Session Operations
 ```bash
@@ -287,12 +300,12 @@ coding-task → coding-task-eval → next-task
 # Diagnose
 
 ## When to Use
-Tasks stuck, bridge failures, sessions not updating, dead letters, orphans.
+Tasks stuck, ACP readiness failures, legacy subagent bridge failures, sessions not updating, dead letters, orphans.
 
 ## Diagnostic Flow
 
 ```
-1. openclaw swarm doctor --json      → Check bridge health
+1. openclaw swarm doctor --json      → Check ACP readiness and legacy subagent bridge health
 2. openclaw swarm status --project . → Find abnormal tasks/sessions
 3. Investigate specific issue (see below)
 ```
@@ -306,7 +319,7 @@ Tasks stuck, bridge failures, sessions not updating, dead letters, orphans.
 
 ### Issue Resolution
 
-**Bridge failure:**
+**Legacy subagent bridge failure:**
 - `doctor --json` → check `blockers` → follow `remediation`
 - Common: update `bridge.versionAllow`, check `nodePath`/`openclawRoot`
 
@@ -325,7 +338,7 @@ swarm session cancel --project . --run <runId>   # Force cancel if hung
 swarm session cleanup --project . --stale-minutes 60
 ```
 
-**Version drift** (after OpenClaw upgrade):
+**Version drift** (after OpenClaw upgrade, legacy subagent bridge only):
 ```bash
 swarm doctor --json
 # Update bridge.versionAllow → rerun tests → verify doctor
