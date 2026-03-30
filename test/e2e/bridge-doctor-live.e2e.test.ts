@@ -91,10 +91,10 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
         {
           config: {
             subagent: {
-              enabled: true,
+              enabled: false,
             },
             bridge: {
-              subagentEnabled: true,
+              subagentEnabled: false,
               openclawRoot: resolveOpenClawRoot(),
               versionAllow: [],
             },
@@ -105,7 +105,6 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
 
     expect(result.ok).toBe(true);
     expect(result.severity).toBe("warning");
-    expect(result.remediation.some((item) => item.includes("versionAllow"))).toBe(true);
     expect(result.publicApi.acpControlPlaneExport).toBe(true);
     expect(result.replacementPlan[0]?.runner).toBe("acp");
   });

@@ -16,14 +16,14 @@ import {
   resolveOpenClawRootFromExecPath,
   waitForAcpBackendHealthy,
 } from "../../../src/runtime/openclaw-exec-bridge.js";
-import { INTERNAL_MODULES_BY_VERSION, buildPatchedBridgeModuleSource } from "../../../src/runtime/bridge-manifest.js";
+import { resolveVersionRangeStrategy, buildPatchedBridgeModuleSource } from "../../../src/runtime/bridge-manifest.js";
 
 describe("openclaw exec bridge", () => {
-  it("includes mappings for tested OpenClaw versions", () => {
-    expect(INTERNAL_MODULES_BY_VERSION["2026.2.26"]).toBeDefined();
-    expect(INTERNAL_MODULES_BY_VERSION["2026.3.13"]).toBeDefined();
-    expect(INTERNAL_MODULES_BY_VERSION["2026.3.22"]).toBeDefined();
-    expect(INTERNAL_MODULES_BY_VERSION["2026.3.23-1"]).toBeDefined();
+  it("resolves strategies for tested OpenClaw versions", () => {
+    expect(resolveVersionRangeStrategy("2026.2.26")).not.toBeNull();
+    expect(resolveVersionRangeStrategy("2026.3.13")).not.toBeNull();
+    expect(resolveVersionRangeStrategy("2026.3.22")).not.toBeNull();
+    expect(resolveVersionRangeStrategy("2026.3.23-1")).not.toBeNull();
   });
 
   it("waits until an ACP backend reports healthy", async () => {

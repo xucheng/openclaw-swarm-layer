@@ -7,8 +7,10 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import {
   buildPatchedBridgeModuleSource,
   resolveBridgeCompatibility,
+  resolveBridgeModules,
   resolveInternalModuleSpecCandidates,
   resolveInternalModuleSpec,
+  resolveVersionRangeStrategy,
   type InternalModuleSpec,
 } from "./bridge-manifest.js";
 import { matchesOpenClawVersionAllowlist } from "./openclaw-version.js";
@@ -37,7 +39,7 @@ export type BridgeDoctorResult = {
   openclawRoot: string;
   version?: string;
   compatibility: {
-    strategy?: "internal-bundle";
+    strategy?: "internal-bundle" | "dynamic-discovery";
     testedAt?: string;
     supportedRunners: string[];
     replacementCandidates: string[];
@@ -308,33 +310,8 @@ async function resolveInternalModule(openclawRoot: string, versionAllow?: string
   if (!matchesOpenClawVersionAllowlist(version, versionAllow)) {
     throw new Error(`OpenClaw version ${version} is not in bridge allowlist (${(versionAllow ?? []).join(", ")})`);
   }
-  const specs = resolveInternalModuleSpecCandidates(version);
-  if (specs.length === 0) {
-    throw new Error(`No internal bridge mapping is registered for OpenClaw ${version}`);
-  }
-  let lastError: unknown;
-  for (const spec of specs) {
-    try {
-      const loadConfigModulePath = path.join(openclawRoot, spec.exports.loadConfig.relativeModulePath);
-      const loadConfigModule = await import(pathToFileURL(loadConfigModulePath).href);
-      const loadConfig = loadConfigModule[spec.exports.loadConfig.exportAlias] as (() => unknown) | undefined;
-      if (!loadConfig) {
-        throw new Error(`Internal bridge mapping candidate is stale for OpenClaw ${version}`);
-      }
-      return {
-        version,
-        spec,
-        loadConfig,
-      };
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw new Error(
-    `Internal bridge mapping for OpenClaw ${version} is stale${
-      lastError instanceof Error && lastError.message ? ` (${lastError.message})` : ""
-    }`,
-  );
+  const resolved = await resolveBridgeModules(openclawRoot, version);
+  return { version, spec: resolved.spec, loadConfig: resolved.loadConfig };
 }
 
 async function resolvePatchedSubagentSpawner(openclawRoot: string, spec: InternalModuleSpec) {
@@ -464,8 +441,7 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
     }
     report.checks.versionMapped = Boolean(resolveInternalModuleSpec(packageJson.version));
     if (!report.checks.versionMapped) {
-      report.blockers.push(`No internal bridge mapping is registered for OpenClaw ${packageJson.version}`);
-      return report;
+      report.warnings.push(`No hardcoded bridge mapping for OpenClaw ${packageJson.version}; using dynamic discovery`);
     }
 
     const { loadConfig, spec } = await resolveInternalModule(openclawRoot, input.bridge?.versionAllow);
