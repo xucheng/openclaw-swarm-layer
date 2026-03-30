@@ -15,6 +15,7 @@ firebase-debug.log
 Thumbs.db
 
 coverage/
+.clawhub-package/
 
 CLAUDE.md
 .claude/settings.local.json

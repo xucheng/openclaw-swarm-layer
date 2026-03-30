@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2 (2026-03-30)
+
+Forward-compatible bridge resolution update.
+
+- Replaced per-version hardcoded OpenClaw bridge chunk mappings with version-range strategies and runtime discovery
+- Resolved `loadConfig` by scanning stable dist entrypoints for supported OpenClaw versions `>=2026.3.22`
+- Switched ACP session manager lookup to the stable `plugin-sdk/acp-runtime.js` surface so new OpenClaw releases stop requiring plugin republishes for hash churn
+- Added regression coverage for the dynamic bridge manifest and exec bridge resolution paths
+- Added a reproducible ClawHub package preparation script so published plugin artifacts only include runtime assets
+- Excluded `.claude` worktree mirrors and `dist/**` build outputs from Vitest discovery so release validation only runs the canonical test suite
+- Synced plugin manifest and release metadata for `openclaw-swarm-layer@0.3.2`
+
 ## 0.3.1 (2026-03-27)
 
 Doctor and packaging consistency patch for OpenClaw `2026.3.24`.
