@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.3 (2026-03-30)
+
+Release alignment and packaging hygiene patch.
+
+- Synced npm package, plugin manifest, lockfile, and README release metadata to `openclaw-swarm-layer@0.3.3`
+- Kept the runtime-only ClawHub package preparation flow for future plugin publishes
+- Kept Vitest discovery constrained to canonical sources so release validation stays reproducible
+
 ## 0.3.2 (2026-03-30)
 
 Forward-compatible bridge resolution update.

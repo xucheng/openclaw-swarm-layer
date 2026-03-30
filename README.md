@@ -6,7 +6,7 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation, manual fallback, or legacy subagent bridge. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.3.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.3-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
