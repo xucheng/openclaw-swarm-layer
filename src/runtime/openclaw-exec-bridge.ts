@@ -482,7 +482,15 @@ export function resolveAcpxRuntimeServiceFactory(
     return exportedFactory as (params?: { pluginConfig?: unknown }) => AcpxRuntimeService;
   }
 
-  const plugin = mod.default as { register?: (api: { pluginConfig?: unknown; registerService: (service: AcpxRuntimeService) => void }) => void } | undefined;
+  const plugin = mod.default as
+    | {
+        register?: (api: {
+          pluginConfig?: unknown;
+          registerService: (service: AcpxRuntimeService) => void;
+          on?: (event: string, handler: unknown) => void;
+        }) => void;
+      }
+    | undefined;
   const register = plugin?.register;
   if (typeof register !== "function") {
     return null;
@@ -494,6 +502,9 @@ export function resolveAcpxRuntimeServiceFactory(
       pluginConfig: params?.pluginConfig,
       registerService(service) {
         registeredService = service;
+      },
+      on() {
+        return;
       },
     });
     if (!registeredService) {
@@ -509,8 +520,12 @@ export async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any
   const registryModule = await import(registryModulePath);
   const getBackend = () => registryModule.getAcpRuntimeBackend?.(backendId) ?? null;
   if (getBackend()) {
-    await waitForAcpBackendHealthy(getBackend, backendId);
-    return;
+    try {
+      await waitForAcpBackendHealthy(getBackend, backendId, 3_000, 250);
+      return;
+    } catch {
+      registryModule.unregisterAcpRuntimeBackend?.(backendId);
+    }
   }
 
   const serviceModulePath = resolveAcpxServiceModulePath(openclawRoot, cfg);

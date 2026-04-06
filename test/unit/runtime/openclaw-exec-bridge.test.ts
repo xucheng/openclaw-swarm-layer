@@ -158,7 +158,11 @@ describe("openclaw exec bridge", () => {
     const start = vi.fn();
     const factory = resolveAcpxRuntimeServiceFactory({
       default: {
-        register(api: { registerService: (service: { start: typeof start }) => void }) {
+        register(api: {
+          registerService: (service: { start: typeof start }) => void;
+          on: (event: string, handler: unknown) => void;
+        }) {
+          api.on("reply_dispatch", () => undefined);
           api.registerService({ start });
         },
       },

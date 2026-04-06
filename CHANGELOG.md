@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.4 (2026-04-06)
+
+OpenClaw `2026.4.5` compatibility and release packaging update.
+
+- Fixed bundled `acpx` bootstrap for OpenClaw `2026.4.5` by tolerating the newer plugin register API shape that invokes `api.on(...)`
+- Refreshed stale unhealthy ACP runtime backends during bootstrap so live ACP runs recover instead of timing out on a dead registry entry
+- Revalidated the live smoke matrix on local `OpenClaw 2026.4.5`, including direct ACP smoke, doctor, init/plan/status, dry-run, live ACP dispatch, session lifecycle, review, and report
+- Synced npm package, plugin manifest, lockfile, README release metadata, and current operator docs to `openclaw-swarm-layer@0.3.4`
+
 ## 0.3.3 (2026-03-30)
 
 Release alignment and packaging hygiene patch.

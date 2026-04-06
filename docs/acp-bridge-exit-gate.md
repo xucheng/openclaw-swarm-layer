@@ -6,7 +6,7 @@
 
 Current status:
 
-- gate satisfied on the local `OpenClaw 2026.3.24` install as of 2026-03-27
+- gate satisfied on the local `OpenClaw 2026.4.5` install as of 2026-04-06
 - ACP bridge removal is complete for the ACP runner
 - `remainingBridgeDependencies` is now `[]` for ACP
 
@@ -51,7 +51,7 @@ Purpose:
 
 Current local evidence:
 
-- passing on `opencode` with `alibaba-coding-plan-cn/qwen3.5-plus`
+- passing on `codex`, following the configured local default agent route
 
 ### 2. Swarm doctor
 
@@ -70,7 +70,7 @@ Purpose:
 Current local evidence:
 
 - `replacementPlan[acp].status = "complete"`
-- `supportedRunners = ["subagent"]` inside bridge diagnostics, reflecting ACP bridge removal
+- `supportedRunners = ["acp"]` in runtime compatibility diagnostics
 
 ### 3. Swarm init / plan / status
 
@@ -113,7 +113,7 @@ Purpose:
 
 Current local evidence:
 
-- a real smoke spec still resolves `selectedRunner = "acp"` on `OpenClaw 2026.3.24`
+- a real smoke spec resolves `selectedRunner = "acp"` on `OpenClaw 2026.4.5`
 
 ### 5. Swarm live ACP run
 

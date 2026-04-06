@@ -157,7 +157,7 @@ Use this on OpenClaw builds where the public ACP control-plane path is available
             "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.3.24"]
+            "versionAllow": ["2026.4.5"]
           }
         }
       }
@@ -183,7 +183,7 @@ This config is still readable, but it no longer enables ACP automation. Keep it 
             "subagentEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.3.24"]
+            "versionAllow": ["2026.4.5"]
           }
         }
       }

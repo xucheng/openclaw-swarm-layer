@@ -23,7 +23,7 @@
 - Node.js >= 22
 - OpenClaw >= 2026.3.22（ACP public control-plane 默认路径）
 
-当前测试基线：OpenClaw `2026.3.24`。
+当前测试基线：OpenClaw `2026.4.5`。
 
 ### 安装插件
 
@@ -111,7 +111,7 @@ openclaw swarm --help
             "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.3.24"]
+            "versionAllow": ["2026.4.5"]
           }
         }
       }
@@ -137,7 +137,7 @@ openclaw swarm --help
             "subagentEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.3.24"]
+            "versionAllow": ["2026.4.5"]
           }
         }
       }
