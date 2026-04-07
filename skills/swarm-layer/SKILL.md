@@ -1,6 +1,6 @@
 ---
 name: swarm-layer
-description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-first execution, legacy bridge-backed subagent opt-in, persistent sessions, review gates, automatic retry, harness patterns, cross-session continuity, and operator reporting. Covers setup, operation, diagnosis, and reporting."
+description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-first execution, legacy bridge-backed subagent opt-in, persistent sessions, review gates, automatic retry, parallel dispatch, reject-retry workflows, ACP concurrency protection, harness patterns, cross-session continuity, and operator reporting. Covers setup, operation, diagnosis, and reporting."
 ---
 
 # OpenClaw Swarm Layer
@@ -17,6 +17,9 @@ Turn workflow specifications into executable task graphs. Dispatch tasks through
 - **Cross-session continuity** — Progress summary synthesis, bootstrap startup sequence, harness assumption tracking
 - **Protective guardrails** — Task field immutability guard, session budget control (duration + retries)
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking for exhausted tasks
+- **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
+- **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
+- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
 - **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
 
 ## What It Does NOT Do
@@ -225,8 +228,11 @@ openclaw swarm plan --project . --spec SPEC.md      # Import and generate tasks
 openclaw swarm status --project .                     # See what's ready
 openclaw swarm run --project . --dry-run              # Preview
 openclaw swarm run --project . --runner acp           # Execute (acp/manual/subagent)
+openclaw swarm run --project . --parallel 3           # Dispatch up to 3 ready tasks
+openclaw swarm run --project . --all-ready             # Fill all available concurrency slots
 openclaw swarm session status --project . --run <id>  # Poll until complete
 openclaw swarm review --project . --task <id> --approve
+openclaw swarm review --project . --task <id> --reject --retry-now  # Reject and force retry
 ```
 
 ### Runner Selection
@@ -399,8 +405,8 @@ For AI tool calling. All tools accept `--json` for structured output.
 |------|-----------|---------|
 | `swarm_status` | `project` | Workflow status with attention items |
 | `swarm_task_plan` | `project`, `spec` | Import spec, generate task graph |
-| `swarm_run` | `project`, `task?`, `dryRun?` | Dispatch next runnable task |
-| `swarm_review_gate` | `project`, `task`, `approve?`, `reject?`, `note?` | Approve/reject review |
+| `swarm_run` | `project`, `task?`, `dryRun?`, `parallel?`, `allReady?` | Dispatch runnable tasks (single or batch) |
+| `swarm_review_gate` | `project`, `task`, `approve?`, `reject?`, `note?` | Approve/reject review (reject returns to ready by default) |
 | `swarm_session_status` | `project`, `run` | Poll session status |
 | `swarm_session_cancel` | `project`, `run`, `reason?` | Cancel session |
 | `swarm_session_close` | `project`, `run`, `reason?` | Close session |
