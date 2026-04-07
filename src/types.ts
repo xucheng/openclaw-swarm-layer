@@ -17,6 +17,7 @@ export type WorkflowLifecycle =
 export type TaskStatus =
   | "planned"
   | "ready"
+  | "queued"
   | "running"
   | "review_required"
   | "blocked"
@@ -145,6 +146,8 @@ export type TaskNode = {
     preferredSessionId?: string;
   };
   contract?: SprintContract;
+  retryCount?: number;
+  lastRejectReason?: string;
 };
 
 export type RunEvent = {
@@ -178,6 +181,7 @@ export type RunRecord = {
   events?: RunEvent[];
   retryHistory?: RetryHistoryEntry[];
   budgetUsage?: BudgetUsage;
+  lastSignal?: string;
 };
 
 export type SessionRecord = {
@@ -283,6 +287,7 @@ export type WorkflowStatusSummary = {
   lifecycle: WorkflowLifecycle;
   totalTasks: number;
   readyTasks: number;
+  queuedTasks: number;
   runningTasks: number;
   blockedTasks: number;
   deadLetterTasks: number;

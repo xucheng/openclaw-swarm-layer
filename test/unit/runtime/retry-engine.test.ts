@@ -1,4 +1,4 @@
-import { appendRetryHistory, isRetryableStatus, shouldRetry } from "../../../src/runtime/retry-engine.js";
+import { appendRetryHistory, isRetryableStatus, shouldRetry, shouldRetryOnSignal } from "../../../src/runtime/retry-engine.js";
 import type { RunRecord, TaskNode } from "../../../src/types.js";
 
 function makeTask(retryPolicy?: TaskNode["runner"]["retryPolicy"]): TaskNode {
@@ -81,5 +81,48 @@ describe("retry engine", () => {
     expect(history).toHaveLength(2);
     expect(history[1]!.runId).toBe("run-1");
     expect(history[1]!.status).toBe("failed");
+  });
+});
+
+describe("shouldRetryOnSignal", () => {
+  it("retries when signal matches retryOnSignal list", () => {
+    const run = { ...makeRun("failed"), lastSignal: "SIGTERM" };
+    const decision = shouldRetryOnSignal(run, ["SIGTERM"]);
+    expect(decision.retry).toBe(true);
+    expect(decision.reason).toContain("SIGTERM");
+  });
+
+  it("does not retry when signal is not in retryOnSignal list", () => {
+    const run = { ...makeRun("failed"), lastSignal: "SIGKILL" };
+    const decision = shouldRetryOnSignal(run, ["SIGTERM"]);
+    expect(decision.retry).toBe(false);
+    expect(decision.reason).toContain("not in retryable list");
+  });
+
+  it("does not retry when no signal is detected", () => {
+    const run = makeRun("failed");
+    const decision = shouldRetryOnSignal(run, ["SIGTERM"]);
+    expect(decision.retry).toBe(false);
+    expect(decision.reason).toContain("no signal detected");
+  });
+
+  it("does not retry when retryOnSignal list is empty", () => {
+    const run = { ...makeRun("failed"), lastSignal: "SIGTERM" };
+    const decision = shouldRetryOnSignal(run, []);
+    expect(decision.retry).toBe(false);
+    expect(decision.reason).toContain("no retryable signals configured");
+  });
+
+  it("does not retry a second time after signal retry already happened", () => {
+    const run: RunRecord = {
+      ...makeRun("failed"),
+      lastSignal: "SIGTERM",
+      retryHistory: [
+        { attempt: 1, runId: "run-0", status: "failed", at: "2026-03-22T00:00:00.000Z" },
+      ],
+    };
+    const decision = shouldRetryOnSignal(run, ["SIGTERM"]);
+    expect(decision.retry).toBe(false);
+    expect(decision.reason).toContain("already retried");
   });
 });

@@ -57,15 +57,26 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
     {
       name: "swarm_run",
       label: "Swarm Run",
-      description: "Dispatch the next runnable swarm task.",
+      description: "Dispatch the next runnable swarm task. Use --parallel or --allReady for batch dispatch.",
       parameters: Type.Object({
         project: Type.String(),
         task: Type.Optional(Type.String()),
         dryRun: Type.Optional(Type.Boolean()),
+        parallel: Type.Optional(Type.Integer({ minimum: 1 })),
+        allReady: Type.Optional(Type.Boolean()),
       }),
       async execute(_toolCallId, params) {
         return jsonResult(
-          await runSwarmRun({ project: params.project, task: params.task, dryRun: params.dryRun }, toolContext),
+          await runSwarmRun(
+            {
+              project: params.project,
+              task: params.task,
+              dryRun: params.dryRun,
+              parallel: params.parallel,
+              allReady: params.allReady,
+            },
+            toolContext,
+          ),
         );
       },
     },

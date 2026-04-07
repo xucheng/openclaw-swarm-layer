@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.4.0 (2026-04-07)
+
+### Parallel Reliability & Retry-Recovery (SPEC-003)
+
+Three features addressing high-concurrency ACP stability, reject-retry workflows, and batch dispatch semantics.
+
+#### Feature 1: ACP Concurrency Protection & Queued Execution
+- New config: `acp.maxConcurrent` (default 6), `acp.queuePolicy` ("fifo"), `acp.retryOnSignal` (default ["SIGTERM"])
+- New `queued` task status for tasks waiting on concurrency slots
+- Concurrency gate prevents over-dispatching ACP sessions; excess tasks queue automatically
+- Signal-based auto-retry via `shouldRetryOnSignal()` for SIGTERM and configurable signal lists
+
+#### Feature 2: Review Reject → Retry
+- New config: `review.rejectPolicy` (default "ready_retry"), `review.maxRejectRetries` (default 3)
+- Reject now returns tasks to `ready` for re-run instead of permanently blocking
+- `retryCount` and `lastRejectReason` tracked per task
+- Exceeding `maxRejectRetries` falls to `blocked` with diagnostic message
+- CLI `--retry-now` flag forces retry regardless of retry limit
+
+#### Feature 3: Parallel Dispatch Semantics
+- `swarm run --parallel N` dispatches up to N ready tasks in one command
+- `swarm run --all-ready` fills available concurrency slots from the ready queue
+- Dispatch stats (requested / admitted / queued) in output and status
+- `swarm_run` tool updated with `parallel` and `allReady` parameters
+
+#### Infrastructure
+- New `src/runtime/concurrency-gate.ts` module for slot checking
+- Extended `applyReviewDecision()` with optional reject-retry policy
+- New `SwarmOrchestrator.runBatch()` method (single-task `runOnce()` unchanged)
+- `WorkflowStatusSummary` and operator attention items include `queued` status
+- Test coverage: 348 unit tests across 52 files, 29 e2e tests across 20 files
+
 ## 0.3.4 (2026-04-06)
 
 OpenClaw `2026.4.5` compatibility and release packaging update.

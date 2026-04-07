@@ -1,12 +1,12 @@
 import { resolveSwarmPaths } from "../lib/paths.js";
 import { journalCompletionSummary, journalReviewEntry } from "../reporting/obsidian-journal.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
-import { applyReviewDecision } from "../review/review-gate.js";
+import { applyReviewDecision, type ReviewDecisionOptions } from "../review/review-gate.js";
 import { synthesizeProgress } from "../session/progress-summary.js";
 import { resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmReview(
-  options: { project: string; task: string; approve?: boolean; reject?: boolean; note?: string },
+  options: { project: string; task: string; approve?: boolean; reject?: boolean; retryNow?: boolean; note?: string },
   context?: SwarmCliContext,
 ): Promise<unknown> {
   const decision = options.approve ? "approve" : options.reject ? "reject" : null;
@@ -16,8 +16,19 @@ export async function runSwarmReview(
 
   const stateStore = resolveStateStore(context);
   const reportConfig = context?.config ?? stateStore.config;
+  const reviewConfig = stateStore.config.review;
   const workflow = await stateStore.loadWorkflow(options.project);
-  const result = applyReviewDecision(workflow, options.task, decision, options.note);
+
+  let reviewOptions: ReviewDecisionOptions | undefined;
+  if (decision === "reject") {
+    if (options.retryNow) {
+      reviewOptions = { rejectPolicy: "ready_retry", maxRejectRetries: Number.MAX_SAFE_INTEGER };
+    } else {
+      reviewOptions = { rejectPolicy: reviewConfig.rejectPolicy, maxRejectRetries: reviewConfig.maxRejectRetries };
+    }
+  }
+
+  const result = applyReviewDecision(workflow, options.task, decision, options.note, reviewOptions);
   await stateStore.saveWorkflow(options.project, result.workflow);
   const report = await writeWorkflowReport(options.project, result.workflow, reportConfig, stateStore);
 

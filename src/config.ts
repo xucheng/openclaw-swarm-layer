@@ -25,6 +25,9 @@ export type SwarmAcpConfig = {
   allowThreadBinding: boolean;
   defaultTimeoutSeconds?: number;
   experimentalControlPlaneAdapter: boolean;
+  maxConcurrent?: number;
+  queuePolicy?: "fifo";
+  retryOnSignal?: string[];
 };
 
 export type SwarmSubagentConfig = {
@@ -44,6 +47,11 @@ export type ObsidianJournalConfig = JournalConfig;
 export type SwarmEvaluatorConfig = {
   enabled: boolean;
   autoInjectAfter: string[];
+};
+
+export type SwarmReviewConfig = {
+  rejectPolicy: "blocked" | "ready_retry";
+  maxRejectRetries: number;
 };
 
 export type SwarmBootstrapConfig = {
@@ -69,6 +77,7 @@ export type SwarmPluginConfig = {
   reviewRequiredByDefault: boolean;
   enforceTaskImmutability: boolean;
   evaluator: SwarmEvaluatorConfig;
+  review: SwarmReviewConfig;
   acp: SwarmAcpConfig;
   subagent: SwarmSubagentConfig;
   bridge: SwarmBridgeConfig;
@@ -95,6 +104,10 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
     enableSpecArchive: true,
     enableCompletionSummary: true,
   },
+  review: {
+    rejectPolicy: "ready_retry",
+    maxRejectRetries: 3,
+  },
   acp: {
     enabled: false,
     backendId: undefined,
@@ -103,6 +116,9 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
     defaultMode: "run",
     allowThreadBinding: false,
     experimentalControlPlaneAdapter: false,
+    maxConcurrent: 6,
+    queuePolicy: "fifo",
+    retryOnSignal: ["SIGTERM"],
   },
   subagent: {
     enabled: false,
@@ -135,6 +151,7 @@ const allowedConfigKeys = new Set([
   "journal",
   "enforceTaskImmutability",
   "evaluator",
+  "review",
   "acp",
   "subagent",
   "bridge",
@@ -337,6 +354,14 @@ export const swarmPluginConfigJsonSchema = {
         autoInjectAfter: { type: "array", items: { type: "string" }, default: ["coding"] },
       },
     },
+    review: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        rejectPolicy: { type: "string", enum: ["blocked", "ready_retry"], default: "ready_retry" },
+        maxRejectRetries: { type: "integer", minimum: 1, default: 3 },
+      },
+    },
     acp: {
       type: "object",
       additionalProperties: false,
@@ -349,6 +374,9 @@ export const swarmPluginConfigJsonSchema = {
         allowThreadBinding: { type: "boolean", default: false },
         defaultTimeoutSeconds: { type: "integer", minimum: 1 },
         experimentalControlPlaneAdapter: { type: "boolean", default: false },
+        maxConcurrent: { type: "integer", minimum: 1, default: 6 },
+        queuePolicy: { type: "string", enum: ["fifo"], default: "fifo" },
+        retryOnSignal: { type: "array", items: { type: "string" }, default: ["SIGTERM"] },
       },
     },
     subagent: {
@@ -468,6 +496,9 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
           "allowThreadBinding",
           "defaultTimeoutSeconds",
           "experimentalControlPlaneAdapter",
+          "maxConcurrent",
+          "queuePolicy",
+          "retryOnSignal",
         ]);
         for (const key of Object.keys(acp)) {
           if (!allowedAcpKeys.has(key)) {
@@ -503,6 +534,43 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
           (!Number.isInteger(acp.defaultTimeoutSeconds) || Number(acp.defaultTimeoutSeconds) < 1)
         ) {
           errors.push("acp.defaultTimeoutSeconds must be an integer >= 1");
+        }
+        if (
+          acp.maxConcurrent !== undefined &&
+          (!Number.isInteger(acp.maxConcurrent) || Number(acp.maxConcurrent) < 1)
+        ) {
+          errors.push("acp.maxConcurrent must be an integer >= 1");
+        }
+        if (acp.queuePolicy !== undefined && acp.queuePolicy !== "fifo") {
+          errors.push('acp.queuePolicy must be "fifo"');
+        }
+        if (
+          acp.retryOnSignal !== undefined &&
+          (!Array.isArray(acp.retryOnSignal) || acp.retryOnSignal.some((v) => typeof v !== "string"))
+        ) {
+          errors.push("acp.retryOnSignal must be an array of strings");
+        }
+      }
+    }
+    if (input.review !== undefined) {
+      if (!isObject(input.review)) {
+        errors.push("review must be an object");
+      } else {
+        const review = input.review;
+        const allowedReviewKeys = new Set(["rejectPolicy", "maxRejectRetries"]);
+        for (const key of Object.keys(review)) {
+          if (!allowedReviewKeys.has(key)) {
+            errors.push(`Unrecognized key: "review.${key}"`);
+          }
+        }
+        if (review.rejectPolicy !== undefined && review.rejectPolicy !== "blocked" && review.rejectPolicy !== "ready_retry") {
+          errors.push('review.rejectPolicy must be one of: "blocked", "ready_retry"');
+        }
+        if (
+          review.maxRejectRetries !== undefined &&
+          (!Number.isInteger(review.maxRejectRetries) || Number(review.maxRejectRetries) < 1)
+        ) {
+          errors.push("review.maxRejectRetries must be an integer >= 1");
         }
       }
     }
@@ -643,6 +711,16 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
           ? input.journal.enableCompletionSummary
           : defaultSwarmPluginConfig.journal.enableCompletionSummary,
     },
+    review: {
+      rejectPolicy:
+        isObject(input.review) && (input.review.rejectPolicy === "blocked" || input.review.rejectPolicy === "ready_retry")
+          ? input.review.rejectPolicy
+          : defaultSwarmPluginConfig.review.rejectPolicy,
+      maxRejectRetries:
+        isObject(input.review) && typeof input.review.maxRejectRetries === "number" && input.review.maxRejectRetries > 0
+          ? Math.floor(input.review.maxRejectRetries)
+          : defaultSwarmPluginConfig.review.maxRejectRetries,
+    },
     acp: {
       enabled:
         isObject(input.acp) && typeof input.acp.enabled === "boolean"
@@ -676,6 +754,15 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
         isObject(input.acp) && typeof input.acp.experimentalControlPlaneAdapter === "boolean"
           ? input.acp.experimentalControlPlaneAdapter
           : defaultSwarmPluginConfig.acp.experimentalControlPlaneAdapter,
+      maxConcurrent:
+        isObject(input.acp) && typeof input.acp.maxConcurrent === "number" && input.acp.maxConcurrent > 0
+          ? Math.floor(input.acp.maxConcurrent)
+          : defaultSwarmPluginConfig.acp.maxConcurrent,
+      queuePolicy: "fifo" as const,
+      retryOnSignal:
+        isObject(input.acp) && Array.isArray(input.acp.retryOnSignal)
+          ? input.acp.retryOnSignal.filter((value): value is string => typeof value === "string")
+          : defaultSwarmPluginConfig.acp.retryOnSignal,
     },
     subagent,
     bridge,

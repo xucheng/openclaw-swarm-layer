@@ -3,6 +3,11 @@ import { rubricToDecision, scoreRubric } from "./quality-rubric.js";
 
 export type ReviewDecision = "approve" | "reject";
 
+export type ReviewDecisionOptions = {
+  rejectPolicy?: "blocked" | "ready_retry";
+  maxRejectRetries?: number;
+};
+
 export type ReviewResult = {
   workflow: WorkflowState;
   task: TaskNode;
@@ -114,10 +119,71 @@ export function applyReviewDecision(
   taskId: string,
   decision: ReviewDecision,
   note?: string,
+  options?: ReviewDecisionOptions,
 ): ReviewResult {
   const task = workflow.tasks.find((entry) => entry.taskId === taskId);
   if (!task) {
     throw new Error(`Unknown taskId: ${taskId}`);
+  }
+
+  if (decision === "reject" && options?.rejectPolicy === "ready_retry") {
+    const currentRetryCount = task.retryCount ?? 0;
+    const maxRetries = options.maxRejectRetries ?? 3;
+
+    if (currentRetryCount < maxRetries) {
+      const retriedTask: TaskNode = {
+        ...task,
+        status: "ready",
+        retryCount: currentRetryCount + 1,
+        lastRejectReason: note,
+        review: {
+          ...task.review,
+          status: "rejected",
+        },
+      };
+
+      const retryWorkflow: WorkflowState = {
+        ...workflow,
+        lifecycle: "planned",
+        tasks: workflow.tasks.map((entry) => (entry.taskId === taskId ? retriedTask : entry)),
+        reviewQueue: workflow.reviewQueue.filter((entry) => entry !== taskId),
+        lastAction: {
+          at: new Date().toISOString(),
+          type: "review:reject_retry",
+          message: note
+            ? `${note} (retry ${currentRetryCount + 1}/${maxRetries})`
+            : `retry ${currentRetryCount + 1}/${maxRetries}`,
+        },
+      };
+
+      return { workflow: retryWorkflow, task: retriedTask };
+    }
+
+    // Exceeded max retries — fall through to blocked
+    const blockedTask: TaskNode = {
+      ...task,
+      status: "blocked",
+      retryCount: currentRetryCount + 1,
+      lastRejectReason: note,
+      review: {
+        ...task.review,
+        status: "rejected",
+      },
+    };
+
+    const blockedWorkflow: WorkflowState = {
+      ...workflow,
+      lifecycle: "blocked",
+      tasks: workflow.tasks.map((entry) => (entry.taskId === taskId ? blockedTask : entry)),
+      reviewQueue: workflow.reviewQueue.filter((entry) => entry !== taskId),
+      lastAction: {
+        at: new Date().toISOString(),
+        type: "review:reject_exhausted",
+        message: `exceeded max reject retries (${maxRetries}): ${note ?? "no reason"}`,
+      },
+    };
+
+    return { workflow: blockedWorkflow, task: blockedTask };
   }
 
   const updatedTask: TaskNode = {

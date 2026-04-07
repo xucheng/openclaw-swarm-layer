@@ -2,7 +2,8 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import type { OpenClawPluginService } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot } from "../config.js";
 import { getSubagentRunnerDisabledMessage, isSubagentRunnerEnabled, resolveRuntimePolicySnapshot } from "../config.js";
-import { getRunnableTasks } from "../planning/task-graph.js";
+import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
+import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
 import { enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
 import { ManualRunner } from "../runtime/manual-runner.js";
@@ -37,6 +38,28 @@ export type RunOnceResult = {
   runtime?: RuntimePolicySnapshot;
   message?: string;
   bootstrap?: BootstrapResult;
+};
+
+export type RunBatchInput = {
+  projectRoot: string;
+  parallel?: number;
+  allReady?: boolean;
+  dryRun?: boolean;
+  runnerOverride?: RunnerType;
+};
+
+export type DispatchStats = {
+  dispatchRequested: number;
+  dispatchAdmitted: number;
+  dispatchQueued: number;
+};
+
+export type RunBatchResult = {
+  ok: boolean;
+  results: RunOnceResult[];
+  stats: DispatchStats;
+  runtime?: RuntimePolicySnapshot;
+  message?: string;
 };
 
 type OrchestratorDeps = {
@@ -320,6 +343,81 @@ export class SwarmOrchestrator {
       taskId: task.taskId,
       runnerOverride: task.runner.type === "manual" ? undefined : (task.runner.type as "acp" | "subagent"),
     });
+  }
+
+  async runBatch(input: RunBatchInput): Promise<RunBatchResult> {
+    const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
+    const runtime = resolveRuntimePolicySnapshot(this.stateStore.config, workflow.runtime, { runtimeVersion: this.stateStore.runtimeVersion });
+    const maxConcurrent = this.stateStore.config.acp.maxConcurrent ?? 6;
+
+    const queuedTasks = getQueuedTasks(workflow.tasks);
+    const runnableTasks = getRunnableTasks(workflow.tasks);
+    const candidates = [...queuedTasks, ...runnableTasks];
+
+    const requestedCount = input.allReady
+      ? candidates.length
+      : Math.min(input.parallel ?? 1, candidates.length);
+
+    if (requestedCount === 0) {
+      return {
+        ok: true,
+        results: [],
+        stats: { dispatchRequested: 0, dispatchAdmitted: 0, dispatchQueued: 0 },
+        runtime,
+        message: "no runnable tasks",
+      };
+    }
+
+    const concurrency = checkConcurrencySlot(workflow.tasks, maxConcurrent);
+    const availableSlots = Math.max(0, maxConcurrent - concurrency.activeCount);
+    const admitCount = Math.min(requestedCount, availableSlots);
+    const toDispatch = candidates.slice(0, admitCount);
+    const toQueue = candidates.slice(admitCount, requestedCount);
+
+    const results: RunOnceResult[] = [];
+
+    for (const task of toDispatch) {
+      const result = await this.runOnce({
+        projectRoot: input.projectRoot,
+        taskId: task.taskId,
+        dryRun: input.dryRun,
+        runnerOverride: input.runnerOverride,
+      });
+      results.push(result);
+    }
+
+    if (toQueue.length > 0) {
+      const currentWorkflow = await this.stateStore.loadWorkflow(input.projectRoot);
+      const updatedTasks = currentWorkflow.tasks.map((t) => {
+        if (toQueue.some((q) => q.taskId === t.taskId) && (t.status === "ready" || t.status === "planned")) {
+          return { ...t, status: "queued" as const };
+        }
+        return t;
+      });
+      await this.stateStore.saveWorkflow(input.projectRoot, {
+        ...currentWorkflow,
+        tasks: updatedTasks,
+        lastAction: {
+          at: new Date().toISOString(),
+          type: "batch:queued",
+          message: `queued ${toQueue.length} tasks awaiting concurrency slots`,
+        },
+      });
+    }
+
+    const stats: DispatchStats = {
+      dispatchRequested: requestedCount,
+      dispatchAdmitted: toDispatch.length,
+      dispatchQueued: toQueue.length,
+    };
+
+    return {
+      ok: results.every((r) => r.ok),
+      results,
+      stats,
+      runtime,
+      message: `dispatched ${stats.dispatchAdmitted}, queued ${stats.dispatchQueued} of ${stats.dispatchRequested} requested`,
+    };
   }
 }
 

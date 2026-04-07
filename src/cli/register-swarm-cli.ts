@@ -65,6 +65,8 @@ export function registerSwarmCliCommands(
     .option("--task <taskId>")
     .option("--dry-run")
     .option("--runner <kind>")
+    .option("--parallel <N>")
+    .option("--all-ready")
     .option("--json");
   bindCommand(run, (options) =>
     runSwarmRun(
@@ -73,6 +75,8 @@ export function registerSwarmCliCommands(
         task: options.task,
         dryRun: options.dryRun,
         runner: options.runner,
+        parallel: options.parallel ? Number(options.parallel) : undefined,
+        allReady: options.allReady,
       },
       cliContext,
     ),
@@ -84,6 +88,7 @@ export function registerSwarmCliCommands(
     .requiredOption("--task <taskId>")
     .option("--approve")
     .option("--reject")
+    .option("--retry-now")
     .option("--note <text>")
     .option("--json");
   bindCommand(review, (options) =>
@@ -93,6 +98,7 @@ export function registerSwarmCliCommands(
         task: options.task,
         approve: options.approve,
         reject: options.reject,
+        retryNow: options.retryNow,
         note: options.note,
       },
       cliContext,

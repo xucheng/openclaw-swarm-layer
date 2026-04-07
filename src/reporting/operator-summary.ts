@@ -11,7 +11,7 @@ export type ReviewQueueItem = {
 };
 
 export type AttentionItem = {
-  kind: "review" | "blocked" | "running" | "dead_letter";
+  kind: "review" | "blocked" | "running" | "dead_letter" | "queued";
   taskId: string;
   title?: string;
   message: string;
@@ -118,6 +118,16 @@ export function buildAttentionItems(workflow: WorkflowState, runs: RunRecord[]):
       latestRunStatus: latestRun?.status,
       latestRunSummary: latestRun?.resultSummary,
       recommendedAction: "Poll session status again or wait for completion before taking review action.",
+    });
+  }
+
+  for (const task of workflow.tasks.filter((entry) => entry.status === "queued")) {
+    items.push({
+      kind: "queued",
+      taskId: task.taskId,
+      title: task.title,
+      message: `Task is queued awaiting concurrency slot: ${task.title}`,
+      recommendedAction: "Wait for running tasks to complete or increase acp.maxConcurrent to admit more tasks.",
     });
   }
 

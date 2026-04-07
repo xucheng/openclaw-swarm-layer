@@ -6,11 +6,11 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation, manual fallback, or legacy subagent bridge. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.3.4-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-315%20unit%20%7C%2023%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-348%20unit%20%7C%2029%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -26,7 +26,10 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 - **Review gates** — Explicit approve/reject with structured quality rubrics (weighted multi-dimension scoring)
 - **Sprint contracts** — Verifiable acceptance criteria per task with GAN-inspired evaluator injection
 - **Cross-session continuity** — Progress synthesis, bootstrap startup sequence, harness assumption tracking
-- **Automatic retry** — Configurable per-task retry policy with dead letter tracking
+- **Automatic retry** — Configurable per-task retry policy with dead letter tracking and signal-based auto-retry
+- **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
+- **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
+- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
 - **Operator reporting** — Status snapshots, run/review logs, spec archives, completion summaries → local + Obsidian sync
 - **Runtime diagnostics** — `swarm doctor`, `swarm status`, and workflow reports surface ACP bridge-exit gate directly
 
@@ -91,8 +94,8 @@ openclaw swarm report --project /path/to/your/project --json
 |---------|-------------|
 | `swarm init --project <path>` | Initialize swarm state for a project |
 | `swarm plan --project <path> --spec <path>` | Import a spec and build task graph |
-| `swarm run --project <path> [--runner acp\|manual\|subagent] [--dry-run]` | Execute the next runnable task |
-| `swarm review --project <path> --task <id> --approve\|--reject` | Approve or reject a task |
+| `swarm run --project <path> [--runner acp\|manual\|subagent] [--dry-run] [--parallel N] [--all-ready]` | Execute runnable tasks (single or batch) |
+| `swarm review --project <path> --task <id> --approve\|--reject [--retry-now]` | Approve or reject a task |
 | `swarm report --project <path>` | Generate a workflow report |
 | `swarm status --project <path>` | Show workflow status, runtime posture, and bridge-exit gate |
 | `swarm doctor` | Diagnose ACP readiness and bridge-exit gate status |
@@ -125,8 +128,8 @@ openclaw swarm report --project /path/to/your/project --json
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (315 tests, 51 files)
-npm run test:e2e       # E2E tests only (23 tests, 18 files)
+npm run test:unit      # Unit tests only (348 tests, 52 files)
+npm run test:e2e       # E2E tests only (29 tests, 20 files)
 npm run test:watch     # Watch mode
 ```
 

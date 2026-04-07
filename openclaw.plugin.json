@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
@@ -98,6 +98,22 @@
           }
         }
       },
+      "review": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rejectPolicy": {
+            "type": "string",
+            "enum": ["blocked", "ready_retry"],
+            "default": "ready_retry"
+          },
+          "maxRejectRetries": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 3
+          }
+        }
+      },
       "acp": {
         "type": "object",
         "additionalProperties": false,
@@ -133,6 +149,21 @@
           "experimentalControlPlaneAdapter": {
             "type": "boolean",
             "default": false
+          },
+          "maxConcurrent": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 6
+          },
+          "queuePolicy": {
+            "type": "string",
+            "enum": ["fifo"],
+            "default": "fifo"
+          },
+          "retryOnSignal": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": ["SIGTERM"]
           }
         }
       },

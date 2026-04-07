@@ -7,7 +7,7 @@ import { RunnerRegistry } from "../../../src/runtime/runner-registry.js";
 import { createOrchestrator } from "../../../src/services/orchestrator.js";
 import { SessionStore } from "../../../src/session/session-store.js";
 import { StateStore } from "../../../src/state/state-store.js";
-import type { SessionRecord, SpecDoc, TaskNode } from "../../../src/types.js";
+import type { SessionRecord, SpecDoc, TaskNode, WorkflowState } from "../../../src/types.js";
 import { planTasksFromSpec } from "../../../src/planning/planner.js";
 
 async function makeTempProject(): Promise<string> {
@@ -506,5 +506,131 @@ describe("SwarmOrchestrator", () => {
     expect(result.runtime?.configuredDefaultRunner).toBe("auto");
     expect(result.runtime?.resolvedDefaultRunner).toBe("acp");
     expect(result.message).toContain("acp runner is scaffolded");
+  });
+});
+
+describe("SwarmOrchestrator.runBatch", () => {
+  function makeIndependentTasks(count: number, overrides: Partial<TaskNode> = {}): TaskNode[] {
+    return Array.from({ length: count }, (_, i) => ({
+      taskId: `task-${i + 1}`,
+      specId: "spec-1",
+      title: `Task ${i + 1}`,
+      description: `Task ${i + 1}`,
+      kind: "coding" as const,
+      deps: [],
+      status: "ready" as const,
+      workspace: { mode: "shared" as const },
+      runner: { type: "manual" as const },
+      review: { required: false },
+      ...overrides,
+    }));
+  }
+
+  async function setupBatchProject(opts: {
+    taskCount: number;
+    taskOverrides?: Partial<TaskNode>;
+    acpMaxConcurrent?: number;
+  }): Promise<{ projectRoot: string; stateStore: StateStore }> {
+    const projectRoot = await makeTempProject();
+    const stateStore = new StateStore({
+      acp: { maxConcurrent: opts.acpMaxConcurrent ?? 6 } as any,
+    });
+    const tasks = makeIndependentTasks(opts.taskCount, opts.taskOverrides);
+    await stateStore.initProject(projectRoot);
+    await stateStore.saveWorkflow(projectRoot, {
+      version: 1,
+      projectRoot,
+      activeSpecId: "spec-1",
+      lifecycle: "planned",
+      tasks,
+      reviewQueue: [],
+    });
+    return { projectRoot, stateStore };
+  }
+
+  it("dispatches N tasks with --parallel", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({ taskCount: 5 });
+    const orchestrator = createOrchestrator({ stateStore });
+
+    const result = await orchestrator.runBatch({ projectRoot, parallel: 3 });
+
+    expect(result.ok).toBe(true);
+    expect(result.stats.dispatchRequested).toBe(3);
+    expect(result.stats.dispatchAdmitted).toBe(3);
+    expect(result.stats.dispatchQueued).toBe(0);
+    expect(result.results).toHaveLength(3);
+  });
+
+  it("dispatches all ready tasks with --allReady", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({ taskCount: 4 });
+    const orchestrator = createOrchestrator({ stateStore });
+
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.stats.dispatchRequested).toBe(4);
+    expect(result.stats.dispatchAdmitted).toBe(4);
+    expect(result.results).toHaveLength(4);
+  });
+
+  it("queues tasks that exceed maxConcurrent", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({
+      taskCount: 5,
+      acpMaxConcurrent: 2,
+    });
+
+    // First, put 2 tasks into running state to fill the concurrency slots
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+    const updatedTasks = workflow.tasks.map((t, i) =>
+      i < 2 ? { ...t, status: "running" as const, runner: { type: "acp" as const } } : t,
+    );
+    await stateStore.saveWorkflow(projectRoot, { ...workflow, tasks: updatedTasks });
+
+    const orchestrator = createOrchestrator({ stateStore });
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true });
+
+    expect(result.stats.dispatchAdmitted).toBe(0);
+    expect(result.stats.dispatchQueued).toBe(3);
+
+    const finalWorkflow = await stateStore.loadWorkflow(projectRoot);
+    const queuedCount = finalWorkflow.tasks.filter((t) => t.status === "queued").length;
+    expect(queuedCount).toBe(3);
+  });
+
+  it("returns noop when no runnable tasks", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({
+      taskCount: 2,
+      taskOverrides: { status: "done" },
+    });
+    const orchestrator = createOrchestrator({ stateStore });
+
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.stats.dispatchRequested).toBe(0);
+    expect(result.message).toBe("no runnable tasks");
+  });
+
+  it("returns correct dispatch stats", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({
+      taskCount: 5,
+      acpMaxConcurrent: 3,
+    });
+
+    // Put 1 task as running ACP to take one slot
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+    const updatedTasks = workflow.tasks.map((t, i) =>
+      i === 0 ? { ...t, status: "running" as const, runner: { type: "acp" as const } } : t,
+    );
+    await stateStore.saveWorkflow(projectRoot, { ...workflow, tasks: updatedTasks });
+
+    const orchestrator = createOrchestrator({ stateStore });
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true });
+
+    expect(result.stats.dispatchRequested).toBe(4);
+    expect(result.stats.dispatchAdmitted).toBe(2); // 3 max - 1 running = 2 slots
+    expect(result.stats.dispatchQueued).toBe(2);
+    expect(result.message).toContain("dispatched 2");
+    expect(result.message).toContain("queued 2");
   });
 });

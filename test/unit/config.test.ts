@@ -33,6 +33,9 @@ describe("swarm plugin config", () => {
       allowThreadBinding: false,
       defaultTimeoutSeconds: 900,
       experimentalControlPlaneAdapter: true,
+      maxConcurrent: 6,
+      queuePolicy: "fifo",
+      retryOnSignal: ["SIGTERM"],
     });
   });
 
@@ -224,5 +227,68 @@ describe("swarm plugin config", () => {
     });
 
     expect(result).toEqual({ ok: false, errors: ['bridge.subagentEnabled must be true when defaultRunner="subagent"'] });
+  });
+
+  it("resolves acp.maxConcurrent, queuePolicy, and retryOnSignal defaults", () => {
+    const resolved = resolveSwarmPluginConfig({});
+    expect(resolved.acp.maxConcurrent).toBe(6);
+    expect(resolved.acp.queuePolicy).toBe("fifo");
+    expect(resolved.acp.retryOnSignal).toEqual(["SIGTERM"]);
+  });
+
+  it("accepts custom acp.maxConcurrent", () => {
+    const resolved = resolveSwarmPluginConfig({
+      acp: { maxConcurrent: 10 },
+    });
+    expect(resolved.acp.maxConcurrent).toBe(10);
+  });
+
+  it("accepts custom acp.retryOnSignal", () => {
+    const resolved = resolveSwarmPluginConfig({
+      acp: { retryOnSignal: ["SIGTERM", "SIGKILL"] },
+    });
+    expect(resolved.acp.retryOnSignal).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("resolves review defaults", () => {
+    const resolved = resolveSwarmPluginConfig({});
+    expect(resolved.review.rejectPolicy).toBe("ready_retry");
+    expect(resolved.review.maxRejectRetries).toBe(3);
+  });
+
+  it("accepts custom review config", () => {
+    const resolved = resolveSwarmPluginConfig({
+      review: { rejectPolicy: "blocked", maxRejectRetries: 5 },
+    });
+    expect(resolved.review.rejectPolicy).toBe("blocked");
+    expect(resolved.review.maxRejectRetries).toBe(5);
+  });
+
+  it("validates acp.maxConcurrent must be >= 1", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      acp: { maxConcurrent: 0 },
+    });
+    expect(result).toEqual({ ok: false, errors: ["acp.maxConcurrent must be an integer >= 1"] });
+  });
+
+  it("validates review.rejectPolicy must be valid enum", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      review: { rejectPolicy: "invalid" },
+    });
+    expect(result).toEqual({ ok: false, errors: ['review.rejectPolicy must be one of: "blocked", "ready_retry"'] });
+  });
+
+  it("validates review.maxRejectRetries must be >= 1", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      review: { maxRejectRetries: 0 },
+    });
+    expect(result).toEqual({ ok: false, errors: ["review.maxRejectRetries must be an integer >= 1"] });
+  });
+
+  it("rejects unknown review keys", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      review: { unknown: true },
+    });
+    expect(result).toEqual({ ok: false, errors: ['Unrecognized key: "review.unknown"'] });
   });
 });

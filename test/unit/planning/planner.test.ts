@@ -1,5 +1,5 @@
 import { planTasksFromSpec } from "../../../src/planning/planner.js";
-import { getRunnableTasks, upsertTaskStatuses, validateTaskGraph } from "../../../src/planning/task-graph.js";
+import { getQueuedTasks, getRunnableTasks, upsertTaskStatuses, validateTaskGraph } from "../../../src/planning/task-graph.js";
 import type { SpecDoc, TaskNode } from "../../../src/types.js";
 
 const spec: SpecDoc = {
@@ -142,5 +142,29 @@ describe("planner", () => {
     const validation = validateTaskGraph(tasks);
     expect(validation.ok).toBe(true);
     expect(validation.errors).toEqual([]);
+  });
+
+  it("getRunnableTasks excludes queued tasks", () => {
+    const tasks = planTasksFromSpec(spec);
+    const withQueued = tasks.map((t, i) =>
+      i === 0 ? { ...t, status: "queued" as const } : t,
+    );
+    const runnable = getRunnableTasks(withQueued);
+    expect(runnable.every((t) => t.status !== "queued")).toBe(true);
+  });
+
+  it("getQueuedTasks returns only queued tasks", () => {
+    const tasks = planTasksFromSpec(spec);
+    const withQueued = tasks.map((t, i) =>
+      i === 0 ? { ...t, status: "queued" as const } : t,
+    );
+    const queued = getQueuedTasks(withQueued);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.taskId).toBe(tasks[0]!.taskId);
+  });
+
+  it("getQueuedTasks returns empty when no tasks are queued", () => {
+    const tasks = planTasksFromSpec(spec);
+    expect(getQueuedTasks(tasks)).toEqual([]);
   });
 });

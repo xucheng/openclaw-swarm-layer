@@ -61,6 +61,10 @@ export function getRunnableTasks(tasks: TaskNode[]): TaskNode[] {
   }));
 }
 
+export function getQueuedTasks(tasks: TaskNode[]): TaskNode[] {
+  return tasks.filter((task) => task.status === "queued");
+}
+
 export function upsertTaskStatuses(tasks: TaskNode[]): TaskNode[] {
   const runnableIds = new Set(getRunnableTasks(tasks).map((task) => task.taskId));
   return tasks.map((task) => {

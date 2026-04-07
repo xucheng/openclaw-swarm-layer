@@ -32,6 +32,28 @@ export function shouldRetry(
   return { retry: true, reason: `attempt ${currentAttempt + 1} of ${policy.maxAttempts}` };
 }
 
+export function shouldRetryOnSignal(
+  runRecord: RunRecord,
+  retryOnSignal: string[],
+): { retry: boolean; reason: string } {
+  if (!runRecord.lastSignal) {
+    return { retry: false, reason: "no signal detected" };
+  }
+  if (retryOnSignal.length === 0) {
+    return { retry: false, reason: "no retryable signals configured" };
+  }
+  if (!retryOnSignal.includes(runRecord.lastSignal)) {
+    return { retry: false, reason: `signal ${runRecord.lastSignal} is not in retryable list` };
+  }
+  const alreadyRetriedForSignal = runRecord.retryHistory?.some(
+    (entry) => entry.status === "failed" || entry.status === "cancelled",
+  );
+  if (alreadyRetriedForSignal) {
+    return { retry: false, reason: `already retried after signal` };
+  }
+  return { retry: true, reason: `retrying after ${runRecord.lastSignal}` };
+}
+
 export function appendRetryHistory(
   runRecord: RunRecord,
 ): RetryHistoryEntry[] {

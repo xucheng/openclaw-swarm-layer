@@ -15,6 +15,7 @@ export type SwarmStatusResult = {
     activeSpecId?: string;
     totalTasks: number;
     readyTasks: number;
+    queuedTasks: number;
     runningTasks: number;
     blockedTasks: number;
     reviewQueueSize: number;

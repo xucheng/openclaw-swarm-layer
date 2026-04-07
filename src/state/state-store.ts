@@ -203,6 +203,7 @@ export class StateStore {
       lifecycle: workflow.lifecycle,
       totalTasks: workflow.tasks.length,
       readyTasks: workflow.tasks.filter((task) => task.status === "ready").length,
+      queuedTasks: workflow.tasks.filter((task) => task.status === "queued").length,
       runningTasks: workflow.tasks.filter((task) => task.status === "running").length,
       blockedTasks: workflow.tasks.filter((task) => task.status === "blocked").length,
       deadLetterTasks: workflow.tasks.filter((task) => task.status === "dead_letter").length,
