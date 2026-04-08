@@ -21,8 +21,9 @@
 - `M5.4a`: complete (2026-03-27)
 - `M5.4b`: complete (2026-03-27)
 - `M5.4c`: complete (2026-03-27)
+- `M6`: complete (2026-04-08, `Autopilot Control Plane`)
 
-The five-stage roadmap is now complete. `M5.4c Subagent Final Decision` closed with `subagent` retained only as a legacy bridge-backed opt-in path, while ACP stays public-only.
+The original five-stage roadmap is now complete. `M5.4c Subagent Final Decision` closed with `subagent` retained only as a legacy bridge-backed opt-in path, while ACP stays public-only. `M6 Autopilot Control Plane` is now complete through `M6.4`.
 
 ## M5 Delivery Matrix
 
@@ -66,4 +67,26 @@ Outcome posture:
 
 ## Next Slice
 
-No further M5 convergence slice is open. Future work should either stay in post-M5 maintenance/release hardening or start a new milestone only if upstream exposes a public subagent spawn API.
+No further `M5` convergence slice is open.
+
+Active next milestone family:
+
+| Milestone | Goal | Status | Notes |
+|-----------|------|--------|-------|
+| `M6.0` | Control-plane skeleton and state persistence | Complete | `autopilot-state`, config schema, status/report surface landed on 2026-04-08 |
+| `M6.1` | Tick MVP | Complete | lease, deterministic tick, idempotent dispatch landed on 2026-04-08 |
+| `M6.2` | Session sync and review closure | Complete | ACP/subagent sync, tick reconciliation, supervised review policy landed on 2026-04-08 |
+| `M6.3` | Recovery and degraded mode | Complete | stuck/stale detection, cancel/close/retry/escalate, degraded dispatch hold landed on 2026-04-08 |
+| `M6.4` | Service loop and release freeze | Complete | service loop, start/pause/resume/stop, and full local regression landed on 2026-04-08 |
+
+Status note:
+
+- `M6` milestone family is complete as of 2026-04-08.
+- Current release-freeze baseline: 63 unit test files / 381 unit tests, 25 e2e files / 34 e2e tests, `npm run build`, and `npm test` green.
+- No follow-on milestone family is opened yet.
+
+Planning rules for the next slice:
+
+- `M6` is a new milestone family, not an extension of `M5`
+- `M6` should preserve the shipped `M5.4c` runner posture: ACP public-only default path, subagent legacy opt-in only
+- any future public subagent path should be treated as a separate follow-on milestone after `M6`, not as unfinished `M5` debt

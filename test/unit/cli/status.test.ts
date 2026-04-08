@@ -141,5 +141,10 @@ describe("swarm status cli", () => {
     expect(result.recentSessions[0]?.sessionId).toBe("session-1");
     expect(result.reusableSessionCandidates[0]?.selectedSessionId).toBe("session-1");
     expect(result.reusableSessionCandidates[0]?.reason).toContain("Reusable session candidate found");
+    expect(result.autopilot.enabled).toBe(false);
+    expect(result.autopilot.desiredState).toBe("stopped");
+    expect(result.autopilot.queuePressure.reviewQueueSize).toBe(1);
+    expect(result.autopilot.health.degraded).toBe(false);
+    expect(result.autopilot.decisionLogPath).toContain(path.join(".openclaw", "swarm", "logs", "autopilot-decisions.ndjson"));
   });
 });

@@ -229,6 +229,69 @@ Completion evidence:
 
 Exit rule: satisfied on 2026-03-27.
 
+## M6 Autopilot Control Plane
+
+### M6 Overall DoD
+
+- a deterministic autopilot `tick` exists and can progress a project without duplicating dispatch
+- active ACP and legacy subagent runs can be synchronized into workflow state through the supported runtime surface
+- review, recovery, and escalation behavior is policy-driven and auditable
+- autopilot state, lease ownership, and decision logs persist independently from workflow business state
+- pause/resume/stop controls are operator-visible
+- every `M6.x` node adds unit coverage, reruns e2e regression, and keeps `npm run build` green
+
+Current status: complete (2026-04-08).
+
+### M6.0 DoD
+
+- `autopilot` config schema resolves and validates
+- `autopilot-state` persists independently from workflow state
+- status/report surfaces expose autopilot summary fields
+- `swarm autopilot status` and `swarm autopilot tick --dry-run` exist
+- unit + e2e coverage exists for the skeleton path
+
+Current status: complete (2026-04-08).
+
+### M6.1 DoD
+
+- lease acquisition and expiry prevent concurrent active ticks on the same project
+- deterministic `tick()` can dispatch ready/queued tasks through the existing orchestrator
+- repeated no-op ticks do not create duplicate runs
+- queue refill respects existing runtime concurrency limits and new autopilot dispatch caps
+- unit + e2e coverage exists for idempotent dispatch behavior
+
+Current status: complete (2026-04-08).
+
+### M6.2 DoD
+
+- ACP and legacy subagent runners expose a supported sync path into run records
+- accepted/running sessions can be reconciled during a tick
+- supervised review policies can auto-close low-risk review items while holding unsafe cases
+- review decisions record policy reasons in operator-visible state
+- unit + e2e coverage exists for sync and review closure
+
+Current status: complete (2026-04-08).
+
+### M6.3 DoD
+
+- stuck-run and stale-session detection is policy-driven
+- controlled recovery actions exist for retry, safe cancel, safe close, and escalation
+- degraded mode can reduce or halt new dispatch when failure rate breaches policy
+- report/status surfaces summarize recovery, retry, and escalation activity
+- unit + e2e coverage exists for recovery and degraded-mode behavior
+
+Current status: complete (2026-04-08).
+
+### M6.4 DoD
+
+- service loop wrapper exists over deterministic tick
+- `start`, `pause`, `resume`, and `stop --mode safe` work with visible operator state
+- decision log, status, and report semantics are aligned
+- full milestone regression is rerun before closeout
+- unit tests, e2e tests, and build pass at release-freeze time
+
+Current status: complete (2026-04-08).
+
 ## Assessment History
 
 - `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline
@@ -251,3 +314,9 @@ Exit rule: satisfied on 2026-03-27.
 - `M5.4a` complete (2026-03-27): 306 unit tests across 53 files, 25 e2e tests across 18 files, build clean; full local smoke matrix green on `OpenClaw 2026.3.24`
 - `M5.4b` complete (2026-03-27): 300 unit tests across 51 files, 23 e2e tests across 18 files, build clean; local doctor and ACP dry-run smoke green on `OpenClaw 2026.3.24`
 - `M5.4c` complete (2026-03-27): 305 unit tests across 51 files, 23 e2e tests across 18 files, build clean; subagent retained only as a legacy bridge-backed opt-in path
+- `M6.0` complete (2026-04-08): control-plane skeleton, autopilot state persistence, and operator status/report surface shipped
+- `M6.1` complete (2026-04-08): deterministic lease-backed dispatch tick shipped
+- `M6.2` complete (2026-04-08): ACP/subagent sync and supervised review closure shipped; full local regression green
+- `M6.3` complete (2026-04-08): recovery planner, stuck/stale handling, cancel/close/retry/escalate actions, and degraded dispatch hold shipped
+- `M6.4` complete (2026-04-08): service loop, start/pause/resume/stop controls, and aligned status/report semantics shipped; `npm run build` and `npm test` green
+- `M6` complete (2026-04-08): Autopilot Control Plane closed out at 63 unit test files / 381 unit tests and 25 e2e files / 34 e2e tests

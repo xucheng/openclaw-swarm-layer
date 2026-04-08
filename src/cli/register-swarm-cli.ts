@@ -18,6 +18,9 @@ import { runSwarmRun } from "./swarm-run.js";
 import { runSwarmSessionStatus } from "./swarm-session-status.js";
 import { runSwarmSessionSteer } from "./swarm-session-steer.js";
 import { runSwarmStatus } from "./swarm-status.js";
+import { runSwarmAutopilotControl } from "./swarm-autopilot-control.js";
+import { runSwarmAutopilotStatus } from "./swarm-autopilot-status.js";
+import { runSwarmAutopilotTick } from "./swarm-autopilot-tick.js";
 
 type CommandAction = (options: any) => Promise<unknown>;
 
@@ -110,6 +113,57 @@ export function registerSwarmCliCommands(
 
   const doctor = swarm.command("doctor").option("--json");
   bindCommand(doctor, () => runSwarmDoctor({}, cliContext));
+
+  const autopilot = swarm.command("autopilot").description("Autopilot control-plane commands");
+  const autopilotStatus = autopilot.command("status").requiredOption("--project <path>").option("--json");
+  bindCommand(autopilotStatus, (options) => runSwarmAutopilotStatus({ project: options.project }, cliContext));
+
+  const autopilotStart = autopilot
+    .command("start")
+    .requiredOption("--project <path>")
+    .option("--reason <text>")
+    .option("--json");
+  bindCommand(autopilotStart, (options) =>
+    runSwarmAutopilotControl({ project: options.project, command: "start", reason: options.reason }, cliContext),
+  );
+
+  const autopilotPause = autopilot
+    .command("pause")
+    .requiredOption("--project <path>")
+    .option("--reason <text>")
+    .option("--json");
+  bindCommand(autopilotPause, (options) =>
+    runSwarmAutopilotControl({ project: options.project, command: "pause", reason: options.reason }, cliContext),
+  );
+
+  const autopilotResume = autopilot
+    .command("resume")
+    .requiredOption("--project <path>")
+    .option("--reason <text>")
+    .option("--json");
+  bindCommand(autopilotResume, (options) =>
+    runSwarmAutopilotControl({ project: options.project, command: "resume", reason: options.reason }, cliContext),
+  );
+
+  const autopilotStop = autopilot
+    .command("stop")
+    .requiredOption("--project <path>")
+    .option("--mode <mode>", "stop mode", "safe")
+    .option("--reason <text>")
+    .option("--json");
+  bindCommand(autopilotStop, (options) =>
+    runSwarmAutopilotControl(
+      { project: options.project, command: "stop", mode: options.mode, reason: options.reason },
+      cliContext,
+    ),
+  );
+
+  const autopilotTick = autopilot
+    .command("tick")
+    .requiredOption("--project <path>")
+    .option("--dry-run")
+    .option("--json");
+  bindCommand(autopilotTick, (options) => runSwarmAutopilotTick({ project: options.project, dryRun: options.dryRun }, cliContext));
 
   const session = swarm.command("session").description("ACP session operator commands");
   const sessionList = session.command("list").requiredOption("--project <path>").option("--json");

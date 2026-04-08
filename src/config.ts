@@ -58,6 +58,32 @@ export type SwarmBootstrapConfig = {
   enabled: boolean;
 };
 
+export type SwarmAutopilotReviewPolicy = {
+  mode: "manual_only" | "auto_safe" | "auto_allowlist";
+  allowlistTags: string[];
+  denyTags: string[];
+};
+
+export type SwarmAutopilotRecoveryPolicy = {
+  stuckRunMinutes: number;
+  idleSessionMinutes: number;
+  maxRecoveriesPerTask: number;
+  cancelBeforeRetry: boolean;
+  degradedFailureRate: number;
+  degradedMinTerminalRuns: number;
+  degradedTerminalWindow: number;
+};
+
+export type SwarmAutopilotConfig = {
+  enabled: boolean;
+  mode: "supervised";
+  tickSeconds: number;
+  leaseSeconds: number;
+  maxDispatchPerTick: number;
+  reviewPolicy: SwarmAutopilotReviewPolicy;
+  recoveryPolicy: SwarmAutopilotRecoveryPolicy;
+};
+
 export type AcpAutomationResolutionHints = {
   runtimeVersion?: string | null;
 };
@@ -82,6 +108,7 @@ export type SwarmPluginConfig = {
   subagent: SwarmSubagentConfig;
   bridge: SwarmBridgeConfig;
   bootstrap: SwarmBootstrapConfig;
+  autopilot: SwarmAutopilotConfig;
 };
 
 export const defaultSwarmPluginConfig: SwarmPluginConfig = {
@@ -134,6 +161,27 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
   bootstrap: {
     enabled: false,
   },
+  autopilot: {
+    enabled: false,
+    mode: "supervised",
+    tickSeconds: 15,
+    leaseSeconds: 45,
+    maxDispatchPerTick: 2,
+    reviewPolicy: {
+      mode: "manual_only",
+      allowlistTags: [],
+      denyTags: ["high-risk", "security", "prod"],
+    },
+    recoveryPolicy: {
+      stuckRunMinutes: 20,
+      idleSessionMinutes: 60,
+      maxRecoveriesPerTask: 1,
+      cancelBeforeRetry: true,
+      degradedFailureRate: 0.5,
+      degradedMinTerminalRuns: 3,
+      degradedTerminalWindow: 6,
+    },
+  },
 };
 
 const allowedConfigKeys = new Set([
@@ -156,6 +204,7 @@ const allowedConfigKeys = new Set([
   "subagent",
   "bridge",
   "bootstrap",
+  "autopilot",
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -410,6 +459,39 @@ export const swarmPluginConfigJsonSchema = {
         enabled: { type: "boolean", default: false },
       },
     },
+    autopilot: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        enabled: { type: "boolean", default: false },
+        mode: { type: "string", enum: ["supervised"], default: "supervised" },
+        tickSeconds: { type: "integer", minimum: 1, default: 15 },
+        leaseSeconds: { type: "integer", minimum: 1, default: 45 },
+        maxDispatchPerTick: { type: "integer", minimum: 1, default: 2 },
+        reviewPolicy: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            mode: { type: "string", enum: ["manual_only", "auto_safe", "auto_allowlist"], default: "manual_only" },
+            allowlistTags: { type: "array", items: { type: "string" }, default: [] },
+            denyTags: { type: "array", items: { type: "string" }, default: ["high-risk", "security", "prod"] },
+          },
+        },
+        recoveryPolicy: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            stuckRunMinutes: { type: "integer", minimum: 1, default: 20 },
+            idleSessionMinutes: { type: "integer", minimum: 1, default: 60 },
+            maxRecoveriesPerTask: { type: "integer", minimum: 1, default: 1 },
+            cancelBeforeRetry: { type: "boolean", default: true },
+            degradedFailureRate: { type: "number", minimum: 0, maximum: 1, default: 0.5 },
+            degradedMinTerminalRuns: { type: "integer", minimum: 1, default: 3 },
+            degradedTerminalWindow: { type: "integer", minimum: 1, default: 6 },
+          },
+        },
+      },
+    },
   },
 } satisfies Record<string, unknown>;
 
@@ -636,6 +718,119 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
         }
       }
     }
+    if (input.autopilot !== undefined) {
+      if (!isObject(input.autopilot)) {
+        errors.push("autopilot must be an object");
+      } else {
+        const autopilot = input.autopilot;
+        const allowedAutopilotKeys = new Set([
+          "enabled",
+          "mode",
+          "tickSeconds",
+          "leaseSeconds",
+          "maxDispatchPerTick",
+          "reviewPolicy",
+          "recoveryPolicy",
+        ]);
+        for (const key of Object.keys(autopilot)) {
+          if (!allowedAutopilotKeys.has(key)) {
+            errors.push(`Unrecognized key: "autopilot.${key}"`);
+          }
+        }
+        if (autopilot.enabled !== undefined && typeof autopilot.enabled !== "boolean") {
+          errors.push("autopilot.enabled must be a boolean");
+        }
+        if (autopilot.mode !== undefined && autopilot.mode !== "supervised") {
+          errors.push('autopilot.mode must be "supervised"');
+        }
+        for (const [key, value] of [
+          ["tickSeconds", autopilot.tickSeconds],
+          ["leaseSeconds", autopilot.leaseSeconds],
+          ["maxDispatchPerTick", autopilot.maxDispatchPerTick],
+        ] as const) {
+          if (value !== undefined && (!Number.isInteger(value) || Number(value) < 1)) {
+            errors.push(`autopilot.${key} must be an integer >= 1`);
+          }
+        }
+        if (autopilot.reviewPolicy !== undefined) {
+          if (!isObject(autopilot.reviewPolicy)) {
+            errors.push("autopilot.reviewPolicy must be an object");
+          } else {
+            const reviewPolicy = autopilot.reviewPolicy;
+            const allowedReviewPolicyKeys = new Set(["mode", "allowlistTags", "denyTags"]);
+            for (const key of Object.keys(reviewPolicy)) {
+              if (!allowedReviewPolicyKeys.has(key)) {
+                errors.push(`Unrecognized key: "autopilot.reviewPolicy.${key}"`);
+              }
+            }
+            if (
+              reviewPolicy.mode !== undefined &&
+              reviewPolicy.mode !== "manual_only" &&
+              reviewPolicy.mode !== "auto_safe" &&
+              reviewPolicy.mode !== "auto_allowlist"
+            ) {
+              errors.push('autopilot.reviewPolicy.mode must be one of: "manual_only", "auto_safe", "auto_allowlist"');
+            }
+            if (
+              reviewPolicy.allowlistTags !== undefined &&
+              (!Array.isArray(reviewPolicy.allowlistTags) || reviewPolicy.allowlistTags.some((v) => typeof v !== "string"))
+            ) {
+              errors.push("autopilot.reviewPolicy.allowlistTags must be an array of strings");
+            }
+            if (
+              reviewPolicy.denyTags !== undefined &&
+              (!Array.isArray(reviewPolicy.denyTags) || reviewPolicy.denyTags.some((v) => typeof v !== "string"))
+            ) {
+              errors.push("autopilot.reviewPolicy.denyTags must be an array of strings");
+            }
+          }
+        }
+        if (autopilot.recoveryPolicy !== undefined) {
+          if (!isObject(autopilot.recoveryPolicy)) {
+            errors.push("autopilot.recoveryPolicy must be an object");
+          } else {
+            const recoveryPolicy = autopilot.recoveryPolicy;
+            const allowedRecoveryPolicyKeys = new Set([
+              "stuckRunMinutes",
+              "idleSessionMinutes",
+              "maxRecoveriesPerTask",
+              "cancelBeforeRetry",
+              "degradedFailureRate",
+              "degradedMinTerminalRuns",
+              "degradedTerminalWindow",
+            ]);
+            for (const key of Object.keys(recoveryPolicy)) {
+              if (!allowedRecoveryPolicyKeys.has(key)) {
+                errors.push(`Unrecognized key: "autopilot.recoveryPolicy.${key}"`);
+              }
+            }
+            for (const [key, value] of [
+              ["stuckRunMinutes", recoveryPolicy.stuckRunMinutes],
+              ["idleSessionMinutes", recoveryPolicy.idleSessionMinutes],
+              ["maxRecoveriesPerTask", recoveryPolicy.maxRecoveriesPerTask],
+              ["degradedMinTerminalRuns", recoveryPolicy.degradedMinTerminalRuns],
+              ["degradedTerminalWindow", recoveryPolicy.degradedTerminalWindow],
+            ] as const) {
+              if (value !== undefined && (!Number.isInteger(value) || Number(value) < 1)) {
+                errors.push(`autopilot.recoveryPolicy.${key} must be an integer >= 1`);
+              }
+            }
+            if (recoveryPolicy.cancelBeforeRetry !== undefined && typeof recoveryPolicy.cancelBeforeRetry !== "boolean") {
+              errors.push("autopilot.recoveryPolicy.cancelBeforeRetry must be a boolean");
+            }
+            if (
+              recoveryPolicy.degradedFailureRate !== undefined &&
+              (typeof recoveryPolicy.degradedFailureRate !== "number" ||
+                Number.isNaN(recoveryPolicy.degradedFailureRate) ||
+                recoveryPolicy.degradedFailureRate < 0 ||
+                recoveryPolicy.degradedFailureRate > 1)
+            ) {
+              errors.push("autopilot.recoveryPolicy.degradedFailureRate must be a number between 0 and 1");
+            }
+          }
+        }
+      }
+    }
 
     if (input.defaultRunner === "subagent") {
       if (isObject(input.subagent) && input.subagent.enabled === false) {
@@ -771,6 +966,96 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
         isObject(input.bootstrap) && typeof input.bootstrap.enabled === "boolean"
           ? input.bootstrap.enabled
           : defaultSwarmPluginConfig.bootstrap.enabled,
+    },
+    autopilot: {
+      enabled:
+        isObject(input.autopilot) && typeof input.autopilot.enabled === "boolean"
+          ? input.autopilot.enabled
+          : defaultSwarmPluginConfig.autopilot.enabled,
+      mode: "supervised",
+      tickSeconds:
+        isObject(input.autopilot) && typeof input.autopilot.tickSeconds === "number" && input.autopilot.tickSeconds > 0
+          ? Math.floor(input.autopilot.tickSeconds)
+          : defaultSwarmPluginConfig.autopilot.tickSeconds,
+      leaseSeconds:
+        isObject(input.autopilot) && typeof input.autopilot.leaseSeconds === "number" && input.autopilot.leaseSeconds > 0
+          ? Math.floor(input.autopilot.leaseSeconds)
+          : defaultSwarmPluginConfig.autopilot.leaseSeconds,
+      maxDispatchPerTick:
+        isObject(input.autopilot) &&
+        typeof input.autopilot.maxDispatchPerTick === "number" &&
+        input.autopilot.maxDispatchPerTick > 0
+          ? Math.floor(input.autopilot.maxDispatchPerTick)
+          : defaultSwarmPluginConfig.autopilot.maxDispatchPerTick,
+      reviewPolicy: {
+        mode:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.reviewPolicy) &&
+          (input.autopilot.reviewPolicy.mode === "manual_only" ||
+            input.autopilot.reviewPolicy.mode === "auto_safe" ||
+            input.autopilot.reviewPolicy.mode === "auto_allowlist")
+            ? input.autopilot.reviewPolicy.mode
+            : defaultSwarmPluginConfig.autopilot.reviewPolicy.mode,
+        allowlistTags:
+          isObject(input.autopilot) && isObject(input.autopilot.reviewPolicy) && Array.isArray(input.autopilot.reviewPolicy.allowlistTags)
+            ? input.autopilot.reviewPolicy.allowlistTags.filter((value): value is string => typeof value === "string")
+            : defaultSwarmPluginConfig.autopilot.reviewPolicy.allowlistTags,
+        denyTags:
+          isObject(input.autopilot) && isObject(input.autopilot.reviewPolicy) && Array.isArray(input.autopilot.reviewPolicy.denyTags)
+            ? input.autopilot.reviewPolicy.denyTags.filter((value): value is string => typeof value === "string")
+            : defaultSwarmPluginConfig.autopilot.reviewPolicy.denyTags,
+      },
+      recoveryPolicy: {
+        stuckRunMinutes:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.stuckRunMinutes === "number" &&
+          input.autopilot.recoveryPolicy.stuckRunMinutes > 0
+            ? Math.floor(input.autopilot.recoveryPolicy.stuckRunMinutes)
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.stuckRunMinutes,
+        idleSessionMinutes:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.idleSessionMinutes === "number" &&
+          input.autopilot.recoveryPolicy.idleSessionMinutes > 0
+            ? Math.floor(input.autopilot.recoveryPolicy.idleSessionMinutes)
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.idleSessionMinutes,
+        maxRecoveriesPerTask:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.maxRecoveriesPerTask === "number" &&
+          input.autopilot.recoveryPolicy.maxRecoveriesPerTask > 0
+            ? Math.floor(input.autopilot.recoveryPolicy.maxRecoveriesPerTask)
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.maxRecoveriesPerTask,
+        cancelBeforeRetry:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.cancelBeforeRetry === "boolean"
+            ? input.autopilot.recoveryPolicy.cancelBeforeRetry
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.cancelBeforeRetry,
+        degradedFailureRate:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.degradedFailureRate === "number" &&
+          input.autopilot.recoveryPolicy.degradedFailureRate >= 0 &&
+          input.autopilot.recoveryPolicy.degradedFailureRate <= 1
+            ? input.autopilot.recoveryPolicy.degradedFailureRate
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.degradedFailureRate,
+        degradedMinTerminalRuns:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.degradedMinTerminalRuns === "number" &&
+          input.autopilot.recoveryPolicy.degradedMinTerminalRuns > 0
+            ? Math.floor(input.autopilot.recoveryPolicy.degradedMinTerminalRuns)
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.degradedMinTerminalRuns,
+        degradedTerminalWindow:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.recoveryPolicy) &&
+          typeof input.autopilot.recoveryPolicy.degradedTerminalWindow === "number" &&
+          input.autopilot.recoveryPolicy.degradedTerminalWindow > 0
+            ? Math.floor(input.autopilot.recoveryPolicy.degradedTerminalWindow)
+            : defaultSwarmPluginConfig.autopilot.recoveryPolicy.degradedTerminalWindow,
+      },
     },
   };
 }

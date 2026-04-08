@@ -26,11 +26,21 @@ describe("swarm cli", () => {
       "review",
       "report",
       "doctor",
+      "autopilot",
       "session",
     ]);
 
     const runCommand = swarm?.commands.find((command) => command.name() === "run");
     expect(runCommand?.options.some((option) => option.long === "--runner")).toBe(true);
+    const autopilotCommand = swarm?.commands.find((command) => command.name() === "autopilot");
+    expect(autopilotCommand?.commands.map((command) => command.name())).toEqual([
+      "status",
+      "start",
+      "pause",
+      "resume",
+      "stop",
+      "tick",
+    ]);
     const sessionCommand = swarm?.commands.find((command) => command.name() === "session");
     expect(sessionCommand?.commands.map((command) => command.name())).toEqual(["list", "inspect", "status", "cancel", "close", "follow-up", "cleanup", "steer"]);
   });

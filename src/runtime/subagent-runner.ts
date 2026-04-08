@@ -1,6 +1,7 @@
 import { buildSubagentSpawnParams } from "./subagent-mapping.js";
 import { UnsupportedOpenClawSubagentAdapter, type OpenClawSubagentAdapter } from "./openclaw-subagent-adapter.js";
-import type { RunnerPlan, RunnerPlanInput, RunnerRunInput, RunnerRunResult, TaskRunner } from "./task-runner.js";
+import { syncSubagentRunRecord } from "./session-sync.js";
+import type { RunnerPlan, RunnerPlanInput, RunnerRunInput, RunnerRunResult, RunnerSyncInput, RunnerSyncResult, TaskRunner } from "./task-runner.js";
 
 export class SubagentRunner implements TaskRunner {
   readonly kind = "subagent" as const;
@@ -61,6 +62,22 @@ export class SubagentRunner implements TaskRunner {
           },
         ],
       },
+    };
+  }
+
+  async sync(input: RunnerSyncInput): Promise<RunnerSyncResult> {
+    const childSessionKey = input.runRecord.sessionRef?.sessionKey;
+    if (!childSessionKey) {
+      throw new Error(`Subagent run record ${input.runRecord.runId} has no session key`);
+    }
+
+    const remoteStatus = await this.subagentAdapter.getSubagentRunStatus(childSessionKey);
+    const synced = syncSubagentRunRecord(input.runRecord, remoteStatus);
+
+    return {
+      runRecord: synced.runRecord,
+      checkedAt: remoteStatus.checkedAt,
+      remoteState: remoteStatus.state,
     };
   }
 }

@@ -2,7 +2,7 @@
 
 ## Summary
 
-The project follows a five-stage roadmap:
+The project completed an initial five-stage roadmap:
 
 - `M1` Orchestration Foundation
 - `M2` ACP Execution Beta
@@ -12,7 +12,11 @@ The project follows a five-stage roadmap:
 
 Repository history does not define a formal `M0` milestone. The tracked milestone history starts at `M1`.
 
-All tracked roadmap stages `M1-M5` are now complete.
+All tracked historical roadmap stages `M1-M5` are now complete.
+
+Latest completed follow-on stage:
+
+- `M6` Autopilot Control Plane
 
 ## Historical Stages
 
@@ -153,6 +157,39 @@ Sub-milestones:
 
 Current status: complete through `M5.4c`.
 
+## Follow-on Stage
+
+### M6 - Autopilot Control Plane
+
+Target:
+
+- supervised control-plane loop over the existing orchestration runtime
+- deterministic `tick`-based dispatch, review, sync, and recovery flow
+- dedicated autopilot state, lease, and decision-log persistence
+- operator-visible pause/resume/stop controls and status/report surfaces
+- stronger automation without changing the supported runner boundary
+
+Sub-milestones:
+
+- `M6.0` Control-plane skeleton and state persistence
+- `M6.1` Tick MVP with idempotent dispatch
+- `M6.2` Session sync and review closure
+- `M6.3` Recovery, escalation, and degraded mode
+- `M6.4` Service loop, control commands, and release freeze
+
+Delivery level:
+
+- single-machine, single-project supervised automation layer over the shipped `M1-M5` runtime
+
+Target posture after closeout:
+
+- existing workflow state remains the business plane; autopilot adds a separate control plane
+- automation decisions are auditable and reversible
+- low-risk review and recovery paths are policy-driven, not hardcoded shell glue
+- unattended execution remains supervised; the project still does not claim a fully autonomous PR factory
+
+Current status: complete (2026-04-08). `M6.0-M6.4` are implemented, and the local release-freeze baseline is 63 unit test files / 381 unit tests plus 25 e2e files / 34 e2e tests with `npm run build` and `npm test` green.
+
 ## Assessment Timeline
 
 - `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline
@@ -175,6 +212,12 @@ Current status: complete through `M5.4c`.
 - `M5.4a` complete (2026-03-27): 306 unit tests across 53 files, 25 e2e tests across 18 files, build clean; full local smoke matrix green on `OpenClaw 2026.3.24`
 - `M5.4b` complete (2026-03-27): 300 unit tests across 51 files, 23 e2e tests across 18 files, build clean; local doctor and ACP dry-run smoke green on `OpenClaw 2026.3.24`
 - `M5.4c` complete (2026-03-27): 305 unit tests across 51 files, 23 e2e tests across 18 files, build clean; subagent retained only as a legacy bridge-backed opt-in path
+- `M6.0` complete (2026-04-08): control-plane skeleton, autopilot state persistence, status/report surfaces, and dry-run tick shipped; full local regression green
+- `M6.1` complete (2026-04-08): lease-backed deterministic dispatch tick shipped; full local regression green
+- `M6.2` complete (2026-04-08): ACP/subagent sync path and supervised review closure shipped; 58 unit test files / 368 unit tests, 22 e2e files / 31 e2e tests, build clean
+- `M6.3` complete (2026-04-08): recovery planner, stuck/stale remediation, and degraded dispatch hold shipped; targeted recovery/degraded regression green
+- `M6.4` complete (2026-04-08): service loop and start/pause/resume/stop controls shipped; 63 unit test files / 381 unit tests, 25 e2e files / 34 e2e tests, build clean
+- `M6` complete (2026-04-08): Autopilot Control Plane closed with full local regression green and no open `M6` slices
 
 ## What The Project Claims
 

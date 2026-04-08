@@ -95,6 +95,11 @@ describe("reporter", () => {
     expect(report).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(report).toContain("## ACP Bridge Exit Gate");
     expect(report).toContain("Bridge-free ACP floor: >=2026.3.22.");
+    expect(report).toContain("## Autopilot");
+    expect(report).toContain("Desired state: stopped");
+    expect(report).toContain("Degraded: no");
+    expect(report).toContain("Health:");
+    expect(report).toContain("Queue pressure:");
     expect(report).toContain("OpenClaw runtime version: 2026.3.24.");
     expect(report).toContain(
       "Live smoke matrix checks: acp-backend-direct, swarm-doctor, swarm-init-plan-status, swarm-dry-run, swarm-live-run, swarm-session-lifecycle, swarm-review-report-journal",
@@ -174,6 +179,8 @@ describe("reporter", () => {
     expect(localContent).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(localContent).toContain("## ACP Bridge Exit Gate");
     expect(localContent).toContain("Bridge-free ACP floor: >=2026.3.22.");
+    expect(localContent).toContain("## Autopilot");
+    expect(localContent).toContain("Health:");
     expect(localContent).toContain("## Sessions");
     expect(localContent).toContain("active session");
     expect(localContent).toContain("## Session Reuse Candidates");

@@ -38,8 +38,34 @@ describe("review gate", () => {
     const rejected = applyReviewDecision(queued, "task-1", "reject");
 
     expect(approved.task.status).toBe("done");
+    expect(approved.workflow.lifecycle).toBe("completed");
     expect(approved.workflow.reviewQueue).toEqual([]);
     expect(rejected.task.status).toBe("blocked");
+  });
+
+  it("returns to planned after approval when other tasks remain", () => {
+    const queued: WorkflowState = {
+      ...enqueueReview(workflow, "task-1"),
+      tasks: [
+        ...workflow.tasks,
+        {
+          taskId: "task-2",
+          specId: "spec-1",
+          title: "Task 2",
+          description: "Task 2",
+          kind: "coding",
+          deps: ["task-1"],
+          status: "planned",
+          workspace: { mode: "shared" },
+          runner: { type: "manual" },
+          review: { required: false },
+        },
+      ],
+    };
+
+    const approved = applyReviewDecision(queued, "task-1", "approve");
+
+    expect(approved.workflow.lifecycle).toBe("planned");
   });
 
   it("reject without options preserves existing blocked behavior", () => {

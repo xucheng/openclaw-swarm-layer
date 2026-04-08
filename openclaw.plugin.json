@@ -216,6 +216,98 @@
             "default": false
           }
         }
+      },
+      "autopilot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["supervised"],
+            "default": "supervised"
+          },
+          "tickSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 15
+          },
+          "leaseSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 45
+          },
+          "maxDispatchPerTick": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 2
+          },
+          "reviewPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["manual_only", "auto_safe", "auto_allowlist"],
+                "default": "manual_only"
+              },
+              "allowlistTags": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": []
+              },
+              "denyTags": {
+                "type": "array",
+                "items": { "type": "string" },
+                "default": ["high-risk", "security", "prod"]
+              }
+            }
+          },
+          "recoveryPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "stuckRunMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 20
+              },
+              "idleSessionMinutes": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 60
+              },
+              "maxRecoveriesPerTask": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 1
+              },
+              "cancelBeforeRetry": {
+                "type": "boolean",
+                "default": true
+              },
+              "degradedFailureRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.5
+              },
+              "degradedMinTerminalRuns": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 3
+              },
+              "degradedTerminalWindow": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 6
+              }
+            }
+          }
+        }
       }
     }
   }

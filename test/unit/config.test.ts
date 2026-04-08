@@ -7,7 +7,64 @@ describe("swarm plugin config", () => {
     expect(resolved.enableCli).toBe(true);
     expect(resolved.defaultRunner).toBe("auto");
     expect(resolved.acp.enabled).toBe(false);
+    expect(resolved.autopilot.enabled).toBe(false);
     expect(resolved.subagent.enabled).toBe(false);
+  });
+
+  it("resolves autopilot defaults", () => {
+    const resolved = resolveSwarmPluginConfig({});
+    expect(resolved.autopilot).toEqual({
+      enabled: false,
+      mode: "supervised",
+      tickSeconds: 15,
+      leaseSeconds: 45,
+      maxDispatchPerTick: 2,
+      reviewPolicy: {
+        mode: "manual_only",
+        allowlistTags: [],
+        denyTags: ["high-risk", "security", "prod"],
+      },
+      recoveryPolicy: {
+        stuckRunMinutes: 20,
+        idleSessionMinutes: 60,
+        maxRecoveriesPerTask: 1,
+        cancelBeforeRetry: true,
+        degradedFailureRate: 0.5,
+        degradedMinTerminalRuns: 3,
+        degradedTerminalWindow: 6,
+      },
+    });
+  });
+
+  it("accepts nested autopilot config", () => {
+    const resolved = resolveSwarmPluginConfig({
+      autopilot: {
+        enabled: true,
+        tickSeconds: 30,
+        leaseSeconds: 90,
+        maxDispatchPerTick: 3,
+        reviewPolicy: {
+          mode: "auto_allowlist",
+          allowlistTags: ["low-risk"],
+          denyTags: ["prod"],
+        },
+        recoveryPolicy: {
+          stuckRunMinutes: 15,
+          idleSessionMinutes: 30,
+          maxRecoveriesPerTask: 2,
+          cancelBeforeRetry: false,
+          degradedFailureRate: 0.75,
+          degradedMinTerminalRuns: 4,
+          degradedTerminalWindow: 8,
+        },
+      },
+    });
+
+    expect(resolved.autopilot.enabled).toBe(true);
+    expect(resolved.autopilot.tickSeconds).toBe(30);
+    expect(resolved.autopilot.reviewPolicy.mode).toBe("auto_allowlist");
+    expect(resolved.autopilot.recoveryPolicy.cancelBeforeRetry).toBe(false);
+    expect(resolved.autopilot.recoveryPolicy.degradedFailureRate).toBe(0.75);
   });
 
   it("accepts nested acp config", () => {
@@ -202,6 +259,29 @@ describe("swarm plugin config", () => {
       },
     });
     expect(result).toEqual({ ok: false, errors: ["acp.allowedAgents must be an array of strings"] });
+  });
+
+  it("rejects invalid autopilot config", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      autopilot: {
+        tickSeconds: 0,
+        recoveryPolicy: {
+          degradedFailureRate: 2,
+        },
+        reviewPolicy: {
+          mode: "unsafe",
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        "autopilot.tickSeconds must be an integer >= 1",
+        'autopilot.reviewPolicy.mode must be one of: "manual_only", "auto_safe", "auto_allowlist"',
+        "autopilot.recoveryPolicy.degradedFailureRate must be a number between 0 and 1",
+      ],
+    });
   });
 
   it("rejects contradictory subagent config when subagent is the default runner", () => {

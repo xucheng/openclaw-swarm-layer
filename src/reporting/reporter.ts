@@ -1,5 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { AutopilotStore } from "../autopilot/autopilot-store.js";
+import { buildAutopilotHealthSummary } from "../autopilot/metrics.js";
+import { createDefaultAutopilotState, type AutopilotState } from "../autopilot/types.js";
 import type { SwarmPluginConfig } from "../config.js";
 import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { ensureDir } from "../lib/json-file.js";
@@ -85,6 +88,43 @@ function buildRuntimePolicyLines(workflow: WorkflowState, stateStore: StateStore
   ];
 }
 
+function buildAutopilotLines(
+  workflow: WorkflowState,
+  stateStore: StateStore,
+  runs: RunRecord[],
+  autopilotState = createDefaultAutopilotState(workflow.projectRoot, stateStore.config),
+): string[] {
+  const autopilotStore = new AutopilotStore(stateStore.config);
+  const health = buildAutopilotHealthSummary(runs, autopilotState, stateStore.config);
+  const queuePressure = {
+    runnableTasks: workflow.tasks.filter((task) => task.status === "planned" || task.status === "ready").length,
+    queuedTasks: workflow.tasks.filter((task) => task.status === "queued").length,
+    runningTasks: workflow.tasks.filter((task) => task.status === "running").length,
+    reviewQueueSize: workflow.reviewQueue.length,
+  };
+  return [
+    `- Enabled: ${stateStore.config.autopilot.enabled ? "yes" : "no"}`,
+    `- Mode: ${autopilotState.mode}`,
+    `- Desired state: ${autopilotState.desiredState}`,
+    `- Runtime state: ${autopilotState.runtimeState}`,
+    ...(autopilotState.pausedReason ? [`- Paused reason: ${autopilotState.pausedReason}`] : []),
+    `- Last tick: ${autopilotState.lastTickAt ?? "(never)"}`,
+    `- Next tick: ${autopilotState.nextTickAt ?? "(none)"}`,
+    `- Degraded: ${health.degraded ? "yes" : "no"}`,
+    ...(autopilotState.degradedReason ? [`- Degraded reason: ${autopilotState.degradedReason}`] : []),
+    ...(autopilotState.degradedSince ? [`- Degraded since: ${autopilotState.degradedSince}`] : []),
+    ...(autopilotState.lastDecision
+      ? [
+          `- Last decision: ${autopilotState.lastDecision.action} - ${autopilotState.lastDecision.summary}`,
+        ]
+      : ["- Last decision: (none)"]),
+    `- Queue pressure: runnable=${queuePressure.runnableTasks}, queued=${queuePressure.queuedTasks}, running=${queuePressure.runningTasks}, review=${queuePressure.reviewQueueSize}`,
+    `- Metrics: ticks=${autopilotState.metrics.tickCount}, dryRuns=${autopilotState.metrics.dryRunCount}, observations=${autopilotState.metrics.observationCount}, dispatches=${autopilotState.metrics.dispatchCount}, autoApprovals=${autopilotState.metrics.autoApproveCount}, retries=${autopilotState.metrics.retryCount}, escalations=${autopilotState.metrics.escalationCount}, cancels=${autopilotState.metrics.cancelCount}, closes=${autopilotState.metrics.closeCount}, degradedTicks=${autopilotState.metrics.degradedTickCount}`,
+    `- Health: terminalRuns=${health.terminalRuns}/${health.terminalWindow}, failures=${health.failedRuns}, successes=${health.successfulRuns}, interventions=${health.intervenedRuns}, failureRate=${Math.round(health.failureRate * 100)}%, interventionRate=${Math.round(health.interventionRate * 100)}%`,
+    `- Decision log: ${autopilotStore.resolvePaths(workflow.projectRoot).autopilotDecisionLogPath}`,
+  ];
+}
+
 function buildAcpBridgeExitGateLines(stateStore: StateStore): string[] {
   const gate = buildAcpBridgeExitGate(stateStore.runtimeVersion, {
     publicControlPlaneExportReady: null,
@@ -102,7 +142,12 @@ function buildAcpBridgeExitGateLines(stateStore: StateStore): string[] {
   ];
 }
 
-export function buildWorkflowReport(workflow: WorkflowState, stateStore = new StateStore(), runs: RunRecord[] = []): string {
+export function buildWorkflowReport(
+  workflow: WorkflowState,
+  stateStore = new StateStore(),
+  runs: RunRecord[] = [],
+  autopilotState?: AutopilotState,
+): string {
   const summary = stateStore.summarizeWorkflow(workflow);
   const taskLines = workflow.tasks.map(
     (task) => `- ${task.taskId}: ${task.title} [${task.status}]${task.review.required ? " review" : ""}`,
@@ -114,6 +159,7 @@ export function buildWorkflowReport(workflow: WorkflowState, stateStore = new St
   const recommendedActionLines = buildRecommendedActionLines(workflow, runs);
   const runtimePolicyLines = buildRuntimePolicyLines(workflow, stateStore);
   const acpBridgeExitGateLines = buildAcpBridgeExitGateLines(stateStore);
+  const autopilotLines = buildAutopilotLines(workflow, stateStore, runs, autopilotState);
 
   return [
     `# Swarm Report`,
@@ -138,6 +184,9 @@ export function buildWorkflowReport(workflow: WorkflowState, stateStore = new St
     ``,
     `## ACP Bridge Exit Gate`,
     ...acpBridgeExitGateLines,
+    ``,
+    `## Autopilot`,
+    ...autopilotLines,
     ``,
     `## Attention`,
     ...(attentionLines.length > 0 ? attentionLines : ["- (none)"]),
@@ -168,9 +217,11 @@ export async function writeWorkflowReport(
   const resolvedConfig = config ?? stateStore.config;
   const paths = resolveSwarmPaths(projectRoot, resolvedConfig);
   const sessionStore = new SessionStore(stateStore.config);
+  const autopilotStore = new AutopilotStore(stateStore.config);
   const runs = await stateStore.loadRuns(projectRoot);
   const sessions = await sessionStore.listSessions(projectRoot);
-  const report = buildWorkflowReport(workflow, stateStore, runs);
+  const autopilotState = await autopilotStore.getState(projectRoot);
+  const report = buildWorkflowReport(workflow, stateStore, runs, autopilotState);
   const sessionCandidateLines = buildSessionCandidateLines(workflow, sessions);
   const reportWithSessions = [
     report,

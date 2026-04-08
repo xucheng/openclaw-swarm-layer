@@ -1,4 +1,4 @@
-import type { QualityRubric, RubricResult, RubricScore, RunRecord, TaskNode, WorkflowState } from "../types.js";
+import type { QualityRubric, RubricResult, RubricScore, RunRecord, TaskNode, WorkflowLifecycle, WorkflowState } from "../types.js";
 import { rubricToDecision, scoreRubric } from "./quality-rubric.js";
 
 export type ReviewDecision = "approve" | "reject";
@@ -13,6 +13,30 @@ export type ReviewResult = {
   task: TaskNode;
   runRecord?: RunRecord;
 };
+
+export function deriveWorkflowLifecycle(
+  tasks: TaskNode[],
+  reviewQueue: string[],
+  fallback: WorkflowLifecycle = "planned",
+): WorkflowLifecycle {
+  if (reviewQueue.length > 0 || tasks.some((task) => task.status === "review_required")) {
+    return "reviewing";
+  }
+
+  if (tasks.length > 0 && tasks.every((task) => task.status === "done")) {
+    return "completed";
+  }
+
+  if (tasks.some((task) => task.status === "running" || task.status === "queued")) {
+    return "running";
+  }
+
+  if (tasks.some((task) => task.status === "blocked")) {
+    return "blocked";
+  }
+
+  return fallback;
+}
 
 export function enqueueReview(workflow: WorkflowState, taskId: string): WorkflowState {
   if (workflow.reviewQueue.includes(taskId)) {
@@ -72,13 +96,17 @@ export function applyAcpRunStatusToWorkflow(
         status: task.review.required ? "pending" : task.review.status,
       },
     };
+    const nextTasks = workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry));
+    const nextReviewQueue = task.review.required
+      ? [...workflow.reviewQueue, ...(workflow.reviewQueue.includes(task.taskId) ? [] : [task.taskId])]
+      : workflow.reviewQueue.filter((entry) => entry !== task.taskId);
     nextWorkflow = {
       ...workflow,
-      lifecycle: task.review.required ? "reviewing" : "planned",
-      tasks: workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry)),
+      lifecycle: deriveWorkflowLifecycle(nextTasks, nextReviewQueue),
+      tasks: nextTasks,
+      reviewQueue: nextReviewQueue,
     };
-    const queued = task.review.required ? enqueueReview(nextWorkflow, task.taskId) : nextWorkflow;
-    return withLastAction(queued, `run:${params.runStatus}`, params.summary);
+    return withLastAction(nextWorkflow, `run:${params.runStatus}`, params.summary);
   }
 
   if (params.runStatus === "failed" || params.runStatus === "timed_out") {
@@ -195,11 +223,14 @@ export function applyReviewDecision(
     },
   };
 
+  const nextTasks = workflow.tasks.map((entry) => (entry.taskId === taskId ? updatedTask : entry));
+  const nextReviewQueue = workflow.reviewQueue.filter((entry) => entry !== taskId);
+
   const nextWorkflow: WorkflowState = {
     ...workflow,
-    lifecycle: decision === "approve" ? "planned" : "blocked",
-    tasks: workflow.tasks.map((entry) => (entry.taskId === taskId ? updatedTask : entry)),
-    reviewQueue: workflow.reviewQueue.filter((entry) => entry !== taskId),
+    lifecycle: decision === "approve" ? deriveWorkflowLifecycle(nextTasks, nextReviewQueue) : "blocked",
+    tasks: nextTasks,
+    reviewQueue: nextReviewQueue,
     lastAction: {
       at: new Date().toISOString(),
       type: `review:${decision}`,

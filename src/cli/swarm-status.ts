@@ -1,9 +1,12 @@
 import type { RuntimePolicySnapshot } from "../config.js";
+import { AutopilotStore } from "../autopilot/autopilot-store.js";
+import { buildAutopilotHealthSummary } from "../autopilot/metrics.js";
 import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes, type AcpBridgeExitGate } from "../runtime/acp-bridge-exit-gate.js";
 import { buildAttentionItems, buildOperatorHighlights, buildRecommendedActions, buildReviewQueueItems } from "../reporting/operator-summary.js";
 import { summarizeSessionReuseForTask } from "../session/session-selector.js";
 import { resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
+import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
 
 export type SwarmStatusResult = {
   ok: true;
@@ -85,6 +88,54 @@ export type SwarmStatusResult = {
     selectedSessionId?: string;
     reason: string;
   }>;
+  autopilot: {
+    enabled: boolean;
+    mode: string;
+    desiredState: string;
+    runtimeState: string;
+    pausedReason?: string;
+    lastTickAt?: string;
+    nextTickAt?: string;
+    degradedReason?: string;
+    degradedSince?: string;
+    lastDecision?: {
+      at: string;
+      action: string;
+      summary: string;
+      reason?: string;
+      dryRun?: boolean;
+    };
+    queuePressure: {
+      runnableTasks: number;
+      queuedTasks: number;
+      runningTasks: number;
+      reviewQueueSize: number;
+    };
+    metrics: {
+      tickCount: number;
+      dryRunCount: number;
+      observationCount: number;
+      dispatchCount: number;
+      autoApproveCount: number;
+      retryCount: number;
+      escalationCount: number;
+      cancelCount: number;
+      closeCount: number;
+      degradedTickCount: number;
+    };
+    health: {
+      terminalWindow: number;
+      terminalRuns: number;
+      successfulRuns: number;
+      failedRuns: number;
+      intervenedRuns: number;
+      failureRate: number;
+      interventionRate: number;
+      degraded: boolean;
+      degradedReason?: string;
+    };
+    decisionLogPath: string;
+  };
 };
 
 export async function runSwarmStatus(
@@ -96,6 +147,9 @@ export async function runSwarmStatus(
   const workflow = await stateStore.loadWorkflow(options.project);
   const runs = await stateStore.loadRuns(options.project);
   const sessions = await sessionStore.listSessions(options.project);
+  const autopilotStore = new AutopilotStore(stateStore.config);
+  const autopilotState = await autopilotStore.getState(options.project);
+  const autopilotHealth = buildAutopilotHealthSummary(runs, autopilotState, stateStore.config);
   const summary = stateStore.summarizeWorkflow(workflow);
   const runtime = resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion });
   const acpBridgeExitGate = buildAcpBridgeExitGate(stateStore.runtimeVersion, {
@@ -156,5 +210,26 @@ export async function runSwarmStatus(
         status: run.status,
         resultSummary: run.resultSummary,
       })),
+    autopilot: {
+      enabled: stateStore.config.autopilot.enabled,
+      mode: autopilotState.mode,
+      desiredState: autopilotState.desiredState,
+      runtimeState: autopilotState.runtimeState,
+      pausedReason: autopilotState.pausedReason,
+      lastTickAt: autopilotState.lastTickAt,
+      nextTickAt: autopilotState.nextTickAt,
+      degradedReason: autopilotState.degradedReason,
+      degradedSince: autopilotState.degradedSince,
+      lastDecision: autopilotState.lastDecision,
+      queuePressure: {
+        runnableTasks: getRunnableTasks(workflow.tasks).length,
+        queuedTasks: getQueuedTasks(workflow.tasks).length,
+        runningTasks: workflow.tasks.filter((task) => task.status === "running").length,
+        reviewQueueSize: workflow.reviewQueue.length,
+      },
+      metrics: autopilotState.metrics,
+      health: autopilotHealth,
+      decisionLogPath: autopilotStore.resolvePaths(options.project).autopilotDecisionLogPath,
+    },
   };
 }

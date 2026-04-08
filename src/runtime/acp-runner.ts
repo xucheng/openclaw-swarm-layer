@@ -1,8 +1,9 @@
 import type { SwarmPluginConfig } from "../config.js";
 import { defaultSwarmPluginConfig } from "../config.js";
+import { syncAcpRunRecord } from "./session-sync.js";
 import { buildAcpSpawnParams } from "./acp-mapping.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "./openclaw-session-adapter.js";
-import type { RunnerPlan, RunnerPlanInput, RunnerRunInput, RunnerRunResult, TaskRunner } from "./task-runner.js";
+import type { RunnerPlan, RunnerPlanInput, RunnerRunInput, RunnerRunResult, RunnerSyncInput, RunnerSyncResult, TaskRunner } from "./task-runner.js";
 
 function createRunId(taskId: string): string {
   return `${taskId}-run-${Date.now()}`;
@@ -84,6 +85,22 @@ export class AcpRunner implements TaskRunner {
           },
         ],
       },
+    };
+  }
+
+  async sync(input: RunnerSyncInput): Promise<RunnerSyncResult> {
+    const sessionKey = input.runRecord.sessionRef?.sessionKey;
+    if (!sessionKey) {
+      throw new Error(`ACP run record ${input.runRecord.runId} has no session key`);
+    }
+
+    const remoteStatus = await this.sessionAdapter.getAcpSessionStatus(sessionKey);
+    const synced = syncAcpRunRecord(input.runRecord, remoteStatus);
+
+    return {
+      runRecord: synced.runRecord,
+      checkedAt: remoteStatus.checkedAt,
+      remoteState: remoteStatus.state,
     };
   }
 }

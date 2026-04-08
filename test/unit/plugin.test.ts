@@ -17,7 +17,7 @@ describe("plugin registration", () => {
     plugin.register?.(api);
 
     expect(api.registerCli).toHaveBeenCalledTimes(1);
-    expect(api.registerTool).toHaveBeenCalledTimes(7);
+    expect(api.registerTool).toHaveBeenCalledTimes(8);
     expect(api.registerService).toHaveBeenCalledTimes(1);
   });
 

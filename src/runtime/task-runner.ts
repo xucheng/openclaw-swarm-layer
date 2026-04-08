@@ -35,6 +35,8 @@ export type RunnerSyncInput = {
 
 export type RunnerSyncResult = {
   runRecord: RunRecord;
+  checkedAt?: string;
+  remoteState?: RunRecord["status"];
 };
 
 export interface TaskRunner {

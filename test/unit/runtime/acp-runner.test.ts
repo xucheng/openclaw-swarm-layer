@@ -223,4 +223,60 @@ describe("AcpRunner", () => {
     expect(result.runRecord.sessionRef?.threadId).toBe("thread-from-backend");
     expect(result.runRecord.events?.[0]?.detail?.threadId).toBe("thread-123");
   });
+
+  it("syncs accepted ACP runs through the adapter", async () => {
+    const adapter: OpenClawSessionAdapter = {
+      async spawnAcpSession() {
+        throw new Error("not used");
+      },
+      async getAcpSessionStatus() {
+        return {
+          sessionKey: "agent:codex:acp:sync",
+          state: "completed",
+          checkedAt: "2026-03-21T00:05:00.000Z",
+          message: "done",
+        };
+      },
+      async cancelAcpSession() {
+        return { sessionKey: "agent:codex:acp:sync" };
+      },
+      async closeAcpSession() {
+        return { sessionKey: "agent:codex:acp:sync" };
+      },
+    };
+    const runner = new AcpRunner(
+      {
+        acp: {
+          enabled: true,
+          defaultAgentId: "codex",
+          allowedAgents: ["codex"],
+          defaultMode: "run",
+          allowThreadBinding: false,
+          defaultTimeoutSeconds: 600,
+          experimentalControlPlaneAdapter: false,
+        },
+      },
+      adapter,
+    );
+
+    const result = await runner.sync({
+      projectRoot: workflow.projectRoot,
+      task,
+      runRecord: {
+        runId: "run-sync",
+        taskId: task.taskId,
+        attempt: 1,
+        status: "accepted",
+        runner: { type: "acp" },
+        workspacePath: workflow.projectRoot,
+        startedAt: "2026-03-21T00:00:00.000Z",
+        artifacts: [],
+        sessionRef: { runtime: "acp", sessionKey: "agent:codex:acp:sync" },
+      },
+    });
+
+    expect(result.runRecord.status).toBe("completed");
+    expect(result.checkedAt).toBe("2026-03-21T00:05:00.000Z");
+    expect(result.remoteState).toBe("completed");
+  });
 });

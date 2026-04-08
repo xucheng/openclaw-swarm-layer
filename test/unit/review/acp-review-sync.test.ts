@@ -38,9 +38,48 @@ describe("ACP review sync", () => {
       taskId: "task-1",
       runStatus: "completed",
     });
-    expect(next.lifecycle).toBe("planned");
+    expect(next.lifecycle).toBe("completed");
     expect(next.tasks[0]?.status).toBe("done");
     expect(next.reviewQueue).toEqual([]);
+  });
+
+  it("keeps workflow planned when a no-review completion leaves more work", () => {
+    const next = applyAcpRunStatusToWorkflow({
+      ...makeWorkflow({ review: { required: false } }),
+      lifecycle: "running",
+      tasks: [
+        {
+          taskId: "task-1",
+          specId: "spec-1",
+          title: "Task 1",
+          description: "Task 1",
+          kind: "coding",
+          deps: [],
+          status: "running",
+          workspace: { mode: "shared" },
+          runner: { type: "acp" },
+          review: { required: false },
+        },
+        {
+          taskId: "task-2",
+          specId: "spec-1",
+          title: "Task 2",
+          description: "Task 2",
+          kind: "coding",
+          deps: ["task-1"],
+          status: "planned",
+          workspace: { mode: "shared" },
+          runner: { type: "manual" },
+          review: { required: false },
+        },
+      ],
+    }, {
+      taskId: "task-1",
+      runStatus: "completed",
+    });
+
+    expect(next.lifecycle).toBe("planned");
+    expect(next.tasks[0]?.status).toBe("done");
   });
 
   it("sets task to running on accepted status", () => {

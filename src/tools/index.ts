@@ -7,6 +7,7 @@ import { runSwarmSessionCancel } from "../cli/swarm-session-cancel.js";
 import { runSwarmSessionClose } from "../cli/swarm-session-close.js";
 import { runSwarmSessionStatus } from "../cli/swarm-session-status.js";
 import { runSwarmStatus } from "../cli/swarm-status.js";
+import { runSwarmAutopilotStatus } from "../cli/swarm-autopilot-status.js";
 import { resolvePluginConfigFromApi } from "../config.js";
 import { StateStore } from "../state/state-store.js";
 
@@ -32,6 +33,21 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
       }),
       async execute(_toolCallId, params) {
         return jsonResult(await runSwarmStatus({ project: params.project }, toolContext));
+      },
+    },
+    { optional: true },
+  );
+
+  api.registerTool(
+    {
+      name: "swarm_autopilot_status",
+      label: "Swarm Autopilot Status",
+      description: "Show current autopilot control-plane status for a project.",
+      parameters: Type.Object({
+        project: Type.String(),
+      }),
+      async execute(_toolCallId, params) {
+        return jsonResult(await runSwarmAutopilotStatus({ project: params.project }, toolContext));
       },
     },
     { optional: true },

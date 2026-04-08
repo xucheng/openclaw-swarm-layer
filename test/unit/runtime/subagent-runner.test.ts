@@ -65,4 +65,46 @@ describe("SubagentRunner", () => {
     expect(result.runRecord.runner.type).toBe("subagent");
     expect(result.runRecord.sessionRef?.sessionKey).toBe("agent:main:subagent:123");
   });
+
+  it("syncs subagent runs through the adapter", async () => {
+    const adapter: OpenClawSubagentAdapter = {
+      async spawnSubagent() {
+        throw new Error("not used");
+      },
+      async getSubagentRunStatus() {
+        return {
+          childSessionKey: "agent:main:subagent:sync",
+          state: "completed",
+          checkedAt: "2026-03-21T00:05:00.000Z",
+          outputText: "done",
+        };
+      },
+      async killSubagentRun() {
+        return {
+          childSessionKey: "agent:main:subagent:sync",
+        };
+      },
+    };
+    const runner = new SubagentRunner(adapter);
+
+    const result = await runner.sync({
+      projectRoot: workflow.projectRoot,
+      task,
+      runRecord: {
+        runId: "sub-run-sync",
+        taskId: task.taskId,
+        attempt: 1,
+        status: "running",
+        runner: { type: "subagent" },
+        workspacePath: workflow.projectRoot,
+        startedAt: "2026-03-21T00:00:00.000Z",
+        artifacts: [],
+        sessionRef: { runtime: "subagent", sessionKey: "agent:main:subagent:sync" },
+      },
+    });
+
+    expect(result.runRecord.status).toBe("completed");
+    expect(result.checkedAt).toBe("2026-03-21T00:05:00.000Z");
+    expect(result.remoteState).toBe("completed");
+  });
 });

@@ -150,7 +150,7 @@ describe("SwarmOrchestrator", () => {
 
     expect(result.ok).toBe(true);
     expect(result.action).toBe("dispatched");
-    expect(workflow.lifecycle).toBe("planned");
+    expect(workflow.lifecycle).toBe("completed");
     expect(workflow.tasks[0]?.status).toBe("done");
   });
 
@@ -169,6 +169,174 @@ describe("SwarmOrchestrator", () => {
     expect(sessions.length).toBeGreaterThanOrEqual(1);
     expect(sessions[0]?.runner).toBe("acp");
     expect(sessions[0]?.state).toBe("active");
+  });
+
+  it("syncs active ACP runs back into workflow and session state", async () => {
+    const { projectRoot, stateStore } = await setupProject({
+      taskOverrides: { status: "running", runner: { type: "acp" } },
+    });
+    const sessionStore = new SessionStore(stateStore.config);
+    await stateStore.writeRun(projectRoot, {
+      runId: "run-acp-sync",
+      taskId: (await stateStore.loadWorkflow(projectRoot)).tasks[0]!.taskId,
+      attempt: 1,
+      status: "accepted",
+      runner: { type: "acp" },
+      workspacePath: projectRoot,
+      startedAt: "2026-03-22T00:00:00.000Z",
+      artifacts: [],
+      sessionRef: { runtime: "acp", sessionKey: "agent:codex:acp:sync" },
+    });
+    const adapter: OpenClawSessionAdapter = {
+      async spawnAcpSession() {
+        return { sessionKey: "agent:codex:acp:sync", backend: "acpx" };
+      },
+      async getAcpSessionStatus() {
+        return {
+          sessionKey: "agent:codex:acp:sync",
+          state: "completed",
+          checkedAt: "2026-03-22T00:05:00.000Z",
+          message: "done",
+        };
+      },
+      async cancelAcpSession() {
+        return { sessionKey: "agent:codex:acp:sync" };
+      },
+      async closeAcpSession() {
+        return { sessionKey: "agent:codex:acp:sync" };
+      },
+    };
+    const orchestrator = createOrchestrator({
+      stateStore,
+      sessionStore,
+      sessionAdapter: adapter,
+    });
+
+    const result = await orchestrator.syncActiveRuns({ projectRoot });
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+    const run = await stateStore.loadRun(projectRoot, "run-acp-sync");
+    const sessions = await sessionStore.listSessions(projectRoot);
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.status).toBe("completed");
+    expect(workflow.reviewQueue).toEqual([workflow.tasks[0]!.taskId]);
+    expect(run?.status).toBe("completed");
+    expect(sessions[0]?.state).toBe("closed");
+  });
+
+  it("cancels a stuck ACP run into timed_out and updates workflow/session state", async () => {
+    const { projectRoot, stateStore } = await setupProject({
+      taskOverrides: { status: "running", runner: { type: "acp" } },
+    });
+    const sessionStore = new SessionStore(stateStore.config);
+    await stateStore.writeRun(projectRoot, {
+      runId: "run-acp-stuck",
+      taskId: (await stateStore.loadWorkflow(projectRoot)).tasks[0]!.taskId,
+      attempt: 1,
+      status: "running",
+      runner: { type: "acp" },
+      workspacePath: projectRoot,
+      startedAt: "2026-03-22T00:00:00.000Z",
+      artifacts: [],
+      sessionRef: { runtime: "acp", sessionKey: "agent:codex:acp:stuck" },
+    });
+    const adapter: OpenClawSessionAdapter = {
+      async spawnAcpSession() {
+        return { sessionKey: "agent:codex:acp:stuck", backend: "acpx" };
+      },
+      async getAcpSessionStatus() {
+        return { sessionKey: "agent:codex:acp:stuck", state: "running" };
+      },
+      async cancelAcpSession() {
+        return { sessionKey: "agent:codex:acp:stuck", cancelledAt: "2026-03-22T00:05:00.000Z", message: "cancelled" };
+      },
+      async closeAcpSession() {
+        return { sessionKey: "agent:codex:acp:stuck" };
+      },
+    };
+    const orchestrator = createOrchestrator({
+      stateStore,
+      sessionStore,
+      sessionAdapter: adapter,
+    });
+
+    const result = await orchestrator.cancelRun({
+      projectRoot,
+      runId: "run-acp-stuck",
+      terminalStatus: "timed_out",
+      reason: "stuck",
+    });
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+    const run = await stateStore.loadRun(projectRoot, "run-acp-stuck");
+    const sessions = await sessionStore.listSessions(projectRoot);
+
+    expect(result.status).toBe("timed_out");
+    expect(run?.events?.some((event) => event.type === "recovery_cancelled")).toBe(true);
+    expect(workflow.reviewQueue).toEqual([workflow.tasks[0]!.taskId]);
+    expect(sessions[0]?.state).toBe("failed");
+  });
+
+  it("closes stale ACP sessions and records the recovery event", async () => {
+    const { projectRoot, stateStore } = await setupProject({
+      taskOverrides: { status: "done", runner: { type: "acp" }, review: { required: false, status: "approved" } as any },
+      reviewRequired: false,
+    });
+    const sessionStore = new SessionStore(stateStore.config);
+    await stateStore.writeRun(projectRoot, {
+      runId: "run-acp-closed",
+      taskId: (await stateStore.loadWorkflow(projectRoot)).tasks[0]!.taskId,
+      attempt: 1,
+      status: "completed",
+      runner: { type: "acp" },
+      workspacePath: projectRoot,
+      startedAt: "2026-03-22T00:00:00.000Z",
+      endedAt: "2026-03-22T00:01:00.000Z",
+      artifacts: [],
+      sessionRef: { runtime: "acp", sessionKey: "agent:codex:acp:idle" },
+    });
+    await sessionStore.writeSession(projectRoot, {
+      sessionId: "acp-idle",
+      runner: "acp",
+      projectRoot,
+      scope: { bindingKey: "feature-a", taskKind: "coding" },
+      mode: "persistent",
+      state: "idle",
+      createdAt: "2026-03-22T00:00:00.000Z",
+      updatedAt: "2026-03-22T00:10:00.000Z",
+      lastRunId: "run-acp-closed",
+      providerRef: { sessionKey: "agent:codex:acp:idle" },
+    });
+    const adapter: OpenClawSessionAdapter = {
+      async spawnAcpSession() {
+        return { sessionKey: "agent:codex:acp:idle", backend: "acpx" };
+      },
+      async getAcpSessionStatus() {
+        return { sessionKey: "agent:codex:acp:idle", state: "completed" };
+      },
+      async cancelAcpSession() {
+        return { sessionKey: "agent:codex:acp:idle" };
+      },
+      async closeAcpSession() {
+        return { sessionKey: "agent:codex:acp:idle", closedAt: "2026-03-22T00:20:00.000Z", message: "closed" };
+      },
+    };
+    const orchestrator = createOrchestrator({
+      stateStore,
+      sessionStore,
+      sessionAdapter: adapter,
+    });
+
+    const result = await orchestrator.closeSession({
+      projectRoot,
+      sessionId: "acp-idle",
+      reason: "stale",
+    });
+    const session = await sessionStore.loadSession(projectRoot, "acp-idle");
+    const run = await stateStore.loadRun(projectRoot, "run-acp-closed");
+
+    expect(result.state).toBe("closed");
+    expect(session?.state).toBe("closed");
+    expect(run?.events?.some((event) => event.type === "recovery_closed")).toBe(true);
   });
 
   it("reuses an existing idle persistent session for reuse_if_available task", async () => {
