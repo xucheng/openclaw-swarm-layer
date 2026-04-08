@@ -320,3 +320,51 @@ Current status: complete (2026-04-08).
 - `M6.3` complete (2026-04-08): recovery planner, stuck/stale handling, cancel/close/retry/escalate actions, and degraded dispatch hold shipped
 - `M6.4` complete (2026-04-08): service loop, start/pause/resume/stop controls, and aligned status/report semantics shipped; `npm run build` and `npm test` green
 - `M6` complete (2026-04-08): Autopilot Control Plane closed out at 63 unit test files / 381 unit tests and 25 e2e files / 34 e2e tests
+
+## M7 Subagent Removal
+
+Motivation: remove the legacy bridge-backed subagent runner to eliminate the last `child_process` dependency, unblock clean `plugins install -l` on OpenClaw 2026.4.8+, and simplify the runtime to manual + ACP only.
+
+### M7 Overall DoD
+
+- `RunnerType` is `"manual" | "acp"` only
+- no `child_process` reference in source or dist
+- `openclaw plugins install -l .` succeeds without security block
+- historical workflow, run, and session JSON files remain readable
+- unit, e2e, build, and live smoke gates all green
+
+### M7.0 DoD
+
+- 4 core subagent runtime files deleted
+- SubagentRunner removed from RunnerRegistry and orchestrator
+- subagentAdapter removed from CLI context and all commands
+- 4 subagent unit test files + 4 subagent e2e test files deleted
+- mixed tests updated to remove subagent references
+- `npm run build` + `npm test` green
+
+Current status: planned.
+
+### M7.1 DoD
+
+- `"subagent"` removed from `RunnerType`, `VALID_RUNNER_TYPES`, `TaskRunner.kind`
+- `SwarmSubagentConfig` and all subagent config functions deleted
+- `"subagent"` removed from all JSON schemas and `openclaw.plugin.json`
+- subagent diagnostics removed from doctor, public-api-seams, bridge-manifest
+- subagent commands removed from openclaw-exec-bridge
+- subagent references removed from reporter, status, session, and state layers
+- all affected tests updated
+- `npm run build` + `npm test` green
+- `grep -ri subagent src/` returns 0 results
+
+Current status: planned.
+
+### M7.2 DoD
+
+- clean build has zero `child_process` in dist
+- `openclaw plugins install -l .` passes
+- full unit + e2e regression green
+- live smoke: init -> plan -> dry-run -> live ACP run -> review -> report -> autopilot tick all green
+- `openclaw swarm doctor --json` has no subagent references
+- docs updated
+
+Current status: planned.

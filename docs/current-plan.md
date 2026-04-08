@@ -85,8 +85,63 @@ Status note:
 - Current release-freeze baseline: 63 unit test files / 381 unit tests, 25 e2e files / 34 e2e tests, `npm run build`, and `npm test` green.
 - No follow-on milestone family is opened yet.
 
-Planning rules for the next slice:
+## M7 Subagent Removal
 
-- `M6` is a new milestone family, not an extension of `M5`
-- `M6` should preserve the shipped `M5.4c` runner posture: ACP public-only default path, subagent legacy opt-in only
-- any future public subagent path should be treated as a separate follow-on milestone after `M6`, not as unfinished `M5` debt
+Motivation: the legacy subagent runner is bridge-backed, disabled by default, and introduces a `child_process` dependency that triggers the OpenClaw 2026.4.8 security scanner during `plugins install -l`. Removing it eliminates the last bridge dependency, unblocks clean local installation, and simplifies the runtime surface to manual + ACP only.
+
+### M7.0 Core Runtime Removal
+
+Goal: delete the subagent runner, its adapters, and all direct consumers; wire tests.
+
+| Step | Action | Files |
+|------|--------|-------|
+| 0a | Delete 4 core runtime files | `subagent-runner.ts`, `subagent-mapping.ts`, `openclaw-subagent-adapter.ts`, `bridge-openclaw-subagent-adapter.ts` |
+| 0b | Remove SubagentRunner from RunnerRegistry, orchestrator, and `task-runner.ts` kind union | `orchestrator.ts`, `task-runner.ts` |
+| 0c | Remove subagentAdapter from CLI context and all CLI commands | `context.ts`, `swarm-run.ts`, `swarm-session-status.ts`, `swarm-session-cancel.ts`, `swarm-session-followup.ts`, `swarm-autopilot-tick.ts` |
+| 0d | Remove subagent sync from session-sync | `session-sync.ts` |
+| 0e | Delete 4 unit test files + edit mixed tests | `subagent-runner.test.ts`, `subagent-mapping.test.ts`, `openclaw-subagent-adapter.test.ts`, `bridge-openclaw-subagent-adapter.test.ts` + edit `runner-registry.test.ts`, `orchestrator.test.ts`, `session-sync.test.ts`, `concurrency-gate.test.ts` |
+| 0f | Delete 4 e2e test files | `subagent-fallback.e2e.test.ts`, `subagent-bridge-lifecycle.e2e.test.ts`, `subagent-dark-mode.e2e.test.ts`, `subagent-bridge-fallback.e2e.test.ts` |
+
+DoD: `npm run build` + `npm test` green.
+
+### M7.1 Config, Schema, and Diagnostics Cleanup
+
+Goal: remove `"subagent"` from the type system, config schema, JSON schemas, and all diagnostic surfaces.
+
+| Step | Action | Files |
+|------|--------|-------|
+| 1a | Remove `"subagent"` from `RunnerType` union, `VALID_RUNNER_TYPES`, `TaskRunner.kind` | `config.ts`, `task-runner.ts` |
+| 1b | Delete `SwarmSubagentConfig`, `subagentEnabled`, and all subagent config functions | `config.ts` |
+| 1c | Remove `"subagent"` from 4 JSON schemas | `run.schema.json`, `session.schema.json`, `task.schema.json`, `workflow-state.schema.json` |
+| 1d | Remove subagent config and enum values from `openclaw.plugin.json` | `openclaw.plugin.json` |
+| 1e | Remove subagent diagnostics from doctor and public-api-seams | `swarm-doctor.ts`, `public-api-seams.ts` |
+| 1f | Remove subagent patch specs from bridge-manifest | `bridge-manifest.ts` |
+| 1g | Remove subagent commands from openclaw-exec-bridge | `openclaw-exec-bridge.ts` |
+| 1h | Remove subagent references from reporter, status, session, and state layers | `reporter.ts`, `swarm-status.ts`, `session-lifecycle.ts`, `session-store.ts`, `state-store.ts`, `recovery-planner.ts` |
+| 1i | Update all affected tests | `config.test.ts`, `doctor.test.ts`, `status.test.ts`, `bridge-manifest.test.ts`, `public-api-seams.test.ts`, `reporter.test.ts`, `session-store.test.ts`, `state-store.test.ts`, etc. |
+
+DoD: `npm run build` + `npm test` green + `grep -ri subagent src/` returns 0 results.
+
+### M7.2 Verification and Live Smoke
+
+Goal: prove the removal is clean end-to-end.
+
+| Step | Action |
+|------|--------|
+| 2a | Clean build (`rm -rf dist && npm run build`) |
+| 2b | Verify zero `child_process` in `dist/` |
+| 2c | Full unit + e2e regression |
+| 2d | `openclaw plugins install -l .` passes without security block |
+| 2e | Live smoke: init -> plan -> dry-run -> live ACP run -> review -> report -> autopilot tick |
+| 2f | `openclaw swarm doctor --json` has no subagent references |
+| 2g | Update docs: `milestones.md`, `roadmap.md`, `current-plan.md` |
+
+DoD: zero `child_process` + install passes + all tests green + live smoke green + docs updated.
+
+### M7 Exit Criteria
+
+- `RunnerType` = `"manual" | "acp"` only
+- no `child_process` in source or dist
+- `openclaw plugins install -l .` succeeds on OpenClaw 2026.4.8
+- historical workflow/run/session JSON files remain readable (schema allows unknown runner types in persisted state)
+- all unit, e2e, and live smoke gates green

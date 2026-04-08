@@ -190,6 +190,34 @@ Target posture after closeout:
 
 Current status: complete (2026-04-08). `M6.0-M6.4` are implemented, and the local release-freeze baseline is 63 unit test files / 381 unit tests plus 25 e2e files / 34 e2e tests with `npm run build` and `npm test` green.
 
+### M7 - Subagent Removal
+
+Target:
+
+- remove the legacy bridge-backed subagent runner entirely
+- eliminate the last `child_process` dependency from the plugin
+- unblock clean `openclaw plugins install -l` on OpenClaw 2026.4.8+ without security scanner blocks
+- simplify the runtime surface to manual + ACP only
+
+Sub-milestones:
+
+- `M7.0` Core runtime removal (delete runner, adapters, bridge adapter, and their tests)
+- `M7.1` Config, schema, and diagnostics cleanup (purge `"subagent"` from the type system and all surfaces)
+- `M7.2` Verification and live smoke (clean build, install gate, full regression, live ACP smoke)
+
+Delivery level:
+
+- debt-reduction milestone that closes the subagent chapter opened in M2 and deferred in M5.4c
+
+Target posture after closeout:
+
+- `RunnerType` = `"manual" | "acp"` only
+- zero bridge infrastructure remaining
+- zero `child_process` in source or dist
+- historical persisted state (workflow, run, session JSON) remains readable
+
+Current status: planned.
+
 ## Assessment Timeline
 
 - `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline
@@ -224,12 +252,11 @@ Current status: complete (2026-04-08). `M6.0-M6.4` are implemented, and the loca
 The project claims:
 
 - ACP as the only default-capable automated runner
-- `subagent` as a legacy bridge-backed opt-in path with a documented support boundary
+- `subagent` as a legacy bridge-backed opt-in path with a documented support boundary (scheduled for removal in M7)
 - single-machine, single-project orchestration with operator-visible workflow state, reports, and session control
 
 The project still does not claim:
 
-- a public subagent execution path
 - distributed multi-node orchestration
 - a fully autonomous unattended PR factory
 
