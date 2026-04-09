@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.0`
+- Current release line: `0.5.1`
 
 ## Preflight
 
@@ -65,14 +65,14 @@ npm view openclaw-swarm-layer version
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.0
-git push origin v0.5.0
-gh release create v0.5.0 --title "v0.5.0" --notes-file /tmp/openclaw-swarm-layer-v0.5.0-notes.md
+git tag v0.5.1
+git push origin v0.5.1
+gh release create v0.5.1 --title "v0.5.1" --notes-file /tmp/openclaw-swarm-layer-v0.5.1-notes.md
 ```
 
 Recommended release notes source:
 
-- copy the `0.5.0` section from [CHANGELOG.md](../CHANGELOG.md)
+- copy the `0.5.1` section from [CHANGELOG.md](../CHANGELOG.md)
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -90,11 +90,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.0 \
+  --version 0.5.1 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.0 \
+  --source-ref v0.5.1 \
   --source-commit <git-sha> \
-  --changelog "M6 Autopilot Control Plane and M7 Subagent Removal."
+  --changelog "Hotfix the ACP autopilot service loop so background supervised runs use the same runtime-backed session adapter as the CLI."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -113,8 +113,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.0 \
-  --changelog "Refresh skill docs for the autopilot control plane and the manual+ACP runtime surface."
+  --version 0.5.1 \
+  --changelog "Refresh release metadata after the ACP autopilot service-loop hotfix."
 ```
 
 Optional tags to keep aligned with the current listing:

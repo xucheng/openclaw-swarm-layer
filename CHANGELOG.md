@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.1 (2026-04-09)
+
+ACP autopilot service-loop hotfix and release-prep alignment update.
+
+- Fixed the supervised service-loop path so background autopilot resolves the same runtime-backed ACP session adapter as the CLI and tool paths
+- Passed the resolved ACP session adapter through `createSwarmService(...)`, default `AutopilotServiceLoop` construction, and custom loop dependency injection
+- Passed `api.runtime` through `registerSwarmService(...)` so runtime-capable installs stop falling back to `UnsupportedOpenClawSessionAdapter`
+- Added regression coverage for custom-loop session-adapter injection, default service-loop ACP wiring, and `registerSwarmService(...)` runtime propagation
+- Synced package metadata, plugin manifest metadata, in-plugin version metadata, README release badge, and release runbook to `openclaw-swarm-layer@0.5.1`
+
+### Verification
+- `npm run build` green
+- `npx vitest run test/unit/services/swarm-service.test.ts` green
+- `npm test` green: 59 unit test files / 356 unit tests and 19 e2e files / 25 e2e tests
+- `npm run release:check` green
+
 ## 0.5.0 (2026-04-08)
 
 ### M6 Autopilot Control Plane + M7 Subagent Removal

@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, PluginRuntime } from "openclaw/plugin-sdk";
 import type { OpenClawPluginService, OpenClawPluginServiceContext } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig } from "../config.js";
 import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
@@ -8,6 +8,7 @@ import { applyAcpRunStatusToWorkflow, deriveWorkflowLifecycle, enqueueReview } f
 import { AcpRunner } from "../runtime/acp-runner.js";
 import { ManualRunner } from "../runtime/manual-runner.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
+import { createSessionAdapter } from "../runtime/real-openclaw-session-adapter.js";
 import { appendRetryHistory, shouldRetry } from "../runtime/retry-engine.js";
 import { RunnerRegistry } from "../runtime/runner-registry.js";
 import type { TaskRunner } from "../runtime/task-runner.js";
@@ -135,10 +136,13 @@ type SwarmServiceLoopLike = {
 };
 
 type SwarmServiceDeps = {
+  runtime?: Pick<PluginRuntime, "config" | "version">;
+  sessionAdapter?: OpenClawSessionAdapter;
   createLoop?: (deps: {
     stateStore: StateStore;
     autopilotStore: AutopilotStore;
     logger: OpenClawPluginServiceContext["logger"];
+    sessionAdapter: OpenClawSessionAdapter;
   }) => SwarmServiceLoopLike;
 };
 
@@ -770,10 +774,14 @@ export function createSwarmService(
 
       const stateStore = new StateStore(config, { runtimeVersion });
       const autopilotStore = new AutopilotStore(stateStore.config);
+      const sessionAdapter =
+        deps?.sessionAdapter ??
+        createSessionAdapter(deps?.runtime, { acp: stateStore.config.acp }) ??
+        new UnsupportedOpenClawSessionAdapter();
       loop =
-        deps?.createLoop?.({ stateStore, autopilotStore, logger: ctx.logger }) ??
+        deps?.createLoop?.({ stateStore, autopilotStore, logger: ctx.logger, sessionAdapter }) ??
         new AutopilotServiceLoop(
-          new AutopilotController(stateStore, autopilotStore, createOrchestrator({ stateStore })),
+          new AutopilotController(stateStore, autopilotStore, createOrchestrator({ stateStore, sessionAdapter })),
           autopilotStore,
           stateStore.config.autopilot.tickSeconds * 1000,
           ctx.logger,
@@ -787,7 +795,7 @@ export function createSwarmService(
 }
 
 export function registerSwarmService(api: OpenClawPluginApi): void {
-  api.registerService(createSwarmService(resolvePluginConfigFromApi(api), api.runtime?.version));
+  api.registerService(createSwarmService(resolvePluginConfigFromApi(api), api.runtime?.version, { runtime: api.runtime }));
 }
 
 export function createOrchestrator(deps?: OrchestratorDeps): SwarmOrchestrator {
