@@ -105,9 +105,9 @@ describe("bridge manifest", () => {
       expect(result.spec.exports.getAcpSessionManager.relativeModulePath).toBe("dist/plugin-sdk/acp-runtime.js");
     });
 
-    it("sets subagentPatch to null for dynamic strategy", async () => {
+    it("reports ACP-only compatibility for dynamic strategy", async () => {
       const result = await resolveBridgeModules(tmpDir, "2026.4.1");
-      expect(result.subagentPatch).toBeNull();
+      expect(result.compatibility.supportedRunners).toEqual(["acp"]);
     });
 
     it("throws when no io-*.js file exports loadConfig", async () => {

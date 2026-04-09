@@ -91,8 +91,6 @@ describe("reporter", () => {
     expect(report).toContain("Default runner resolution: auto -> acp on this install");
     expect(report).toContain("Manual runner fallback: available");
     expect(report).toContain("ACP execution posture: public control-plane only");
-    expect(report).toContain("Subagent enabled: no");
-    expect(report).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(report).toContain("## ACP Bridge Exit Gate");
     expect(report).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(report).toContain("## Autopilot");
@@ -176,7 +174,6 @@ describe("reporter", () => {
     expect(localContent).toContain("Default runner resolution: auto -> acp on this install");
     expect(localContent).toContain("Manual runner fallback: available");
     expect(localContent).toContain("ACP execution posture: public control-plane only");
-    expect(localContent).toContain("Subagent posture: legacy bridge-backed opt-in (disabled by default)");
     expect(localContent).toContain("## ACP Bridge Exit Gate");
     expect(localContent).toContain("Bridge-free ACP floor: >=2026.3.22.");
     expect(localContent).toContain("## Autopilot");

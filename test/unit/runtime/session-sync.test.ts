@@ -1,4 +1,4 @@
-import { syncAcpRunRecord, syncSubagentRunRecord } from "../../../src/runtime/session-sync.js";
+import { syncAcpRunRecord } from "../../../src/runtime/session-sync.js";
 import type { RunRecord } from "../../../src/types.js";
 
 const baseRun: RunRecord = {
@@ -56,32 +56,5 @@ describe("session sync", () => {
     expect(result.runRecord.status).toBe("timed_out");
     expect(result.runRecord.events?.map((event) => event.type)).toContain("timeout");
     expect(result.runRecord.resultSummary).toBe("Timed out: ACP session exceeded allowed time");
-  });
-});
-
-describe("subagent session sync", () => {
-  const subagentRun: RunRecord = {
-    ...baseRun,
-    runId: "sub-run-1",
-    runner: { type: "subagent" },
-    sessionRef: {
-      runtime: "subagent",
-      sessionKey: "agent:main:subagent:1",
-    },
-  };
-
-  it("maps subagent completion into a terminal run record", () => {
-    const result = syncSubagentRunRecord(subagentRun, {
-      childSessionKey: "agent:main:subagent:1",
-      state: "completed",
-      checkedAt: "2026-03-20T00:05:00.000Z",
-      message: "done",
-      outputText: "done",
-    });
-
-    expect(result.runRecord.status).toBe("completed");
-    expect(result.runRecord.endedAt).toBe("2026-03-20T00:05:00.000Z");
-    expect(result.runRecord.events?.map((event) => event.type)).toContain("done");
-    expect(result.runRecord.resultSummary).toBe("Completed: done");
   });
 });

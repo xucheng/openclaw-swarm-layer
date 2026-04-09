@@ -1,6 +1,6 @@
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { createOrchestrator } from "../services/orchestrator.js";
-import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
+import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmSessionStatus(
   options: { project: string; run: string },
@@ -12,7 +12,6 @@ export async function runSwarmSessionStatus(
     stateStore,
     sessionStore: resolveSessionStore(context),
     sessionAdapter: resolveSessionAdapter(context),
-    subagentAdapter: resolveSubagentAdapter(context),
   });
   const synced = await orchestrator.syncRun({
     projectRoot: options.project,

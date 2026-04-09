@@ -27,7 +27,6 @@ Current baseline:
 - run -> review -> report
 - ACP dry-run scaffold
 - bridge doctor and bridge failure classification
-- subagent dark-mode rejection and compatibility flows
 - backward compatibility with existing workflow state and session reads
 
 ## Smoke Coverage
@@ -41,6 +40,7 @@ Current baseline:
 5. swarm live ACP run
 6. swarm session lifecycle
 7. swarm review / report / journal sync
+8. swarm autopilot tick
 
 Minimum artifact expectations:
 

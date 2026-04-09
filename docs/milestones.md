@@ -342,7 +342,7 @@ Motivation: remove the legacy bridge-backed subagent runner to eliminate the las
 - mixed tests updated to remove subagent references
 - `npm run build` + `npm test` green
 
-Current status: planned.
+Current status: complete (2026-04-08).
 
 ### M7.1 DoD
 
@@ -356,7 +356,7 @@ Current status: planned.
 - `npm run build` + `npm test` green
 - `grep -ri subagent src/` returns 0 results
 
-Current status: planned.
+Current status: complete (2026-04-08).
 
 ### M7.2 DoD
 
@@ -367,4 +367,15 @@ Current status: planned.
 - `openclaw swarm doctor --json` has no subagent references
 - docs updated
 
-Current status: planned.
+Current status: complete (2026-04-08).
+
+Closeout evidence recorded on 2026-04-08:
+
+- `npm run build` green after a clean `dist/` rebuild
+- `npm test` green at 59 unit files / 354 unit tests and 19 e2e files / 25 e2e tests
+- `rg -n "child_process" src dist` returned 0 results after the clean build
+- `openclaw --profile m7-smoke plugins install -l .` passed on OpenClaw 2026.4.8 without the prior security block
+- `openclaw --profile m7-smoke swarm doctor --json` resolved `auto -> acp` with no subagent references
+- local ACP control-plane smoke completed through `init -> plan -> dry-run -> live run -> autopilot tick(sync) -> review approve -> report -> autopilot tick(noop)`
+
+Overall status: complete (2026-04-08).

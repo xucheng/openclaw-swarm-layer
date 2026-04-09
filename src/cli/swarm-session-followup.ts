@@ -1,17 +1,15 @@
-import { getSubagentRunnerDisabledMessage } from "../config.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { createOrchestrator } from "../services/orchestrator.js";
 import { SessionStore } from "../session/session-store.js";
-import { resolveSessionAdapter, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
+import { resolveSessionAdapter, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmSessionFollowup(
-  options: { project: string; session: string; task: string; runner?: "acp" | "subagent" },
+  options: { project: string; session: string; task: string; runner?: "acp" },
   context?: SwarmCliContext,
 ): Promise<unknown> {
   const stateStore = resolveStateStore(context);
   const sessionStore = context?.sessionStore ?? new SessionStore(stateStore.config);
   const sessionAdapter = resolveSessionAdapter(context);
-  const subagentAdapter = resolveSubagentAdapter(context);
 
   const session = await sessionStore.loadSession(options.project, options.session);
   if (!session) {
@@ -24,10 +22,6 @@ export async function runSwarmSessionFollowup(
   // Load workflow and find next runnable task, or inject a synthetic one
   const workflow = await stateStore.loadWorkflow(options.project);
   const runnerType = options.runner ?? session.runner;
-  const subagentDisabledMessage = runnerType === "subagent" ? getSubagentRunnerDisabledMessage(stateStore.config) : undefined;
-  if (subagentDisabledMessage) {
-    return { ok: false, error: subagentDisabledMessage };
-  }
 
   // Create a synthetic follow-up task injected into the workflow
   const followupTaskId = `followup-${Date.now()}`;
@@ -57,7 +51,7 @@ export async function runSwarmSessionFollowup(
   await stateStore.saveWorkflow(options.project, updatedWorkflow);
 
   // Dispatch through orchestrator
-  const orchestrator = createOrchestrator({ stateStore, sessionStore, sessionAdapter, subagentAdapter });
+  const orchestrator = createOrchestrator({ stateStore, sessionStore, sessionAdapter });
   const result = await orchestrator.runOnce({
     projectRoot: options.project,
     taskId: followupTaskId,

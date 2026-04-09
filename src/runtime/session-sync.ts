@@ -1,6 +1,5 @@
 import type { RunRecord } from "../types.js";
 import type { AcpSessionStatus } from "./openclaw-session-adapter.js";
-import type { SubagentRunStatus } from "./openclaw-subagent-adapter.js";
 
 type SyncableRemoteStatus = {
   state: RunRecord["status"];
@@ -60,34 +59,7 @@ function buildAcpSummary(remoteStatus: AcpSessionStatus, fallback?: string): str
   return fallback;
 }
 
-function buildSubagentSummary(remoteStatus: SubagentRunStatus, fallback?: string): string | undefined {
-  const normalizedOutput = remoteStatus.outputText?.trim();
-  const normalizedMessage = remoteStatus.message?.trim();
-
-  if (remoteStatus.state === "completed") {
-    if (normalizedOutput) {
-      return `Completed: ${normalizedOutput.replace(/\s+/g, " ").trim()}`;
-    }
-    if (normalizedMessage) {
-      return `Completed: ${normalizedMessage}`;
-    }
-  }
-  if (remoteStatus.state === "running") {
-    return normalizedMessage ? `Running: ${normalizedMessage}` : fallback;
-  }
-  if (remoteStatus.state === "accepted") {
-    return normalizedMessage ? `Accepted: ${normalizedMessage}` : fallback;
-  }
-  if (remoteStatus.state === "cancelled") {
-    return normalizedMessage ? `Cancelled: ${normalizedMessage}` : fallback;
-  }
-  if (remoteStatus.state === "failed") {
-    return normalizedMessage ? `Failed: ${normalizedMessage}` : fallback;
-  }
-  return fallback;
-}
-
-export type SessionSyncResult<TRemoteStatus = AcpSessionStatus | SubagentRunStatus> = {
+export type SessionSyncResult<TRemoteStatus = AcpSessionStatus> = {
   runRecord: RunRecord;
   remoteStatus: TRemoteStatus;
 };
@@ -182,18 +154,3 @@ export function syncAcpRunRecord(runRecord: RunRecord, remoteStatus: AcpSessionS
   };
 }
 
-export function syncSubagentRunRecord(runRecord: RunRecord, remoteStatus: SubagentRunStatus): SessionSyncResult<SubagentRunStatus> {
-  if (runRecord.runner.type !== "subagent") {
-    throw new Error("Only subagent run records can be synced");
-  }
-
-  const synced = {
-    ...applyTerminalFields(runRecord, remoteStatus, "subagent"),
-    resultSummary: buildSubagentSummary(remoteStatus, runRecord.resultSummary),
-  };
-
-  return {
-    runRecord: synced,
-    remoteStatus,
-  };
-}

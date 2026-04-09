@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -13,34 +12,21 @@ type InternalModuleExport = {
   exportAlias: string;
 };
 
-type InternalSubagentPatchSpec = {
-  relativeModulePath: string;
-  patchedModulePath: string;
-  patchedSubagentExports: {
-    spawn: string;
-    findLatestRun: string;
-    killByChildSession: string;
-    isRunActive: string;
-  };
-};
-
 export type InternalModuleSpec = {
   exports: {
     loadConfig: InternalModuleExport;
     getAcpSessionManager: InternalModuleExport;
   };
-  subagentPatch: InternalSubagentPatchSpec;
 };
 
 export type BridgeCompatibility = {
   version: string;
   strategy: "internal-bundle" | "dynamic-discovery";
   testedAt: string;
-  supportedRunners: Array<"acp" | "subagent">;
+  supportedRunners: Array<"acp">;
   notes: string[];
   replacementCandidates: {
     acpControlPlaneExport: string;
-    subagentSpawnExport: string;
   };
 };
 
@@ -67,8 +53,6 @@ type VersionRangeStrategy = {
   acpSessionManager:
     | { mode: "exact"; relativeModulePath: string; exportAlias: string }
     | { mode: "stable-path"; relativeModulePath: string; exportName: string };
-  /** Subagent bridge spec, or `null` if not supported in this range */
-  subagentPatch: InternalSubagentPatchSpec | null;
   compatibility: BridgeCompatibility;
 };
 
@@ -80,18 +64,13 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
     maxVersion: "2026.2.26",
     loadConfig: { mode: "exact", relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js", exportAlias: "i" },
     acpSessionManager: { mode: "exact", relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js", exportAlias: "Vr" },
-    subagentPatch: {
-      relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js",
-      patchedModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.swarm-bridge.mjs",
-      patchedSubagentExports: { spawn: "__bridgeSpawnSubagentDirect", findLatestRun: "__bridgeFindLatestSubagentRunByChildSession", killByChildSession: "__bridgeKillSubagentRunByChildSession", isRunActive: "__bridgeIsSubagentSessionRunActive" },
-    },
     compatibility: {
       version: "2026.2.26",
       strategy: "internal-bundle",
       testedAt: "2026-03-21",
-      supportedRunners: ["acp", "subagent"],
-      notes: ["Uses hashed thread-bindings bundle aliases for ACP control-plane access.", "Requires patched subagent helper exports for status and kill support."],
-      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager", subagentSpawnExport: "spawnSubagentDirect" },
+      supportedRunners: ["acp"],
+      notes: ["Uses hashed thread-bindings bundle aliases for ACP control-plane access."],
+      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager" },
     },
   },
   {
@@ -99,18 +78,13 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
     maxVersion: "2026.3.13",
     loadConfig: { mode: "exact", relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js", exportAlias: "i" },
     acpSessionManager: { mode: "exact", relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js", exportAlias: "Vr" },
-    subagentPatch: {
-      relativeModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.js",
-      patchedModulePath: "dist/plugin-sdk/thread-bindings-SYAnWHuW.swarm-bridge.mjs",
-      patchedSubagentExports: { spawn: "__bridgeSpawnSubagentDirect", findLatestRun: "__bridgeFindLatestSubagentRunByChildSession", killByChildSession: "__bridgeKillSubagentRunByChildSession", isRunActive: "__bridgeIsSubagentSessionRunActive" },
-    },
     compatibility: {
       version: "2026.3.13",
       strategy: "internal-bundle",
       testedAt: "2026-03-21",
-      supportedRunners: ["acp", "subagent"],
-      notes: ["Uses hashed thread-bindings bundle aliases for ACP control-plane access.", "Requires patched subagent helper exports for status and kill support."],
-      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager", subagentSpawnExport: "spawnSubagentDirect" },
+      supportedRunners: ["acp"],
+      notes: ["Uses hashed thread-bindings bundle aliases for ACP control-plane access."],
+      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager" },
     },
   },
   {
@@ -118,7 +92,6 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
     maxVersion: "2026.3.24",
     loadConfig: { mode: "dynamic", fileGlob: "io-*.js", exportName: "loadConfig" },
     acpSessionManager: { mode: "stable-path", relativeModulePath: "dist/plugin-sdk/acp-runtime.js", exportName: "getAcpSessionManager" },
-    subagentPatch: null, // pi-embedded may or may not exist; not guaranteed in this range
     compatibility: {
       version: ">=2026.3.22 <=2026.3.24",
       strategy: "dynamic-discovery",
@@ -127,9 +100,8 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
       notes: [
         "loadConfig resolved dynamically from dist/io-*.js.",
         "getAcpSessionManager available via stable plugin-sdk/acp-runtime export.",
-        "Subagent bridge not guaranteed (pi-embedded bundle may be absent).",
       ],
-      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager", subagentSpawnExport: "spawnSubagentDirect" },
+      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager" },
     },
   },
 
@@ -139,7 +111,6 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
     maxVersion: null,
     loadConfig: { mode: "dynamic", fileGlob: "io-*.js", exportName: "loadConfig" },
     acpSessionManager: { mode: "stable-path", relativeModulePath: "dist/plugin-sdk/acp-runtime.js", exportName: "getAcpSessionManager" },
-    subagentPatch: null,
     compatibility: {
       version: ">=2026.3.22",
       strategy: "dynamic-discovery",
@@ -148,9 +119,8 @@ const VERSION_RANGE_STRATEGIES: VersionRangeStrategy[] = [
       notes: [
         "Forward-compatible range: loadConfig discovered dynamically from dist/io-*.js.",
         "getAcpSessionManager resolved via stable plugin-sdk/acp-runtime.js path.",
-        "Subagent bridge is not available; awaiting public spawnSubagentDirect export.",
       ],
-      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager", subagentSpawnExport: "spawnSubagentDirect" },
+      replacementCandidates: { acpControlPlaneExport: "getAcpSessionManager" },
     },
   },
 ];
@@ -215,7 +185,6 @@ export type ResolvedBridgeModules = {
   version: string;
   loadConfig: () => unknown;
   getAcpSessionManager: Function | null;
-  subagentPatch: InternalSubagentPatchSpec | null;
   /** The full spec (for callers that still need it) */
   spec: InternalModuleSpec;
   compatibility: BridgeCompatibility;
@@ -283,25 +252,17 @@ export async function resolveBridgeModules(openclawRoot: string, version: string
   }
 
   // --- Construct legacy-compatible InternalModuleSpec ---
-  const emptySubagentPatch: InternalSubagentPatchSpec = {
-    relativeModulePath: "",
-    patchedModulePath: "",
-    patchedSubagentExports: { spawn: "", findLatestRun: "", killByChildSession: "", isRunActive: "" },
-  };
-
   const spec: InternalModuleSpec = {
     exports: {
       loadConfig: { relativeModulePath: loadConfigPath, exportAlias: loadConfigAlias },
       getAcpSessionManager: { relativeModulePath: acpPath, exportAlias: acpAlias },
     },
-    subagentPatch: strategy.subagentPatch ?? emptySubagentPatch,
   };
 
   return {
     version,
     loadConfig: loadConfigFn,
     getAcpSessionManager: acpFn,
-    subagentPatch: strategy.subagentPatch,
     spec,
     compatibility: strategy.compatibility,
   };
@@ -326,28 +287,3 @@ export function resolveBridgeCompatibility(version: string): BridgeCompatibility
   return resolveVersionRangeStrategy(version)?.compatibility ?? null;
 }
 
-// ---------------------------------------------------------------------------
-// Subagent patch helper (unchanged)
-// ---------------------------------------------------------------------------
-
-export function buildPatchedBridgeModuleSource(source: string): string {
-  if (source.includes("__bridgeSpawnSubagentDirect") && source.includes("__bridgeKillSubagentRunByChildSession")) {
-    return source;
-  }
-  return `${source}
-function __bridgeFindLatestSubagentRunByChildSession(childSessionKey) {
-  return findLatestRunForChildSession(getSubagentRunsSnapshotForRead(subagentRuns), childSessionKey);
-}
-async function __bridgeKillSubagentRunByChildSession(cfg, childSessionKey) {
-  const entry = __bridgeFindLatestSubagentRunByChildSession(childSessionKey);
-  if (!entry) return { killed: false };
-  return await killSubagentRun({ cfg, entry, cache: new Map() });
-}
-export {
-  spawnSubagentDirect as __bridgeSpawnSubagentDirect,
-  __bridgeFindLatestSubagentRunByChildSession,
-  __bridgeKillSubagentRunByChildSession,
-  isSubagentSessionRunActive as __bridgeIsSubagentSessionRunActive
-};
-`;
-}

@@ -22,7 +22,15 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
-function assertTask(task: unknown): asserts task is TaskNode {
+function isCurrentRunnerType(value: unknown): value is "manual" | "acp" {
+  return value === "manual" || value === "acp";
+}
+
+function isPersistedRunnerType(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function assertTask(task: unknown, options?: { allowLegacyRunnerTypes?: boolean }): asserts task is TaskNode {
   assert(isObject(task), "task must be an object");
   assert(typeof task.taskId === "string" && task.taskId.length > 0, "task.taskId is required");
   assert(typeof task.specId === "string" && task.specId.length > 0, "task.specId is required");
@@ -32,7 +40,7 @@ function assertTask(task: unknown): asserts task is TaskNode {
   assert(isObject(task.workspace) && (task.workspace.mode === "shared" || task.workspace.mode === "isolated"), "task.workspace.mode is invalid");
   assert(
     isObject(task.runner) &&
-      (task.runner.type === "manual" || task.runner.type === "acp" || task.runner.type === "subagent"),
+      (options?.allowLegacyRunnerTypes ? isPersistedRunnerType(task.runner.type) : isCurrentRunnerType(task.runner.type)),
     "task.runner.type is invalid",
   );
   assert(isObject(task.review) && typeof task.review.required === "boolean", "task.review.required is invalid");
@@ -75,7 +83,7 @@ export function createEmptyWorkflowState(
     reviewQueue: [],
     runtime: {
       defaultRunner: resolveWorkflowDefaultRunner(resolvedConfig, hints),
-      allowedRunners: resolveDefaultAllowedRunners(resolvedConfig),
+      allowedRunners: resolveDefaultAllowedRunners(),
     },
   };
 }
@@ -120,7 +128,7 @@ export class StateStore {
     if (!workflow) {
       throw new Error("workflow-state.json is missing after initialization");
     }
-    this.assertValidWorkflow(workflow);
+    this.assertValidWorkflow(workflow, { allowLegacyRunnerTypes: true });
     return workflow;
   }
 
@@ -168,7 +176,7 @@ export class StateStore {
   async loadRuns(projectRoot: string): Promise<RunRecord[]> {
     const paths = await this.initProject(projectRoot);
     const runs = await readDirectoryJsonFiles<RunRecord>(paths.runsDir);
-    runs.forEach((runRecord) => this.assertValidRun(runRecord));
+    runs.forEach((runRecord) => this.assertValidRun(runRecord, { allowLegacyRunnerTypes: true }));
     return runs;
   }
 
@@ -179,7 +187,7 @@ export class StateStore {
     if (!runRecord) {
       return null;
     }
-    this.assertValidRun(runRecord);
+    this.assertValidRun(runRecord, { allowLegacyRunnerTypes: true });
     return runRecord;
   }
 
@@ -224,7 +232,7 @@ export class StateStore {
     assert(Array.isArray(spec.phases), "spec.phases must be an array");
   }
 
-  assertValidRun(runRecord: RunRecord): void {
+  assertValidRun(runRecord: RunRecord, options?: { allowLegacyRunnerTypes?: boolean }): void {
     assert(isObject(runRecord), "runRecord must be an object");
     assert(typeof runRecord.runId === "string" && runRecord.runId.length > 0, "runRecord.runId is required");
     assert(typeof runRecord.taskId === "string" && runRecord.taskId.length > 0, "runRecord.taskId is required");
@@ -241,7 +249,7 @@ export class StateStore {
     );
     assert(
       isObject(runRecord.runner) &&
-        (runRecord.runner.type === "manual" || runRecord.runner.type === "acp" || runRecord.runner.type === "subagent"),
+        (options?.allowLegacyRunnerTypes ? isPersistedRunnerType(runRecord.runner.type) : isCurrentRunnerType(runRecord.runner.type)),
       "runRecord.runner.type is invalid",
     );
     assert(typeof runRecord.workspacePath === "string" && runRecord.workspacePath.length > 0, "runRecord.workspacePath is required");
@@ -249,13 +257,13 @@ export class StateStore {
     assert(isStringArray(runRecord.artifacts), "runRecord.artifacts must be a string array");
   }
 
-  assertValidWorkflow(workflow: WorkflowState): void {
+  assertValidWorkflow(workflow: WorkflowState, options?: { allowLegacyRunnerTypes?: boolean }): void {
     try {
       assert(isObject(workflow), "workflow must be an object");
       assert(typeof workflow.version === "number" && workflow.version >= 1, "workflow.version is invalid");
       assert(typeof workflow.projectRoot === "string" && workflow.projectRoot.length > 0, "workflow.projectRoot is required");
       assert(Array.isArray(workflow.tasks), "workflow.tasks must be an array");
-      workflow.tasks.forEach((task) => assertTask(task));
+      workflow.tasks.forEach((task) => assertTask(task, options));
       assert(isStringArray(workflow.reviewQueue), "workflow.reviewQueue must be a string array");
     } catch (error) {
       throw new Error(

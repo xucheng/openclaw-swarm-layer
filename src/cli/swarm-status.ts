@@ -1,7 +1,7 @@
 import type { RuntimePolicySnapshot } from "../config.js";
 import { AutopilotStore } from "../autopilot/autopilot-store.js";
 import { buildAutopilotHealthSummary } from "../autopilot/metrics.js";
-import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
+import { describeAcpExecutionPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes, type AcpBridgeExitGate } from "../runtime/acp-bridge-exit-gate.js";
 import { buildAttentionItems, buildOperatorHighlights, buildRecommendedActions, buildReviewQueueItems } from "../reporting/operator-summary.js";
 import { summarizeSessionReuseForTask } from "../session/session-selector.js";
@@ -165,7 +165,6 @@ export async function runSwarmStatus(
       `Default runner resolution: ${runtime.configuredDefaultRunner} -> ${runtime.resolvedDefaultRunner} on this install.`,
       `Manual runner remains the safe explicit fallback.`,
       `ACP execution posture: ${describeAcpExecutionPosture(stateStore.config)}.`,
-      `Subagent posture: ${describeSubagentPosture(stateStore.config)}.`,
       ...formatAcpBridgeExitGateNotes(acpBridgeExitGate),
     ],
     workflow: {

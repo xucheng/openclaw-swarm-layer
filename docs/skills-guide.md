@@ -1,13 +1,19 @@
 # Skills 使用指南
 
-OpenClaw Swarm Layer 提供 1 个统一 skill（`swarm-layer`），内含 5 个功能模块 + Harness Enhancement 子模块，覆盖从安装到日常运营的完整生命周期。
+OpenClaw Swarm Layer 提供 1 个统一 skill（`swarm-layer`），覆盖从安装、执行、诊断、autopilot 控制到日常运营的完整生命周期。
 
 ## 安装
 
-从 ClawHub 安装：
+从 ClawHub 安装 skill：
 
 ```bash
-clawhub install swarm-layer
+openclaw skills install swarm-layer
+```
+
+插件本体可单独从 ClawHub 安装：
+
+```bash
+openclaw plugins install clawhub:openclaw-swarm-layer
 ```
 
 或通过插件自带（`skills/swarm-layer/SKILL.md`），安装插件后自动可用。
@@ -20,6 +26,7 @@ Skill 根据用户意图自动路由到对应模块：
 |---------|------|---------|
 | 安装、配置、初始化 | **Setup** | `plugins install`, `doctor`, `init` |
 | 规划、执行、审批、session 操作 | **Operate** | `plan`, `run`, `review`, `session *` |
+| 监督式自动推进 | **Operate → Autopilot** | `autopilot status/start/pause/resume/stop/tick` |
 | 故障排查、任务卡住 | **Diagnose** | `doctor`, `session status/cancel/cleanup` |
 | 查看进度、报告分析 | **Report** | `status`, `report`, `session list/inspect` |
 | 启用 GAN 模式、增强编排 | **Operate → Harness** | `evaluator`, `bootstrap`, `immutability`, `rubric` |
@@ -36,6 +43,7 @@ Skill 根据用户意图自动路由到对应模块：
 > 用这个 spec 开始工作流            → Operate 模块
 > 任务卡住了                        → Diagnose 模块
 > 当前进度怎么样                    → Report 模块
+> 开启自动推进                       → Operate → Autopilot 模块
 ```
 
 ### 方式二：直接使用 CLI
@@ -53,7 +61,7 @@ openclaw swarm report --project .
 
 ### Setup 模块
 
-完整安装流程：环境检查 → 插件安装 → Bridge 配置 → Doctor 验证 → 项目初始化 → Obsidian 同步配置。
+完整安装流程：环境检查 → 插件安装 → ACP 配置 → Doctor 验证 → 项目初始化 → Obsidian 同步配置。
 
 ### Operate 模块
 
@@ -63,7 +71,9 @@ openclaw swarm report --project .
 写 Spec → plan → status → run → session status → review → 下一个任务
 ```
 
-包含 runner 选择指南（manual/acp/subagent）、session 策略（none/create_persistent/reuse_if_available/require_existing）、follow-up/steer 操作。
+包含 runner 选择指南（manual/acp）、session 策略（none/create_persistent/reuse_if_available/require_existing）、follow-up/steer 操作。
+
+包含 autopilot 控制面命令：`status/start/pause/resume/stop/tick`，用于受监督地推进 workflow。
 
 ### Diagnose 模块
 
@@ -105,6 +115,8 @@ doctor → severity?
 | "生成报告" | `swarm report` |
 | "任务卡住了" | Diagnose: `doctor` → `status` → 排查 |
 | "清理超时 session" | `swarm session cleanup` |
+| "启动 autopilot" | `swarm autopilot start --project .` |
+| "先看 autopilot 现在在干什么" | `swarm autopilot status --project .` |
 | "启用增强模式" | 添加 evaluator + immutability + bootstrap 配置 |
 | "追加任务到 session" | `swarm session follow-up` |
 | "改变方向" | `swarm session steer` |

@@ -6,14 +6,14 @@ import { createOrchestrator } from "../services/orchestrator.js";
 import type { RunBatchResult } from "../services/orchestrator.js";
 import { synthesizeProgress } from "../session/progress-summary.js";
 import { SessionStore } from "../session/session-store.js";
-import { resolveSessionAdapter, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
+import { resolveSessionAdapter, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmRun(
   options: {
     project: string;
     task?: string;
     dryRun?: boolean;
-    runner?: "manual" | "acp" | "subagent";
+    runner?: "manual" | "acp";
     parallel?: number;
     allReady?: boolean;
   },
@@ -22,9 +22,8 @@ export async function runSwarmRun(
   const stateStore = resolveStateStore(context);
   const sessionStore = context?.sessionStore ?? new SessionStore(stateStore.config);
   const sessionAdapter = resolveSessionAdapter(context);
-  const subagentAdapter = resolveSubagentAdapter(context);
   const reportConfig = stateStore.config;
-  const orchestrator = createOrchestrator({ stateStore, sessionStore, sessionAdapter, subagentAdapter });
+  const orchestrator = createOrchestrator({ stateStore, sessionStore, sessionAdapter });
 
   const isBatch = options.parallel !== undefined || options.allReady === true;
 
@@ -75,7 +74,7 @@ async function runSwarmRunBatch(
   options: {
     project: string;
     dryRun?: boolean;
-    runner?: "manual" | "acp" | "subagent";
+    runner?: "manual" | "acp";
     parallel?: number;
     allReady?: boolean;
   },

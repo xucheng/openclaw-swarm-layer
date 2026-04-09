@@ -21,36 +21,14 @@ describe("StateStore", () => {
     expect(workflow).toEqual(createEmptyWorkflowState(projectRoot, store.config));
   });
 
-  it("uses ACP-preferred workflow defaults on supported runtimes and keeps subagent out of fresh allowed runners", () => {
+  it("uses ACP-preferred workflow defaults on supported runtimes", () => {
     const workflow = createEmptyWorkflowState("/tmp/project", {
       defaultRunner: "auto",
       acp: { enabled: true },
-      subagent: { enabled: false },
     } as any, { runtimeVersion: "2026.3.24" });
 
     expect(workflow.runtime?.defaultRunner).toBe("acp");
     expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp"]);
-  });
-
-  it("keeps subagent out of fresh allowed runners when bridge opt-in is missing", () => {
-    const workflow = createEmptyWorkflowState("/tmp/project", {
-      defaultRunner: "subagent",
-      subagent: { enabled: true },
-    } as any);
-
-    expect(workflow.runtime?.defaultRunner).toBe("manual");
-    expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp"]);
-  });
-
-  it("includes subagent in fresh allowed runners only when subagent bridge is enabled explicitly", () => {
-    const workflow = createEmptyWorkflowState("/tmp/project", {
-      defaultRunner: "subagent",
-      subagent: { enabled: true },
-      bridge: { subagentEnabled: true },
-    } as any);
-
-    expect(workflow.runtime?.defaultRunner).toBe("subagent");
-    expect(workflow.runtime?.allowedRunners).toEqual(["manual", "acp", "subagent"]);
   });
 
   it("persists validated spec and run records", async () => {
@@ -171,6 +149,66 @@ describe("StateStore", () => {
 
     const sessions = await store.loadSessions(projectRoot);
     expect(sessions).toEqual([]);
+  });
+
+  it("loads legacy workflow and run records with retired runner types", async () => {
+    const projectRoot = await makeTempProject();
+    const store = new StateStore();
+    const paths = await store.initProject(projectRoot);
+    const startedAt = new Date().toISOString();
+
+    await fs.writeFile(
+      paths.workflowStatePath,
+      JSON.stringify(
+        {
+          version: 1,
+          projectRoot,
+          lifecycle: "planned",
+          tasks: [
+            {
+              taskId: "task-legacy",
+              specId: "spec-1",
+              title: "Legacy task",
+              description: "Legacy task",
+              kind: "coding",
+              deps: [],
+              status: "ready",
+              workspace: { mode: "shared" },
+              runner: { type: "subagent" },
+              review: { required: false },
+            },
+          ],
+          reviewQueue: [],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(paths.runsDir, "legacy-run.json"),
+      JSON.stringify(
+        {
+          runId: "legacy-run",
+          taskId: "task-legacy",
+          attempt: 1,
+          status: "completed",
+          runner: { type: "subagent" },
+          workspacePath: projectRoot,
+          startedAt,
+          artifacts: [],
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const workflow = await store.loadWorkflow(projectRoot);
+    const run = await store.loadRun(projectRoot, "legacy-run");
+
+    expect(workflow.tasks[0]?.runner.type).toBe("subagent");
+    expect(run?.runner.type).toBe("subagent");
   });
 
   it("summarizes workflow status counts", () => {

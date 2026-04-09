@@ -1,6 +1,6 @@
 import { AutopilotController } from "../autopilot/controller.js";
 import { createOrchestrator } from "../services/orchestrator.js";
-import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
+import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 export async function runSwarmAutopilotTick(
   options: { project: string; dryRun?: boolean },
@@ -14,7 +14,6 @@ export async function runSwarmAutopilotTick(
       stateStore,
       sessionStore: resolveSessionStore(context),
       sessionAdapter: resolveSessionAdapter(context),
-      subagentAdapter: resolveSubagentAdapter(context),
     }),
   );
   return controller.tick({

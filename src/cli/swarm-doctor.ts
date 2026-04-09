@@ -3,10 +3,7 @@ import { pathToFileURL } from "node:url";
 import {
   defaultSwarmPluginConfig,
   describeAcpExecutionPosture,
-  describeSubagentPosture,
   hasLegacyAcpBridgeFallbackConfig,
-  isBridgeEnabledForRunner,
-  isSubagentRunnerEnabled,
   resolveSwarmPluginConfig,
   type SwarmPluginConfig,
 } from "../config.js";
@@ -15,7 +12,6 @@ import {
   formatAcpBridgeExitGateNotes,
   type AcpBridgeExitGate,
 } from "../runtime/acp-bridge-exit-gate.js";
-import { resolveBridgeScriptPath, resolveTsxLoaderPath, runBridgeCommandDirect } from "../runtime/bridge-openclaw-subagent-adapter.js";
 import { resolveAcpRuntimeRegistryModulePath, resolveOpenClawRoot } from "../runtime/openclaw-exec-bridge.js";
 import {
   buildMigrationChecklist,
@@ -39,12 +35,11 @@ type BridgeDoctorResult = {
   };
   publicApi: {
     acpControlPlaneExport: boolean;
-    subagentSpawnExport: boolean;
     readyReplacementPoints: string[];
   };
   acpBridgeExitGate: AcpBridgeExitGate;
   replacementPlan: Array<{
-    runner: "acp" | "subagent";
+    runner: string;
     publicExport: string;
     available: boolean;
     status: "complete" | "ready" | "blocked";
@@ -62,7 +57,6 @@ type BridgeDoctorResult = {
   nextAction: string;
 };
 
-export type BridgeCommandRunner = typeof runBridgeCommandDirect;
 type PublicApiDetector = typeof detectPublicApiAvailability;
 
 function resolveEffectiveConfig(context?: SwarmCliContext): SwarmPluginConfig {
@@ -97,16 +91,13 @@ function pushUnique(items: string[], value: string): string[] {
 }
 
 function resolveDoctorDefaultRunner(
-  config: Pick<SwarmPluginConfig, "defaultRunner" | "acp" | "subagent" | "bridge">,
+  config: Pick<SwarmPluginConfig, "defaultRunner" | "acp" | "bridge">,
   result: Pick<BridgeDoctorResult, "publicApi">,
-): "manual" | "acp" | "subagent" {
+): "manual" | "acp" {
   if (config.defaultRunner === "auto") {
     return config.acp.enabled && result.publicApi.acpControlPlaneExport
       ? "acp"
       : "manual";
-  }
-  if (config.defaultRunner === "subagent") {
-    return isSubagentRunnerEnabled(config) ? "subagent" : "manual";
   }
   return config.defaultRunner;
 }
@@ -186,21 +177,6 @@ function annotateAcpBridgeContainment(
   };
 }
 
-function annotateSubagentLegacyStatus(
-  result: BridgeDoctorResult,
-  config: SwarmPluginConfig,
-): BridgeDoctorResult {
-  const note = `Subagent posture: ${describeSubagentPosture(config)}.`;
-  return {
-    ...result,
-    compatibility: {
-      ...result.compatibility,
-      notes: result.compatibility.notes.includes(note) ? result.compatibility.notes : [...result.compatibility.notes, note],
-    },
-    warnings: result.warnings.includes(note) ? result.warnings : [...result.warnings, note],
-  };
-}
-
 function buildBridgeOptionalDoctorResult(
   config: SwarmPluginConfig,
   availability: PublicApiAvailability,
@@ -208,19 +184,14 @@ function buildBridgeOptionalDoctorResult(
 ): BridgeDoctorResult {
   const replacementPlan = buildReplacementPlan(availability);
   const migrationChecklist = buildMigrationChecklist(replacementPlan);
-  const subagentBridgeEnabled = config.subagent.enabled && isBridgeEnabledForRunner(config, "subagent");
 
   const blockers: string[] = [];
-  const warnings: string[] = ["ACP bridge has been removed; doctor is reporting public API readiness for ACP and bridge status only for subagent."];
+  const warnings: string[] = ["ACP bridge has been removed; doctor is reporting public API readiness for ACP only."];
   const remediation: string[] = [];
 
   if (config.acp.enabled && !availability.acpControlPlaneExport) {
     blockers.push("ACP is enabled but the public ACP control-plane export is not available on this install.");
     remediation.push("Keep using manual runner until the public ACP control-plane export is available on the target OpenClaw install.");
-  }
-  if (config.subagent.enabled && !availability.subagentSpawnExport && !subagentBridgeEnabled) {
-    blockers.push("subagent is enabled but neither a public subagent export nor subagent bridge fallback is available.");
-    remediation.push("Disable subagent or enable bridge.subagentEnabled until the public subagent export is available.");
   }
   if (!config.acp.enabled) {
     warnings.push("ACP is disabled in plugin config; manual runner remains the safe fallback.");
@@ -229,53 +200,45 @@ function buildBridgeOptionalDoctorResult(
 
   return annotateAcpBridgeExitGate(
     annotateDefaultRunnerGuidance(
-      annotateSubagentLegacyStatus(
-        annotateAcpBridgeContainment(
-          {
-            ok: blockers.length === 0,
-            severity: blockers.length > 0 ? "blocked" : "warning",
-            openclawRoot: config.bridge.openclawRoot ?? "(unset)",
-            compatibility: {
-              supportedRunners: [
-                ...(config.acp.enabled ? ["acp"] : []),
-                ...(subagentBridgeEnabled ? ["subagent"] : []),
-              ],
-              replacementCandidates: replacementPlan.map((item) => item.publicExport),
-              notes: ["ACP bridge has been removed from the supported runtime path.", ...availability.notes],
-            },
-            publicApi: {
-              acpControlPlaneExport: availability.acpControlPlaneExport,
-              subagentSpawnExport: availability.subagentSpawnExport,
-              readyReplacementPoints: availability.readyReplacementPoints,
-            },
-            acpBridgeExitGate: buildAcpBridgeExitGate(runtimeVersion, {
-              publicControlPlaneExportReady: availability.acpControlPlaneExport,
-              evidenceMode: "doctor",
-            }),
-            replacementPlan,
-            migrationChecklist,
-            checks: {
-              bridgeEnabled: subagentBridgeEnabled,
-              acpBridgeFallbackEnabled: false,
-              subagentBridgeFallbackEnabled: subagentBridgeEnabled,
-              acpBridgeRemoved: true,
-              acpPublicControlPlaneReady: availability.acpControlPlaneExport,
-              subagentPublicSpawnReady: availability.subagentSpawnExport,
-              acpConfigured: config.acp.enabled,
-              subagentConfigured: config.subagent.enabled,
-            },
-            blockers,
-            warnings,
-            risks: blockers.length > 0 ? ["Automated execution availability depends on missing public exports or disabled fallbacks."] : [],
-            remediation,
-            nextAction:
-              blockers[0] ??
-              (availability.acpControlPlaneExport
-                ? "Use the ACP public control-plane path; ACP bridge is no longer part of the supported runtime."
-                : "Keep manual runner as baseline, and only enable ACP on installs where the public control-plane export is available."),
+      annotateAcpBridgeContainment(
+        {
+          ok: blockers.length === 0,
+          severity: blockers.length > 0 ? "blocked" : "warning",
+          openclawRoot: config.bridge.openclawRoot ?? "(unset)",
+          compatibility: {
+            supportedRunners: [
+              ...(config.acp.enabled ? ["acp"] : []),
+            ],
+            replacementCandidates: replacementPlan.map((item) => item.publicExport),
+            notes: ["ACP bridge has been removed from the supported runtime path.", ...availability.notes],
           },
-          config,
-        ),
+          publicApi: {
+            acpControlPlaneExport: availability.acpControlPlaneExport,
+            readyReplacementPoints: availability.readyReplacementPoints,
+          },
+          acpBridgeExitGate: buildAcpBridgeExitGate(runtimeVersion, {
+            publicControlPlaneExportReady: availability.acpControlPlaneExport,
+            evidenceMode: "doctor",
+          }),
+          replacementPlan,
+          migrationChecklist,
+          checks: {
+            bridgeEnabled: false,
+            acpBridgeFallbackEnabled: false,
+            acpBridgeRemoved: true,
+            acpPublicControlPlaneReady: availability.acpControlPlaneExport,
+            acpConfigured: config.acp.enabled,
+          },
+          blockers,
+          warnings,
+          risks: blockers.length > 0 ? ["Automated execution availability depends on missing public exports or disabled fallbacks."] : [],
+          remediation,
+          nextAction:
+            blockers[0] ??
+            (availability.acpControlPlaneExport
+              ? "Use the ACP public control-plane path; ACP bridge is no longer part of the supported runtime."
+              : "Keep manual runner as baseline, and only enable ACP on installs where the public control-plane export is available."),
+        },
         config,
       ),
       config,
@@ -287,48 +250,16 @@ function buildBridgeOptionalDoctorResult(
 export async function runSwarmDoctor(
   _options: Record<string, never>,
   context?: SwarmCliContext,
-  commandRunner: BridgeCommandRunner = runBridgeCommandDirect,
   publicApiDetector: PublicApiDetector = detectPublicApiAvailability,
 ): Promise<BridgeDoctorResult> {
   const config = resolveEffectiveConfig(context);
   const runtimeVersion = resolveContextRuntimeVersion(context);
-  const subagentBridgeEnabled = config.subagent.enabled && isBridgeEnabledForRunner(config, "subagent");
 
-  if (!subagentBridgeEnabled) {
-    const detectorInput = buildDoctorPublicApiDetectorInput(config);
-    const availability = await publicApiDetector(detectorInput ?? {}).catch(() => ({
-      acpControlPlaneExport: false,
-      subagentSpawnExport: false,
-      readyReplacementPoints: [],
-      notes: ["Unable to detect public API availability from the current OpenClaw install."],
-    }));
-    return buildBridgeOptionalDoctorResult(config, availability, runtimeVersion);
-  }
-
-  const result = await commandRunner(
-    [config.bridge.nodePath ?? process.execPath, "--import", resolveTsxLoaderPath(), resolveBridgeScriptPath(), "doctor"],
-    {
-      timeoutMs: 120_000,
-      cwd: process.cwd(),
-      input: JSON.stringify({
-        bridge: {
-          openclawRoot: config.bridge.openclawRoot,
-          versionAllow: config.bridge.versionAllow,
-        },
-      }),
-    },
-  );
-
-  if (result.code !== 0) {
-    throw new Error(result.stderr.trim() || result.stdout.trim() || "bridge doctor failed");
-  }
-
-  const parsed = JSON.parse(result.stdout) as { result: BridgeDoctorResult };
-  return annotateAcpBridgeExitGate(
-    annotateDefaultRunnerGuidance(
-      annotateSubagentLegacyStatus(annotateAcpBridgeContainment(parsed.result, config), config),
-      config,
-    ),
-    parsed.result.version ?? runtimeVersion,
-  );
+  const detectorInput = buildDoctorPublicApiDetectorInput(config);
+  const availability = await publicApiDetector(detectorInput ?? {}).catch(() => ({
+    acpControlPlaneExport: false,
+    readyReplacementPoints: [],
+    notes: ["Unable to detect public API availability from the current OpenClaw install."],
+  }));
+  return buildBridgeOptionalDoctorResult(config, availability, runtimeVersion);
 }

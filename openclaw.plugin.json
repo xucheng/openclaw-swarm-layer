@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
@@ -45,7 +45,7 @@
       },
       "defaultRunner": {
         "type": "string",
-        "enum": ["auto", "manual", "acp", "subagent"],
+        "enum": ["auto", "manual", "acp"],
         "default": "auto"
       },
       "maxParallelTasks": {
@@ -167,16 +167,6 @@
           }
         }
       },
-      "subagent": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": false
-          }
-        }
-      },
       "bridge": {
         "type": "object",
         "additionalProperties": false,
@@ -186,10 +176,6 @@
             "default": false
           },
           "acpFallbackEnabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "subagentEnabled": {
             "type": "boolean",
             "default": false
           },

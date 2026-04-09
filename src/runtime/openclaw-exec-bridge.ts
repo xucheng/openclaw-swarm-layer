@@ -5,22 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import {
-  buildPatchedBridgeModuleSource,
   resolveBridgeCompatibility,
   resolveBridgeModules,
-  resolveInternalModuleSpecCandidates,
   resolveInternalModuleSpec,
   resolveVersionRangeStrategy,
-  type InternalModuleSpec,
 } from "./bridge-manifest.js";
 import { matchesOpenClawVersionAllowlist } from "./openclaw-version.js";
 import { buildMigrationChecklist, buildReplacementPlan, detectPublicApiAvailability } from "./public-api-seams.js";
 
-type BridgeCommand =
-  | "doctor"
-  | "subagent-spawn"
-  | "subagent-status"
-  | "subagent-kill";
+type BridgeCommand = "doctor";
 
 type BridgeInput = {
   bridge?: {
@@ -47,11 +40,10 @@ export type BridgeDoctorResult = {
   };
   publicApi: {
     acpControlPlaneExport: boolean;
-    subagentSpawnExport: boolean;
     readyReplacementPoints: string[];
   };
   replacementPlan: Array<{
-    runner: "acp" | "subagent";
+    runner: "acp";
     publicExport: string;
     available: boolean;
     status: "complete" | "ready" | "blocked";
@@ -66,7 +58,6 @@ export type BridgeDoctorResult = {
     versionAllowed: boolean;
     internalModuleResolved: boolean;
     acpBackendHealthy: boolean;
-    subagentPatchable: boolean;
   };
   blockers: string[];
   warnings: string[];
@@ -88,9 +79,6 @@ export function deriveDoctorRemediation(report: Omit<BridgeDoctorResult, "remedi
   }
   if (/ACP runtime backend is currently unavailable|ACP runtime backend is not configured/i.test(text)) {
     steps.push("Ensure the acpx plugin is enabled, ACP global config is enabled, and rerun `openclaw swarm doctor --json`.");
-  }
-  if (/subagent helpers|subagent patch/i.test(text)) {
-    steps.push("Refresh the bridge patch export list for subagent helpers before using the subagent bridge path.");
   }
   if (/versionAllow is empty/i.test(warningText)) {
     steps.push("Pin bridge.versionAllow to the validated OpenClaw versions or a minimum compatible range.");
@@ -125,7 +113,7 @@ export function deriveDoctorNextAction(report: Omit<BridgeDoctorResult, "nextAct
     return "Resolve bridge blockers before retrying execution.";
   }
   if (report.ok) {
-    return "Bridge checks passed. You can proceed with bridge-backed execution smoke or normal runs.";
+    return "ACP runtime checks passed. You can proceed with ACP execution smoke or normal runs.";
   }
   return "Inspect doctor output and resolve blockers before retrying.";
 }
@@ -314,50 +302,6 @@ async function resolveInternalModule(openclawRoot: string, versionAllow?: string
   return { version, spec: resolved.spec, loadConfig: resolved.loadConfig };
 }
 
-async function resolvePatchedSubagentSpawner(openclawRoot: string, spec: InternalModuleSpec) {
-  const originalModulePath = path.join(openclawRoot, spec.subagentPatch.relativeModulePath);
-  const patchedModulePath = path.join(openclawRoot, spec.subagentPatch.patchedModulePath);
-  const source = await fs.readFile(originalModulePath, "utf8");
-  await fs.writeFile(patchedModulePath, buildPatchedBridgeModuleSource(source), "utf8");
-  const mod = await import(pathToFileURL(patchedModulePath).href);
-  const spawnSubagentDirect = mod[spec.subagentPatch.patchedSubagentExports.spawn] as
-    | ((params: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<Record<string, unknown>>)
-    | undefined;
-  const findLatestSubagentRunByChildSession = mod[spec.subagentPatch.patchedSubagentExports.findLatestRun] as
-    | ((childSessionKey: string) => Record<string, unknown> | null)
-    | undefined;
-  const killSubagentRunByChildSession = mod[spec.subagentPatch.patchedSubagentExports.killByChildSession] as
-    | ((cfg: unknown, childSessionKey: string) => Promise<Record<string, unknown>>)
-    | undefined;
-  const isSubagentSessionRunActive = mod[spec.subagentPatch.patchedSubagentExports.isRunActive] as
-    | ((childSessionKey: string) => boolean)
-    | undefined;
-  if (!spawnSubagentDirect || !findLatestSubagentRunByChildSession || !killSubagentRunByChildSession || !isSubagentSessionRunActive) {
-    throw new Error("Patched bridge module did not expose subagent helpers");
-  }
-  return {
-    spawnSubagentDirect,
-    findLatestSubagentRunByChildSession,
-    killSubagentRunByChildSession,
-    isSubagentSessionRunActive,
-  };
-}
-
-function mapSubagentRunState(entry: Record<string, unknown>, active: boolean) {
-  if (active) {
-    return "running" as const;
-  }
-  const endedReason = typeof entry.endedReason === "string" ? entry.endedReason : "";
-  const outcome = entry.outcome as { status?: string; error?: string } | undefined;
-  if (endedReason === "killed" || outcome?.error === "killed") {
-    return "cancelled" as const;
-  }
-  if (outcome?.status === "error") {
-    return "failed" as const;
-  }
-  return "completed" as const;
-}
-
 async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> {
   const openclawRoot = resolveOpenClawRoot(input.bridge?.openclawRoot);
   const report: BridgeDoctorResult = {
@@ -371,7 +315,6 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
     },
     publicApi: {
       acpControlPlaneExport: false,
-      subagentSpawnExport: false,
       readyReplacementPoints: [],
     },
     replacementPlan: [],
@@ -381,13 +324,12 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
       versionAllowed: false,
       internalModuleResolved: false,
       acpBackendHealthy: false,
-      subagentPatchable: false,
     },
     blockers: [],
     warnings: [],
     risks: [
-      "subagent bridge mode depends on internal OpenClaw bundle aliases and version pinning",
-      "subagent bridge mode is a legacy opt-in path and may break on upstream packaging changes",
+      "ACP runtime bootstrap depends on internal OpenClaw bundle aliases and version pinning",
+      "ACP runtime bootstrap may need versionAllow or openclawRoot updates when upstream packaging changes",
     ],
     remediation: [],
     nextAction: "Resolve bridge blockers before using bridge-backed execution.",
@@ -409,7 +351,6 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
     });
     report.publicApi = {
       acpControlPlaneExport: publicApi.acpControlPlaneExport,
-      subagentSpawnExport: publicApi.subagentSpawnExport,
       readyReplacementPoints: publicApi.readyReplacementPoints,
     };
     report.replacementPlan = buildReplacementPlan(publicApi);
@@ -427,8 +368,8 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
       report.compatibility = {
         strategy: compatibility.strategy,
         testedAt: compatibility.testedAt,
-        supportedRunners: compatibility.supportedRunners.filter((runner) => runner === "subagent"),
-        replacementCandidates: [compatibility.replacementCandidates.subagentSpawnExport],
+        supportedRunners: compatibility.supportedRunners,
+        replacementCandidates: [compatibility.replacementCandidates.acpControlPlaneExport],
         notes: compatibility.notes,
       };
     }
@@ -444,18 +385,10 @@ async function runBridgeDoctor(input: BridgeInput): Promise<BridgeDoctorResult> 
       report.warnings.push(`No hardcoded bridge mapping for OpenClaw ${packageJson.version}; using dynamic discovery`);
     }
 
-    const { loadConfig, spec } = await resolveInternalModule(openclawRoot, input.bridge?.versionAllow);
+    const { loadConfig } = await resolveInternalModule(openclawRoot, input.bridge?.versionAllow);
     report.checks.internalModuleResolved = true;
-    const cfg = loadConfig();
-    void cfg;
+    void loadConfig();
     report.checks.acpBackendHealthy = true;
-
-    try {
-      await resolvePatchedSubagentSpawner(openclawRoot, spec);
-      report.checks.subagentPatchable = true;
-    } catch (error) {
-      report.blockers.push(error instanceof Error ? error.message : String(error));
-    }
   } catch (error) {
     report.blockers.push(error instanceof Error ? error.message : String(error));
   }
@@ -581,7 +514,6 @@ export async function waitForAcpBackendHealthy(
 }
 
 async function handleAcp(command: BridgeCommand, input: BridgeInput) {
-  const openclawRoot = resolveOpenClawRoot(input.bridge?.openclawRoot);
   if (command === "doctor") {
     const report = await runBridgeDoctor(input);
     return {
@@ -590,99 +522,6 @@ async function handleAcp(command: BridgeCommand, input: BridgeInput) {
       result: report,
     };
   }
-  const { loadConfig, version, spec } = await resolveInternalModule(
-    openclawRoot,
-    input.bridge?.versionAllow,
-  );
-  const cfg = loadConfig();
-  const params = input.params ?? {};
-
-  if (command === "subagent-spawn") {
-    const subagentHelpers = await resolvePatchedSubagentSpawner(openclawRoot, spec);
-    const subagentParams = params as {
-      task: string;
-      label?: string;
-      agentId?: string;
-      mode?: "run" | "session";
-      thread?: boolean;
-      runTimeoutSeconds?: number;
-    };
-    const result = await subagentHelpers.spawnSubagentDirect(
-      {
-        task: subagentParams.task,
-        label: subagentParams.label,
-        agentId: subagentParams.agentId,
-        mode: subagentParams.mode,
-        thread: subagentParams.thread,
-        runTimeoutSeconds: subagentParams.runTimeoutSeconds,
-        expectsCompletionMessage: false,
-      },
-      {
-        requesterAgentIdOverride: "main",
-      },
-    );
-    if (result.status !== "accepted") {
-      throw new Error(result.error ? String(result.error) : `Subagent spawn failed with status ${String(result.status)}`);
-    }
-    return {
-      ok: true,
-      version,
-      result: {
-        childSessionKey: result.childSessionKey,
-        runId: result.runId,
-        mode: result.mode ?? subagentParams.mode ?? "run",
-        acceptedAt: new Date().toISOString(),
-        note: result.note,
-      },
-    };
-  }
-
-  if (command === "subagent-status") {
-    const subagentHelpers = await resolvePatchedSubagentSpawner(openclawRoot, spec);
-    const statusParams = params as { childSessionKey: string };
-    const entry = subagentHelpers.findLatestSubagentRunByChildSession(statusParams.childSessionKey);
-    if (!entry) {
-      throw new Error(`Subagent run not found for ${statusParams.childSessionKey}`);
-    }
-    const active = subagentHelpers.isSubagentSessionRunActive(statusParams.childSessionKey);
-    return {
-      ok: true,
-      version,
-      result: {
-        childSessionKey: statusParams.childSessionKey,
-        runId: typeof entry.runId === "string" ? entry.runId : undefined,
-        state: mapSubagentRunState(entry, active),
-        checkedAt: new Date().toISOString(),
-        message:
-          typeof (entry.outcome as { error?: string } | undefined)?.error === "string"
-            ? (entry.outcome as { error?: string }).error
-            : typeof entry.frozenResultText === "string"
-              ? entry.frozenResultText
-              : undefined,
-        outputText: typeof entry.frozenResultText === "string" ? entry.frozenResultText : undefined,
-      },
-    };
-  }
-
-  if (command === "subagent-kill") {
-    const subagentHelpers = await resolvePatchedSubagentSpawner(openclawRoot, spec);
-    const killParams = params as { childSessionKey: string; reason?: string };
-    const entry = subagentHelpers.findLatestSubagentRunByChildSession(killParams.childSessionKey);
-    if (!entry) {
-      throw new Error(`Subagent run not found for ${killParams.childSessionKey}`);
-    }
-    await subagentHelpers.killSubagentRunByChildSession(cfg, killParams.childSessionKey);
-    return {
-      ok: true,
-      version,
-      result: {
-        childSessionKey: killParams.childSessionKey,
-        killedAt: new Date().toISOString(),
-        message: killParams.reason ?? "killed",
-      },
-    };
-  }
-
   throw new Error(`Unsupported bridge command: ${command}`);
 }
 

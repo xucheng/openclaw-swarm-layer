@@ -131,11 +131,11 @@ describe("session selector", () => {
   });
 
   it("skips sessions with wrong runner type", () => {
-    const subagentSession: SessionRecord = {
-      ...sessions[0]!,
-      runner: "subagent",
+    const mismatchedTask: TaskNode = {
+      ...task,
+      runner: { type: "manual" },
     };
-    expect(selectReusableSessionForTask(task, [subagentSession])).toBeNull();
+    expect(selectReusableSessionForTask(mismatchedTask, sessions)).toBeNull();
   });
 
   it("skips oneshot sessions", () => {

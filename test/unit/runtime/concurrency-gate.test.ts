@@ -59,7 +59,7 @@ describe("concurrency-gate", () => {
     const tasks = [
       makeTask({ status: "running", runner: { type: "acp" } }),
       makeTask({ status: "running", runner: { type: "manual" } }),
-      makeTask({ status: "running", runner: { type: "subagent" } }),
+      makeTask({ status: "running", runner: { type: "manual" } }),
     ];
     const result = checkConcurrencySlot(tasks, 2);
 

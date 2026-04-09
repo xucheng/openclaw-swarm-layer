@@ -1,16 +1,16 @@
 ---
 name: swarm-layer
-description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-first execution, legacy bridge-backed subagent opt-in, persistent sessions, review gates, automatic retry, parallel dispatch, reject-retry workflows, ACP concurrency protection, harness patterns, cross-session continuity, and operator reporting. Covers setup, operation, diagnosis, and reporting."
+description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-first execution, supervised autopilot control plane, manual fallback, persistent sessions, review gates, automatic retry, parallel dispatch, reject-retry workflows, ACP concurrency protection, harness patterns, cross-session continuity, and operator reporting. Covers setup, operation, diagnosis, and reporting."
 ---
 
 # OpenClaw Swarm Layer
 
-Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback, ACP automation, or the legacy bridge-backed subagent path. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
+Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
 ## What It Does
 
 - **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
-- **Multi-runner execution** — Manual (operator-driven safe fallback), ACP (default-capable automation path), Subagent (legacy bridge-backed opt-in child-agent path)
+- **Multi-runner execution** — Manual (operator-driven safe fallback) and ACP (default-capable automation path)
 - **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
 - **Review gates** — Tasks require explicit approve/reject; structured quality rubrics for weighted multi-dimension scoring
 - **Sprint contracts** — Negotiated verifiable acceptance criteria per task with automated evaluator injection (GAN-inspired pattern)
@@ -20,6 +20,7 @@ Turn workflow specifications into executable task graphs. Dispatch tasks through
 - **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
 - **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
 - **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
+- **Autopilot control plane** — Supervised `status/start/pause/resume/stop/tick` flows with lease-backed decisions and degraded-mode holds
 - **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
 
 ## What It Does NOT Do
@@ -35,6 +36,11 @@ Three installation paths:
 **ClawHub** (skill only):
 ```bash
 openclaw skills install swarm-layer
+```
+
+**ClawHub package** (full plugin):
+```bash
+openclaw plugins install clawhub:openclaw-swarm-layer
 ```
 
 **npm** (full plugin):
@@ -110,6 +116,7 @@ Determine which module to use based on what the user needs:
 |------------|--------|-------------|
 | Install, configure, initialize | [Setup](#setup) | `plugins install`, `doctor`, `init` |
 | Plan, execute, review, session ops | [Operate](#operate) | `plan`, `run`, `review`, `session *` |
+| Supervised automation control | [Operate](#operate) | `autopilot status/start/pause/resume/stop/tick` |
 | Something broken, stuck, or failing | [Diagnose](#diagnose) | `doctor`, `session status/cancel/cleanup` |
 | Check progress, read reports | [Report](#report) | `status`, `report`, `session list/inspect` |
 
@@ -120,7 +127,7 @@ When unsure, start with `openclaw swarm status --project .` to assess the situat
 # Setup
 
 ## When to Use
-First-time install, bridge configuration, project initialization, or config troubleshooting.
+First-time install, ACP configuration, project initialization, or config troubleshooting.
 
 ## Flow
 
@@ -132,6 +139,7 @@ openclaw --version # >= 2026.3.22
 
 ### 2. Install Plugin
 ```bash
+openclaw plugins install clawhub:openclaw-swarm-layer   # Published package
 openclaw plugins install -l /path/to/openclaw-swarm-layer
 openclaw plugins info openclaw-swarm-layer   # Should show Status: loaded
 ```
@@ -146,23 +154,6 @@ openclaw plugins info openclaw-swarm-layer   # Should show Status: loaded
       "defaultAgentId": "codex",
       "allowedAgents": ["codex"],
       "defaultMode": "run"
-    }
-  }}}}
-}
-```
-
-### 3b. Optional: Enable Legacy Subagent Path
-```json
-{
-  "plugins": { "entries": { "openclaw-swarm-layer": { "config": {
-    "subagent": {
-      "enabled": true
-    },
-    "bridge": {
-      "subagentEnabled": true,
-      "nodePath": "$(which node)",
-      "openclawRoot": "$(npm root -g)/openclaw",
-      "versionAllow": ["CURRENT_VERSION"]
     }
   }}}}
 }
@@ -195,8 +186,7 @@ openclaw swarm init --project .
 ### Setup Troubleshooting
 - **Plugin not loading** → `openclaw plugins info openclaw-swarm-layer`
 - **ACP unavailable** → `openclaw swarm doctor --json`, confirm public ACP export readiness and runner resolution
-- **Legacy subagent blocked** → confirm both `subagent.enabled=true` and `bridge.subagentEnabled=true`
-- **Version mismatch** → if using legacy subagent bridge, update `bridge.versionAllow`
+- **Legacy bridge config warning** → remove `bridge.acpFallbackEnabled` after confirming ACP public path is ready
 
 ---
 
@@ -227,7 +217,7 @@ Write Spec → Plan → Status → Run → Poll Session → Review → Repeat
 openclaw swarm plan --project . --spec SPEC.md      # Import and generate tasks
 openclaw swarm status --project .                     # See what's ready
 openclaw swarm run --project . --dry-run              # Preview
-openclaw swarm run --project . --runner acp           # Execute (acp/manual/subagent)
+openclaw swarm run --project . --runner acp           # Execute (acp/manual)
 openclaw swarm run --project . --parallel 3           # Dispatch up to 3 ready tasks
 openclaw swarm run --project . --all-ready             # Fill all available concurrency slots
 openclaw swarm session status --project . --run <id>  # Poll until complete
@@ -235,12 +225,23 @@ openclaw swarm review --project . --task <id> --approve
 openclaw swarm review --project . --task <id> --reject --retry-now  # Reject and force retry
 ```
 
+### Autopilot Control Plane
+```bash
+openclaw swarm autopilot status --project .           # Health + last decision
+openclaw swarm autopilot start --project .            # Start supervised loop
+openclaw swarm autopilot pause --project . --reason "operator review"
+openclaw swarm autopilot resume --project .
+openclaw swarm autopilot tick --project . --dry-run   # Inspect next actions without mutating state
+openclaw swarm autopilot stop --project . --mode graceful
+```
+
+Use autopilot when you want the workflow to keep progressing under policy control instead of manually calling `run`, `session status`, and recovery commands one by one.
+
 ### Runner Selection
 | Runner | Use When |
 |--------|----------|
 | `manual` | Safe explicit fallback when ACP automation is unavailable or not desired |
 | `acp` | Default-capable automation path through the public ACP control-plane |
-| `subagent` | Legacy bridge-backed child-agent path; only when explicitly enabled |
 
 ### Session Operations
 ```bash
@@ -306,12 +307,12 @@ coding-task → coding-task-eval → next-task
 # Diagnose
 
 ## When to Use
-Tasks stuck, ACP readiness failures, legacy subagent bridge failures, sessions not updating, dead letters, orphans.
+Tasks stuck, ACP readiness failures, sessions not updating, dead letters, orphans.
 
 ## Diagnostic Flow
 
 ```
-1. openclaw swarm doctor --json      → Check ACP readiness and legacy subagent bridge health
+1. openclaw swarm doctor --json      → Check ACP readiness and bridge-exit health
 2. openclaw swarm status --project . → Find abnormal tasks/sessions
 3. Investigate specific issue (see below)
 ```
@@ -325,9 +326,9 @@ Tasks stuck, ACP readiness failures, legacy subagent bridge failures, sessions n
 
 ### Issue Resolution
 
-**Legacy subagent bridge failure:**
-- `doctor --json` → check `blockers` → follow `remediation`
-- Common: update `bridge.versionAllow`, check `nodePath`/`openclawRoot`
+**Legacy bridge compatibility warning:**
+- `doctor --json` → check `warnings` / `remediation`
+- Common: remove stale `bridge.acpFallbackEnabled`, or clean up old `versionAllow`/`openclawRoot` metadata
 
 **Stuck running task:**
 ```bash
@@ -344,10 +345,10 @@ swarm session cancel --project . --run <runId>   # Force cancel if hung
 swarm session cleanup --project . --stale-minutes 60
 ```
 
-**Version drift** (after OpenClaw upgrade, legacy subagent bridge only):
+**Version drift** (after OpenClaw upgrade):
 ```bash
 swarm doctor --json
-# Update bridge.versionAllow → rerun tests → verify doctor
+# Remove stale bridge metadata if present → rerun doctor → verify runner resolution
 ```
 
 ---

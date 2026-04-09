@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { runSwarmSessionStatus } from "../../../src/cli/swarm-session-status.js";
-import type { OpenClawSubagentAdapter } from "../../../src/runtime/openclaw-subagent-adapter.js";
 import type { OpenClawSessionAdapter } from "../../../src/runtime/openclaw-session-adapter.js";
 import { StateStore } from "../../../src/state/state-store.js";
 import type { RunRecord } from "../../../src/types.js";
@@ -208,66 +207,4 @@ describe("swarm session status cli", () => {
     expect((result as any).resultSummary).toContain("metadata missing");
   });
 
-  it("syncs subagent runs into review when they complete", async () => {
-    const projectRoot = await makeTempProject();
-    const stateStore = new StateStore();
-    await stateStore.initProject(projectRoot);
-    await stateStore.saveWorkflow(projectRoot, {
-      version: 1,
-      projectRoot,
-      lifecycle: "running",
-      tasks: [
-        {
-          taskId: "task-1",
-          specId: "spec-1",
-          title: "Task 1",
-          description: "Task 1",
-          kind: "coding",
-          deps: [],
-          status: "running",
-          workspace: { mode: "shared" },
-          runner: { type: "subagent" },
-          review: { required: true },
-        },
-      ],
-      reviewQueue: [],
-    });
-    await stateStore.writeRun(projectRoot, {
-      runId: "run-subagent-1",
-      taskId: "task-1",
-      attempt: 1,
-      status: "running",
-      runner: { type: "subagent" },
-      workspacePath: projectRoot,
-      startedAt: "2026-03-20T00:00:00.000Z",
-      artifacts: [],
-      sessionRef: { runtime: "subagent", sessionKey: "agent:main:subagent:1" },
-    });
-    const subagentAdapter: OpenClawSubagentAdapter = {
-      async spawnSubagent() {
-        throw new Error("not used");
-      },
-      async getSubagentRunStatus() {
-        return {
-          childSessionKey: "agent:main:subagent:1",
-          state: "completed",
-          checkedAt: "2026-03-20T00:05:00.000Z",
-          message: "done",
-        };
-      },
-      async killSubagentRun() {
-        throw new Error("not used");
-      },
-    };
-
-    const result = await runSwarmSessionStatus(
-      { project: projectRoot, run: "run-subagent-1" },
-      { stateStore, subagentAdapter },
-    );
-    const workflow = await stateStore.loadWorkflow(projectRoot);
-
-    expect((result as any).status).toBe("completed");
-    expect(workflow.lifecycle).toBe("reviewing");
-    expect(workflow.reviewQueue).toEqual(["task-1"]);
-  });
 });

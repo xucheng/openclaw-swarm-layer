@@ -1,15 +1,13 @@
 export type PublicApiAvailability = {
   acpControlPlaneExport: boolean;
-  subagentSpawnExport: boolean;
   readyReplacementPoints: string[];
   notes: string[];
 };
 
 export const ACP_PUBLIC_REPLACEMENT_EXPORT = "getAcpSessionManager";
-export const SUBAGENT_PUBLIC_REPLACEMENT_EXPORT = "spawnSubagentDirect";
 
 export type ReplacementPlanItem = {
-  runner: "acp" | "subagent";
+  runner: "acp";
   publicExport: string;
   available: boolean;
   status: "complete" | "ready" | "blocked";
@@ -34,14 +32,12 @@ export function buildMigrationChecklist(plan: ReplacementPlanItem[]): string[] {
         `[${item.runner}] Replace ${item.currentImplementation} with ${item.targetImplementation}. Update modules: ${item.affectedModules.join(", ")}.`,
       );
     } else {
-      steps.push(
-        `[${item.runner}] Keep the current bridge path until the public export ${item.publicExport} is available.`,
-      );
+      steps.push(`[${item.runner}] ${item.nextStep}`);
     }
   }
 
   steps.push(
-    "After ACP or subagent runtime changes, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
+    "After ACP runtime changes, rerun unit tests, e2e regressions, and at least one live smoke before relaxing bridge guards.",
   );
 
   return steps;
@@ -83,7 +79,6 @@ export async function detectPublicApiAvailability(
   const acpControlPlaneExport =
     typeof acpRuntimeSdk[ACP_PUBLIC_REPLACEMENT_EXPORT] === "function" ||
     typeof rootSdk[ACP_PUBLIC_REPLACEMENT_EXPORT] === "function";
-  const subagentSpawnExport = typeof rootSdk[SUBAGENT_PUBLIC_REPLACEMENT_EXPORT] === "function";
   const readyReplacementPoints: string[] = [];
   const notes: string[] = [];
 
@@ -93,16 +88,9 @@ export async function detectPublicApiAvailability(
     readyReplacementPoints.push(`acp:${ACP_PUBLIC_REPLACEMENT_EXPORT}`);
     notes.push(`Public ACP runtime SDK exposes ${ACP_PUBLIC_REPLACEMENT_EXPORT}(); ACP public control-plane execution is available.`);
   }
-  if (!subagentSpawnExport) {
-    notes.push(`Public plugin SDK does not expose ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}().`);
-  } else {
-    readyReplacementPoints.push(`subagent:${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}`);
-    notes.push(`Public plugin SDK exposes ${SUBAGENT_PUBLIC_REPLACEMENT_EXPORT}(); subagent bridge replacement is now technically possible.`);
-  }
 
   return {
     acpControlPlaneExport,
-    subagentSpawnExport,
     readyReplacementPoints,
     notes,
   };
@@ -124,21 +112,6 @@ export function buildReplacementPlan(availability: PublicApiAvailability): Repla
       nextStep: availability.acpControlPlaneExport
         ? "Keep ACP on the public control-plane path and avoid reintroducing bridge fallbacks."
         : "Keep using manual runner until a public control-plane export is available.",
-    },
-    {
-      runner: "subagent",
-      publicExport: SUBAGENT_PUBLIC_REPLACEMENT_EXPORT,
-      available: availability.subagentSpawnExport,
-      status: availability.subagentSpawnExport ? "ready" : "blocked",
-      currentImplementation: "bridge-openclaw-subagent-adapter -> openclaw-exec-bridge patched helpers",
-      targetImplementation: "public subagent spawn helper from plugin-sdk export",
-      affectedModules: [
-        "src/runtime/bridge-openclaw-subagent-adapter.ts",
-        "src/runtime/openclaw-exec-bridge.ts",
-      ],
-      nextStep: availability.subagentSpawnExport
-        ? "Prototype replacing the subagent bridge spawn path with the public export."
-        : "Keep using the bridge-backed subagent adapter until a public spawn export is available.",
     },
   ];
 }

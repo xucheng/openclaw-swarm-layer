@@ -123,33 +123,6 @@ describe("session follow-up and steer", () => {
     expect(result.error).toContain("not found");
   });
 
-  it("follow-up rejects subagent sessions when subagent is disabled", async () => {
-    const projectRoot = await makeTempProject();
-    const stateStore = new StateStore();
-    const sessionStore = new SessionStore(stateStore.config);
-    await stateStore.initProject(projectRoot);
-
-    await sessionStore.writeSession(projectRoot, {
-      sessionId: "subagent-followup",
-      runner: "subagent",
-      projectRoot,
-      scope: { bindingKey: "feature-subagent", taskKind: "coding" },
-      mode: "persistent",
-      state: "active",
-      createdAt: "2026-03-22T00:00:00.000Z",
-      updatedAt: "2026-03-22T00:10:00.000Z",
-      providerRef: { sessionKey: "agent:main:subagent:followup" },
-    });
-
-    const result = (await runSwarmSessionFollowup(
-      { project: projectRoot, session: "subagent-followup", task: "delegate the follow-up" },
-      { stateStore, sessionStore },
-    )) as any;
-
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("legacy bridge-backed opt-in path");
-  });
-
   it("steer sends a message to an active session", async () => {
     const projectRoot = await makeTempProject();
     const stateStore = new StateStore(acpConfig);

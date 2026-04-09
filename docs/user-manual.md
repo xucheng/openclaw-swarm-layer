@@ -11,8 +11,8 @@
 - 默认 `defaultRunner = "auto"`
 - `auto` 只会在 ACP 自动化真实可用时解析为 `acp`
 - 如果 ACP 当前不可用，`auto` 会安全回退到 `manual`
-- `subagent` 是 legacy bridge-backed opt-in 能力，默认关闭，必须显式开启
-- bridge 只保留给 legacy subagent 路径，不再参与 ACP 默认执行层
+- 当前支持的 runner 只有 `manual` 和 `acp`
+- `bridge.*` 只保留给旧配置兼容读取和 doctor 提示，不再提供执行能力
 
 ---
 
@@ -23,11 +23,17 @@
 - Node.js >= 22
 - OpenClaw >= 2026.3.22（ACP public control-plane 默认路径）
 
-当前测试基线：OpenClaw `2026.4.5`。
+当前测试基线：OpenClaw `2026.4.8`。
 
 ### 安装插件
 
 ```bash
+# 从 ClawHub 安装已发布插件
+openclaw plugins install clawhub:openclaw-swarm-layer
+
+# 从 ClawHub 安装配套 skill
+openclaw skills install swarm-layer
+
 # 从源码安装
 git clone https://github.com/xucheng/openclaw-swarm-layer.git
 cd openclaw-swarm-layer
@@ -92,7 +98,39 @@ openclaw swarm --help
 
 适用场景：OpenClaw 当前版本已经支持 public ACP control-plane，`auto` 会直接解析到 `acp`。
 
-### 3.3 ACP 旧桥接配置（仅保留兼容读取）
+### 3.3 Autopilot 监督控制平面配置
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-swarm-layer": {
+        "config": {
+          "defaultRunner": "auto",
+          "acp": {
+            "enabled": true,
+            "defaultAgentId": "codex",
+            "allowedAgents": ["codex"]
+          },
+          "autopilot": {
+            "enabled": true,
+            "tickSeconds": 15,
+            "leaseSeconds": 45,
+            "maxDispatchPerTick": 2,
+            "reviewPolicy": {
+              "mode": "manual_only"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+适用场景：希望把 `plan/run/review/recovery` 收敛到一个受监督的控制平面里，由 `autopilot` 做确定性推进，但仍保留人工审批和暂停能力。
+
+### 3.4 ACP 旧桥接配置（仅保留兼容读取）
 
 ```json
 {
@@ -111,7 +149,7 @@ openclaw swarm --help
             "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.4.5"]
+            "versionAllow": ["2026.4.8"]
           }
         }
       }
@@ -121,32 +159,6 @@ openclaw swarm --help
 ```
 
 这个配置现在不会再提供 ACP 执行能力，只是兼容读取旧配置时不报错。建议后续清理掉。
-
-### 3.4 Subagent Legacy Opt-In 配置
-
-```json
-{
-  "plugins": {
-    "entries": {
-      "openclaw-swarm-layer": {
-        "config": {
-          "subagent": {
-            "enabled": true
-          },
-          "bridge": {
-            "subagentEnabled": true,
-            "nodePath": "$(which node)",
-            "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.4.5"]
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-注意：`subagent` 现在被定义为 legacy bridge-backed opt-in 路径，不建议作为默认执行面；只有 `subagent.enabled=true` 且 `bridge.subagentEnabled=true` 时才可用。
 
 ### 3.5 文档沉淀配置
 
@@ -211,9 +223,6 @@ openclaw swarm run --project . --runner manual
 
 # 显式指定 ACP
 openclaw swarm run --project . --runner acp
-
-# 只有显式启用 subagent 后才允许
-openclaw swarm run --project . --runner subagent
 ```
 
 ### 4.4 审批与报告
@@ -223,6 +232,29 @@ openclaw swarm review --project . --task <taskId> --approve --note "通过"
 openclaw swarm review --project . --task <taskId> --reject --note "需要修改"
 openclaw swarm report --project .
 ```
+
+### 4.5 Autopilot 控制
+
+```bash
+# 看当前控制平面状态
+openclaw swarm autopilot status --project .
+
+# 启动 / 暂停 / 恢复 / 停止
+openclaw swarm autopilot start --project .
+openclaw swarm autopilot pause --project . --reason "人工介入"
+openclaw swarm autopilot resume --project .
+openclaw swarm autopilot stop --project . --mode graceful
+
+# 单次 tick，同步运行态、审批态和恢复动作
+openclaw swarm autopilot tick --project .
+openclaw swarm autopilot tick --project . --dry-run
+```
+
+什么时候用：
+
+- 想让系统按策略自动推进时，用 `start`
+- 想观察但不真正落地时，用 `tick --dry-run`
+- 出现风险或人工接管时，用 `pause`
 
 ---
 
@@ -300,22 +332,14 @@ openclaw swarm doctor --json
 - 当前 OpenClaw 版本
 - `swarm doctor --json` 输出里的 version drift / remediation
 
-### 7.3 subagent 无法执行
-
-检查：
-
-- `subagent.enabled=true`
-- `bridge.subagentEnabled=true`
-- doctor 是否提示 public subagent export 缺失
-
-### 7.4 升级 OpenClaw 后异常
+### 7.3 升级 OpenClaw 后异常
 
 建议顺序：
 
 1. `openclaw swarm doctor --json`
 2. 看 default runner resolution 是否变化
 3. 看 ACP posture 是否仍然是 public-primary
-4. 如果 subagent legacy bridge 在用，检查 `versionAllow`
+4. 如果旧配置里还有 `bridge.*` 字段，确认它们只是兼容读取，不要把它们当成执行能力
 5. 必要时先退回 `manual`
 
 ---
@@ -324,10 +348,11 @@ openclaw swarm doctor --json
 
 | 命令 | 用途 |
 |------|------|
-| `swarm doctor` | 诊断 ACP readiness、默认 runner 解析和 subagent legacy bridge 状态 |
+| `swarm doctor` | 诊断 ACP readiness、默认 runner 解析和 bridge-exit 状态 |
 | `swarm status` | 查看 workflow 状态、运行姿态和推荐动作 |
 | `swarm plan` | 导入 spec 并生成任务图 |
 | `swarm run` | 执行下一个可运行任务 |
 | `swarm review` | 审批任务结果 |
 | `swarm report` | 生成 workflow 报告 |
 | `swarm session ...` | 管理会话、轮询状态、follow-up、steer |
+| `swarm autopilot ...` | 查看和控制监督式 autopilot 控制平面 |

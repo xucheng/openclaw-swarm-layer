@@ -6,14 +6,20 @@
 - `defaultRunner: "auto"` resolves to `acp` only when the public ACP path is available on the current install.
 - If ACP automation is unavailable, `auto` falls back to `manual`.
 - `bridge.acpFallbackEnabled` is now legacy config; it is ignored for runtime capability.
-- `subagent` remains a legacy bridge-backed opt-in path and is disabled by default.
-- subagent requires both `subagent.enabled=true` and `bridge.subagentEnabled=true`.
-- bridge remains only for the legacy subagent path.
+- The supported runner surface is `manual + acp` only.
+- Bridge settings remain readable for compatibility diagnostics only.
 
 ## Install
 
 ```bash
 openclaw plugins install -l /path/to/openclaw-swarm-layer
+```
+
+Published-package install:
+
+```bash
+openclaw plugins install clawhub:openclaw-swarm-layer
+openclaw skills install swarm-layer
 ```
 
 Ensure config includes:
@@ -69,11 +75,10 @@ Run these before claiming bridge-free ACP readiness:
 5. `openclaw swarm status --project <path> --json`
 6. `openclaw swarm run --project <path> --dry-run --json`
 7. `openclaw swarm run --project <path> --json`
-8. `openclaw swarm session status --project <path> --run <runId> --json`
-9. `openclaw swarm session cancel --project <path> --run <runId> --json`
-10. `openclaw swarm session close --project <path> --run <runId> --json`
-11. `openclaw swarm review --project <path> --task <taskId> --approve --json`
-12. `openclaw swarm report --project <path> --json`
+8. `openclaw swarm session status --project <path> --run <runId> --json` or `openclaw swarm autopilot tick --project <path> --json`
+9. `openclaw swarm review --project <path> --task <taskId> --approve --json`
+10. `openclaw swarm report --project <path> --json`
+11. `openclaw swarm autopilot tick --project <path> --json`
 
 ## Artifact Expectations
 
@@ -123,18 +128,6 @@ Legacy config such as:
 
 no longer enables ACP automation. It should be removed during routine config cleanup. If it remains, doctor surfaces it as guidance only.
 
-## Subagent Legacy Opt-In Smoke
-
-Use this only when you explicitly opt in to `subagent`.
-
-```bash
-openclaw swarm doctor --json
-openclaw swarm run --project <path> --runner subagent --dry-run --json
-openclaw swarm run --project <path> --runner subagent --json
-```
-
-Do not treat subagent as the normal default path.
-
 ## Upgrade Checklist
 
 Before upgrading OpenClaw:
@@ -148,10 +141,6 @@ Before upgrading OpenClaw:
 5. If doctor reports missing ACP public exports:
    - keep `manual` as the fallback
    - do not try to re-enable ACP bridge
-6. If subagent bridge is in use and doctor reports version drift:
-   - update `bridge.versionAllow`
-   - refresh subagent bridge mappings
-   - rerun unit, e2e, and smoke verification
 
 ## Failure Remediation Quick Guide
 
@@ -159,15 +148,10 @@ Before upgrading OpenClaw:
   - verify the local direct-route wrapper or backend tooling for the configured default agent
 - doctor green but live ACP run fails
   - treat that as an environment blocker, not a reason to reintroduce ACP bridge
+- live ACP run reaches `completed` but workflow does not transition
+  - run `openclaw swarm autopilot tick --project <path> --json` to sync active runs into workflow state
 - legacy ACP bridge config warning
   - remove `bridge.acpFallbackEnabled`
-- version drift on subagent bridge
-  - compare installed OpenClaw version with `bridge.versionAllow`
-  - update subagent mappings and allowlist together
-- subagent blocked
-  - confirm `subagent.enabled=true`
-  - confirm `bridge.subagentEnabled=true`
-  - keep subagent on the bridge-backed path until a public spawn export exists
 
 ## Rollback
 
@@ -182,3 +166,7 @@ openclaw plugins uninstall openclaw-swarm-layer
 ```
 
 Do not delete project `.openclaw/swarm/` state automatically.
+
+## Release Workflow
+
+For npm, GitHub release, ClawHub package, and ClawHub skill publication, use [release-runbook.md](release-runbook.md).

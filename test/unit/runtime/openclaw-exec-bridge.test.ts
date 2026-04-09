@@ -16,7 +16,7 @@ import {
   resolveOpenClawRootFromExecPath,
   waitForAcpBackendHealthy,
 } from "../../../src/runtime/openclaw-exec-bridge.js";
-import { resolveVersionRangeStrategy, buildPatchedBridgeModuleSource } from "../../../src/runtime/bridge-manifest.js";
+import { resolveVersionRangeStrategy } from "../../../src/runtime/bridge-manifest.js";
 
 describe("openclaw exec bridge", () => {
   it("resolves strategies for tested OpenClaw versions", () => {
@@ -43,13 +43,6 @@ describe("openclaw exec bridge", () => {
     await expect(
       waitForAcpBackendHealthy(() => ({ healthy: () => false }), "acpx", 5, 1),
     ).rejects.toThrow("ACP runtime backend is currently unavailable");
-  });
-
-  it("appends a subagent bridge export when patching internal modules", () => {
-    const source = "function spawnSubagentDirect(){}";
-    const patched = buildPatchedBridgeModuleSource(source);
-
-    expect(patched).toContain("__bridgeSpawnSubagentDirect");
   });
 
   it("prefers the installed acpx service path when present", () => {
@@ -224,7 +217,7 @@ describe("openclaw exec bridge", () => {
     }
   });
 
-  it("derives remediation for version drift and stale subagent patch failures", () => {
+  it("derives remediation for version drift", () => {
     const remediation = deriveDoctorRemediation({
       ok: false,
       openclawRoot: "/opt/openclaw",
@@ -236,7 +229,6 @@ describe("openclaw exec bridge", () => {
       },
       publicApi: {
         acpControlPlaneExport: false,
-        subagentSpawnExport: false,
         readyReplacementPoints: [],
       },
       replacementPlan: [],
@@ -246,18 +238,13 @@ describe("openclaw exec bridge", () => {
         versionAllowed: false,
         internalModuleResolved: false,
         acpBackendHealthy: true,
-        subagentPatchable: false,
       },
-      blockers: [
-        "OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)",
-        "Patched bridge module did not expose subagent helpers",
-      ],
+      blockers: ["OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)"],
       warnings: [],
       risks: [],
     });
 
     expect(remediation.some((item) => item.includes("versionAllow"))).toBe(true);
-    expect(remediation.some((item) => item.includes("subagent helpers"))).toBe(true);
   });
 
   it("derives severity and next action for doctor output", () => {
@@ -272,7 +259,6 @@ describe("openclaw exec bridge", () => {
       },
       publicApi: {
         acpControlPlaneExport: false,
-        subagentSpawnExport: false,
         readyReplacementPoints: [],
       },
       replacementPlan: [],
@@ -282,7 +268,6 @@ describe("openclaw exec bridge", () => {
         versionAllowed: false,
         internalModuleResolved: false,
         acpBackendHealthy: true,
-        subagentPatchable: false,
       },
       blockers: ["OpenClaw version 2026.4.0 is not in bridge allowlist (2026.3.13)"],
       warnings: [],

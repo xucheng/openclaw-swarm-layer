@@ -1,9 +1,7 @@
 import type { PluginRuntime } from "openclaw/plugin-sdk";
 import type { SwarmPluginConfig } from "../config.js";
 import { resolveSwarmPluginConfig } from "../config.js";
-import { createBridgeSubagentAdapter } from "../runtime/bridge-openclaw-subagent-adapter.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
-import { UnsupportedOpenClawSubagentAdapter, type OpenClawSubagentAdapter } from "../runtime/openclaw-subagent-adapter.js";
 import { createSessionAdapter } from "../runtime/real-openclaw-session-adapter.js";
 import { SessionStore } from "../session/session-store.js";
 import { StateStore } from "../state/state-store.js";
@@ -13,7 +11,6 @@ export type SwarmCliContext = {
   stateStore?: StateStore;
   sessionStore?: SessionStore;
   sessionAdapter?: OpenClawSessionAdapter;
-  subagentAdapter?: OpenClawSubagentAdapter;
   runtime?: Pick<PluginRuntime, "config" | "system" | "version">;
 };
 
@@ -35,13 +32,4 @@ export function resolveSessionAdapter(context?: SwarmCliContext): OpenClawSessio
     return runtimeAdapter;
   }
   return new UnsupportedOpenClawSessionAdapter();
-}
-
-export function resolveSubagentAdapter(context?: SwarmCliContext): OpenClawSubagentAdapter {
-  if (context?.subagentAdapter) {
-    return context.subagentAdapter;
-  }
-  const config = context?.stateStore?.config ?? resolveSwarmPluginConfig(context?.config);
-  const bridgeAdapter = createBridgeSubagentAdapter({ bridge: config.bridge });
-  return bridgeAdapter ?? new UnsupportedOpenClawSubagentAdapter();
 }

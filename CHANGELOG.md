@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.0 (2026-04-08)
+
+### M6 Autopilot Control Plane + M7 Subagent Removal
+
+This release closes the two follow-on milestone families delivered on 2026-04-08 and becomes the new publish baseline for npm, GitHub, and ClawHub.
+
+#### M6: Autopilot Control Plane
+- Added the supervised autopilot control plane with persistent autopilot state, lease ownership, decision logging, and `status/start/pause/resume/stop/tick` command coverage
+- Added deterministic tick-driven dispatch, session sync, review closure, stuck/stale recovery, degraded-mode holds, and service-loop controls
+- Extended status and reports with autopilot health, decision, and queue pressure visibility
+
+#### M7: Runtime Simplification
+- Removed the legacy bridge-backed `subagent` runner, its adapters, bridge command surface, and related tests
+- Reduced the supported runtime surface to `manual + acp` only while keeping historical persisted workflow/run/session JSON readable
+- Eliminated the last `child_process` dependency from source and fresh `dist/`, which unblocks clean `openclaw plugins install -l .` on OpenClaw `2026.4.8`
+
+#### Release Alignment
+- Synced npm package metadata, plugin manifest metadata, lockfile version, README install commands, skills docs, and release runbook to `openclaw-swarm-layer@0.5.0`
+- Revalidated the shipped package against local `OpenClaw 2026.4.8` and the current ClawHub package/skill distribution flow
+
+#### Verification
+- `npm run build` green
+- `npm test` green: 59 unit test files / 354 unit tests and 19 e2e files / 25 e2e tests
+- `npm pack --dry-run` green
+- `npm run prepare:clawhub:package` green
+- `openclaw --profile m7-smoke plugins install -l .` green
+- Local ACP control-plane smoke completed through `init -> plan -> dry-run -> live run -> review -> report -> autopilot tick`
+
 ## 0.4.0 (2026-04-07)
 
 ### Parallel Reliability & Retry-Recovery (SPEC-003)

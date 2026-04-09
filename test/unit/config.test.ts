@@ -8,7 +8,6 @@ describe("swarm plugin config", () => {
     expect(resolved.defaultRunner).toBe("auto");
     expect(resolved.acp.enabled).toBe(false);
     expect(resolved.autopilot.enabled).toBe(false);
-    expect(resolved.subagent.enabled).toBe(false);
   });
 
   it("resolves autopilot defaults", () => {
@@ -101,16 +100,7 @@ describe("swarm plugin config", () => {
     expect(resolved.defaultRunner).toBe("auto");
   });
 
-  it("keeps subagent default configs opt-in", () => {
-    const resolved = resolveSwarmPluginConfig({
-      defaultRunner: "subagent",
-      bridge: { subagentEnabled: true },
-    });
-    expect(resolved.defaultRunner).toBe("subagent");
-    expect(resolved.subagent.enabled).toBe(true);
-  });
-
-  it("accepts bridge config and expands legacy enabled alias into subagent fallback only", () => {
+  it("accepts bridge config with openclawRoot and versionAllow", () => {
     const resolved = resolveSwarmPluginConfig({
       bridge: {
         enabled: true,
@@ -122,7 +112,6 @@ describe("swarm plugin config", () => {
     expect(resolved.bridge).toEqual({
       enabled: true,
       acpFallbackEnabled: false,
-      subagentEnabled: true,
       nodePath: undefined,
       openclawRoot: "/opt/openclaw",
       versionAllow: ["2026.2.26"],
@@ -133,13 +122,11 @@ describe("swarm plugin config", () => {
     const resolved = resolveSwarmPluginConfig({
       bridge: {
         acpFallbackEnabled: true,
-        subagentEnabled: false,
       },
     });
 
     expect(resolved.bridge.enabled).toBe(true);
     expect(resolved.bridge.acpFallbackEnabled).toBe(true);
-    expect(resolved.bridge.subagentEnabled).toBe(false);
   });
 
   it("accepts bridge comparator rules in versionAllow", () => {
@@ -222,30 +209,6 @@ describe("swarm plugin config", () => {
     expect(resolveWorkflowDefaultRunner(resolved)).toBe("manual");
   });
 
-  it("keeps subagent out of allowed runners when bridge support is not enabled", () => {
-    const resolved = resolveSwarmPluginConfig({
-      subagent: {
-        enabled: true,
-      },
-    });
-
-    expect(resolveWorkflowDefaultRunner(resolved)).toBe("manual");
-  });
-
-  it("includes subagent only when both subagent and bridge opt-in are enabled", () => {
-    const resolved = resolveSwarmPluginConfig({
-      defaultRunner: "subagent",
-      subagent: {
-        enabled: true,
-      },
-      bridge: {
-        subagentEnabled: true,
-      },
-    });
-
-    expect(resolveWorkflowDefaultRunner(resolved)).toBe("subagent");
-  });
-
   it("rejects unknown keys in plugin schema validation", () => {
     const result = swarmPluginConfigSchema.validate?.({ nope: true });
     expect(result).toEqual({ ok: false, errors: ['Unrecognized key: "nope"'] });
@@ -282,31 +245,6 @@ describe("swarm plugin config", () => {
         "autopilot.recoveryPolicy.degradedFailureRate must be a number between 0 and 1",
       ],
     });
-  });
-
-  it("rejects contradictory subagent config when subagent is the default runner", () => {
-    const result = swarmPluginConfigSchema.validate?.({
-      defaultRunner: "subagent",
-      subagent: { enabled: false },
-    });
-
-    expect(result).toEqual({
-      ok: false,
-      errors: [
-        'subagent.enabled must be true when defaultRunner="subagent"',
-        'bridge.subagentEnabled must be true when defaultRunner="subagent"',
-      ],
-    });
-  });
-
-  it("rejects subagent default runner when subagent bridge is not enabled", () => {
-    const result = swarmPluginConfigSchema.validate?.({
-      defaultRunner: "subagent",
-      subagent: { enabled: true },
-      bridge: { subagentEnabled: false },
-    });
-
-    expect(result).toEqual({ ok: false, errors: ['bridge.subagentEnabled must be true when defaultRunner="subagent"'] });
   });
 
   it("resolves acp.maxConcurrent, queuePolicy, and retryOnSignal defaults", () => {

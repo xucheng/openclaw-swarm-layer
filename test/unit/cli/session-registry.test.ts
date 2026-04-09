@@ -27,7 +27,7 @@ describe("swarm session registry cli", () => {
     });
     await sessionStore.writeSession(projectRoot, {
       sessionId: "session-2",
-      runner: "subagent",
+      runner: "acp",
       projectRoot,
       scope: {},
       mode: "persistent",

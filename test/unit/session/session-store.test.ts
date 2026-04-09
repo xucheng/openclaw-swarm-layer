@@ -51,7 +51,7 @@ describe("SessionStore", () => {
   it("builds a readable session summary", () => {
     const summary = createSessionSummary({
       sessionId: "session-1",
-      runner: "subagent",
+      runner: "acp",
       projectRoot: "/tmp/project",
       scope: {},
       mode: "oneshot",
@@ -59,11 +59,42 @@ describe("SessionStore", () => {
       createdAt: "2026-03-21T00:00:00.000Z",
       updatedAt: "2026-03-21T00:05:00.000Z",
       providerRef: {
-        sessionKey: "agent:main:subagent:1",
+        sessionKey: "agent:codex:acp:1",
       },
     });
 
-    expect(summary).toContain("subagent/oneshot");
+    expect(summary).toContain("acp/oneshot");
     expect(summary).toContain("idle");
+  });
+
+  it("loads legacy sessions with retired runner types", async () => {
+    const projectRoot = await makeTempProject();
+    const store = new SessionStore();
+    const paths = await store.initProject(projectRoot);
+
+    await fs.writeFile(
+      path.join(paths.sessionsDir, "legacy-session.json"),
+      JSON.stringify(
+        {
+          sessionId: "legacy-session",
+          runner: "subagent",
+          projectRoot,
+          scope: {},
+          mode: "oneshot",
+          state: "closed",
+          createdAt: "2026-03-21T00:00:00.000Z",
+          updatedAt: "2026-03-21T00:05:00.000Z",
+          providerRef: {
+            sessionKey: "agent:main:subagent:1",
+          },
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+
+    const session = await store.loadSession(projectRoot, "legacy-session");
+    expect(session?.runner).toBe("subagent");
   });
 });

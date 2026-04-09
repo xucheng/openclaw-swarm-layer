@@ -22,8 +22,9 @@
 - `M5.4b`: complete (2026-03-27)
 - `M5.4c`: complete (2026-03-27)
 - `M6`: complete (2026-04-08, `Autopilot Control Plane`)
+- `M7`: complete (2026-04-08, `Subagent Removal`)
 
-The original five-stage roadmap is now complete. `M5.4c Subagent Final Decision` closed with `subagent` retained only as a legacy bridge-backed opt-in path, while ACP stays public-only. `M6 Autopilot Control Plane` is now complete through `M6.4`.
+The original five-stage roadmap is now complete. `M6 Autopilot Control Plane` and `M7 Subagent Removal` are both closed. The shipped runtime surface is now `manual + acp` only, with ACP staying public-only.
 
 ## M5 Delivery Matrix
 
@@ -69,20 +70,22 @@ Outcome posture:
 
 No further `M5` convergence slice is open.
 
-Active next milestone family:
+Most recently closed milestone families:
 
 | Milestone | Goal | Status | Notes |
 |-----------|------|--------|-------|
 | `M6.0` | Control-plane skeleton and state persistence | Complete | `autopilot-state`, config schema, status/report surface landed on 2026-04-08 |
 | `M6.1` | Tick MVP | Complete | lease, deterministic tick, idempotent dispatch landed on 2026-04-08 |
-| `M6.2` | Session sync and review closure | Complete | ACP/subagent sync, tick reconciliation, supervised review policy landed on 2026-04-08 |
+| `M6.2` | Session sync and review closure | Complete | ACP sync, tick reconciliation, supervised review policy landed on 2026-04-08 |
 | `M6.3` | Recovery and degraded mode | Complete | stuck/stale detection, cancel/close/retry/escalate, degraded dispatch hold landed on 2026-04-08 |
 | `M6.4` | Service loop and release freeze | Complete | service loop, start/pause/resume/stop, and full local regression landed on 2026-04-08 |
+| `M7` | Subagent removal | Complete | closed on 2026-04-08 after code removal, clean install, regression, and local ACP smoke |
 
 Status note:
 
-- `M6` milestone family is complete as of 2026-04-08.
-- Current release-freeze baseline: 63 unit test files / 381 unit tests, 25 e2e files / 34 e2e tests, `npm run build`, and `npm test` green.
+- `M6` and `M7` milestone families are complete as of 2026-04-08.
+- Current post-M7 baseline: 59 unit test files / 354 unit tests, 19 e2e files / 25 e2e tests, `npm run build`, and `npm test` green.
+- Additional M7 verification on 2026-04-08: `openclaw plugins install -l .` passed on OpenClaw 2026.4.8, `child_process` is absent from source and fresh `dist/`, and the local ACP control-plane smoke completed through review/report/autopilot tick.
 - No follow-on milestone family is opened yet.
 
 ## M7 Subagent Removal
@@ -103,6 +106,7 @@ Goal: delete the subagent runner, its adapters, and all direct consumers; wire t
 | 0f | Delete 4 e2e test files | `subagent-fallback.e2e.test.ts`, `subagent-bridge-lifecycle.e2e.test.ts`, `subagent-dark-mode.e2e.test.ts`, `subagent-bridge-fallback.e2e.test.ts` |
 
 DoD: `npm run build` + `npm test` green.
+Status: complete on 2026-04-08.
 
 ### M7.1 Config, Schema, and Diagnostics Cleanup
 
@@ -121,6 +125,7 @@ Goal: remove `"subagent"` from the type system, config schema, JSON schemas, and
 | 1i | Update all affected tests | `config.test.ts`, `doctor.test.ts`, `status.test.ts`, `bridge-manifest.test.ts`, `public-api-seams.test.ts`, `reporter.test.ts`, `session-store.test.ts`, `state-store.test.ts`, etc. |
 
 DoD: `npm run build` + `npm test` green + `grep -ri subagent src/` returns 0 results.
+Status: complete on 2026-04-08.
 
 ### M7.2 Verification and Live Smoke
 
@@ -137,6 +142,7 @@ Goal: prove the removal is clean end-to-end.
 | 2g | Update docs: `milestones.md`, `roadmap.md`, `current-plan.md` |
 
 DoD: zero `child_process` + install passes + all tests green + live smoke green + docs updated.
+Status: complete on 2026-04-08.
 
 ### M7 Exit Criteria
 
@@ -145,3 +151,5 @@ DoD: zero `child_process` + install passes + all tests green + live smoke green 
 - `openclaw plugins install -l .` succeeds on OpenClaw 2026.4.8
 - historical workflow/run/session JSON files remain readable (schema allows unknown runner types in persisted state)
 - all unit, e2e, and live smoke gates green
+
+Exit status: satisfied on 2026-04-08.

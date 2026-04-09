@@ -90,11 +90,7 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
         {},
         {
           config: {
-            subagent: {
-              enabled: false,
-            },
             bridge: {
-              subagentEnabled: false,
               openclawRoot: resolveOpenClawRoot(),
               versionAllow: [],
             },
@@ -107,31 +103,5 @@ skipInCI("e2e: live bridge doctor diagnostics", () => {
     expect(result.severity).toBe("warning");
     expect(result.publicApi.acpControlPlaneExport).toBe(true);
     expect(result.replacementPlan[0]?.runner).toBe("acp");
-  });
-
-  it("returns blocked severity for live version drift", async () => {
-    const result = await withIsolatedOpenClawState(() =>
-      runSwarmDoctor(
-        {},
-        {
-          config: {
-            subagent: {
-              enabled: true,
-            },
-            bridge: {
-              subagentEnabled: true,
-              openclawRoot: resolveOpenClawRoot(),
-              versionAllow: ["0.0.0-test"],
-            },
-          } as any,
-        },
-      ),
-    );
-
-    expect(result.ok).toBe(false);
-    expect(result.severity).toBe("blocked");
-    expect(result.remediation.some((item) => item.includes("versionAllow"))).toBe(true);
-    expect(result.nextAction).toContain("versionAllow");
-    expect(result.compatibility.supportedRunners.length).toBeGreaterThanOrEqual(0);
   });
 });

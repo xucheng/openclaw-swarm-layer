@@ -4,13 +4,13 @@
 
 ### Spec-Driven Workflow Orchestration for AI Agent Swarms
 
-Turn Markdown specs into executable task graphs. Dispatch through ACP automation, manual fallback, or legacy subagent bridge. Track with persistent sessions. Gate with review approval.
+Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-348%20unit%20%7C%2029%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-354%20unit%20%7C%2025%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -22,6 +22,7 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 
 - **Spec-driven planning** — Markdown spec with goals and phased tasks → dependency-ordered task graph
 - **ACP-first execution** — ACP is the only default-capable automated runner; capability-aware `auto` resolution
+- **Supervised autopilot** — Deterministic control-plane tick, lease-backed service loop, and operator-visible start/pause/resume/stop controls
 - **Persistent sessions** — Reuse, thread binding, follow-up, steer, cancel, and close flows
 - **Review gates** — Explicit approve/reject with structured quality rubrics (weighted multi-dimension scoring)
 - **Sprint contracts** — Verifiable acceptance criteria per task with GAN-inspired evaluator injection
@@ -36,14 +37,20 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 ## Prerequisites
 
 - **Node.js** >= 22
-- **OpenClaw** >= 2026.3.22 (tested against `2026.4.5`)
+- **OpenClaw** >= 2026.3.22 (tested against `2026.4.8`)
 
 ## Installation
 
 ### From ClawHub (recommended)
 
 ```bash
-clawhub install openclaw-swarm-layer
+openclaw plugins install clawhub:openclaw-swarm-layer
+```
+
+### Skill From ClawHub
+
+```bash
+openclaw skills install swarm-layer
 ```
 
 ### From npm
@@ -94,11 +101,14 @@ openclaw swarm report --project /path/to/your/project --json
 |---------|-------------|
 | `swarm init --project <path>` | Initialize swarm state for a project |
 | `swarm plan --project <path> --spec <path>` | Import a spec and build task graph |
-| `swarm run --project <path> [--runner acp\|manual\|subagent] [--dry-run] [--parallel N] [--all-ready]` | Execute runnable tasks (single or batch) |
+| `swarm run --project <path> [--runner acp\|manual] [--dry-run] [--parallel N] [--all-ready]` | Execute runnable tasks (single or batch) |
 | `swarm review --project <path> --task <id> --approve\|--reject [--retry-now]` | Approve or reject a task |
 | `swarm report --project <path>` | Generate a workflow report |
 | `swarm status --project <path>` | Show workflow status, runtime posture, and bridge-exit gate |
 | `swarm doctor` | Diagnose ACP readiness and bridge-exit gate status |
+| `swarm autopilot status --project <path>` | Inspect autopilot health, lease state, and last decision |
+| `swarm autopilot start/pause/resume/stop --project <path>` | Control the supervised autopilot service state |
+| `swarm autopilot tick --project <path> [--dry-run]` | Sync active runs, review state, and queue pressure through the supervised control plane |
 
 ### Session Management
 
@@ -119,7 +129,6 @@ openclaw swarm report --project /path/to/your/project --json
 |--------|------|-----------------|--------------|
 | `acp` | Primary automation path | Yes | ACP enabled, public control-plane available |
 | `manual` | Operator-driven safe fallback | Always available | None |
-| `subagent` | Legacy bridge-backed opt-in | No | `subagent.enabled=true` + `bridge.subagentEnabled=true` |
 
 `defaultRunner: "auto"` resolves to `acp` when ACP automation is available, otherwise falls back to `manual`.
 
@@ -128,9 +137,10 @@ openclaw swarm report --project /path/to/your/project --json
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (348 tests, 52 files)
-npm run test:e2e       # E2E tests only (29 tests, 20 files)
+npm run test:unit      # Unit tests only (354 tests, 59 files)
+npm run test:e2e       # E2E tests only (25 tests, 19 files)
 npm run test:watch     # Watch mode
+npm run release:check  # Build + full regression + npm pack dry-run + ClawHub package prep
 ```
 
 ## Documentation
@@ -139,10 +149,11 @@ npm run test:watch     # Watch mode
 - [User Manual](docs/user-manual.md) — Install, configuration, daily workflow, and troubleshooting
 - [Configuration Reference](docs/configuration.md) — Config schema, defaults, examples, and journaling
 - [Skills Guide](docs/skills-guide.md) — Unified skill usage modules
+- [Release Runbook](docs/release-runbook.md) — npm, GitHub release, ClawHub package, and ClawHub skill publishing steps
 
 **Operations:**
 - [ACP Bridge Exit Gate](docs/acp-bridge-exit-gate.md) — Bridge-free ACP floor, live smoke matrix, artifact expectations
-- [Operator Runbook](docs/operator-runbook.md) — Install, smoke, upgrade, rollback, legacy bridge guidance
+- [Operator Runbook](docs/operator-runbook.md) — Install, smoke, upgrade, rollback, and ACP control-plane operations
 - [Migration Checklist](docs/migration-checklist.md) — Staged bridge replacement planning
 - [Testing Strategy](docs/testing-strategy.md) — Unit, e2e, and smoke verification rules
 

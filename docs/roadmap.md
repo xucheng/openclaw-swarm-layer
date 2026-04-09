@@ -216,7 +216,7 @@ Target posture after closeout:
 - zero `child_process` in source or dist
 - historical persisted state (workflow, run, session JSON) remains readable
 
-Current status: planned.
+Current status: complete (2026-04-08). `M7.0-M7.2` are implemented. The post-M7 verification baseline is 59 unit test files / 354 unit tests plus 19 e2e files / 25 e2e tests with `npm run build` and `npm test` green, clean `plugins install -l`, zero `child_process`, and a local ACP control-plane smoke completed through review/report/autopilot tick on OpenClaw 2026.4.8.
 
 ## Assessment Timeline
 
@@ -246,13 +246,14 @@ Current status: planned.
 - `M6.3` complete (2026-04-08): recovery planner, stuck/stale remediation, and degraded dispatch hold shipped; targeted recovery/degraded regression green
 - `M6.4` complete (2026-04-08): service loop and start/pause/resume/stop controls shipped; 63 unit test files / 381 unit tests, 25 e2e files / 34 e2e tests, build clean
 - `M6` complete (2026-04-08): Autopilot Control Plane closed with full local regression green and no open `M6` slices
+- `M7` complete (2026-04-08): subagent runner and its bridge-backed adapters removed; 59 unit test files / 354 unit tests, 19 e2e files / 25 e2e tests, build clean, install clean, zero `child_process`, and local ACP control-plane smoke green on OpenClaw 2026.4.8
 
 ## What The Project Claims
 
 The project claims:
 
 - ACP as the only default-capable automated runner
-- `subagent` as a legacy bridge-backed opt-in path with a documented support boundary (scheduled for removal in M7)
+- `manual` as the explicit safe fallback when ACP automation is unavailable
 - single-machine, single-project orchestration with operator-visible workflow state, reports, and session control
 
 The project still does not claim:

@@ -9,8 +9,9 @@ The plugin now ships with an ACP-first posture:
 - `defaultRunner` defaults to `"auto"`.
 - `"auto"` resolves to `acp` only when ACP automation is actually available on the current install.
 - If ACP automation is unavailable, `"auto"` resolves to `manual`.
-- `subagent` is a legacy bridge-backed opt-in path and is disabled by default.
-- Bridge is retained only for the legacy subagent path.
+- The supported runner surface is now `manual + acp` only.
+- The supervised `autopilot` control plane is optional and operates over the same workflow state.
+- Bridge config remains readable only for legacy ACP compatibility metadata and doctor guidance.
 
 ## Top-Level Options
 
@@ -24,10 +25,19 @@ The plugin now ships with an ACP-first posture:
 | `enableService` | boolean | `true` | Register the swarm orchestrator service |
 | `enableChatCommand` | boolean | `false` | Reserved for future chat command integration |
 | `defaultWorkspaceMode` | `"shared" \| "isolated"` | `"shared"` | Workspace isolation mode for tasks |
-| `defaultRunner` | `"auto" \| "manual" \| "acp" \| "subagent"` | `"auto"` | Capability-aware default runner policy |
+| `defaultRunner` | `"auto" \| "manual" \| "acp"` | `"auto"` | Capability-aware default runner policy |
 | `maxParallelTasks` | integer (>= 1) | `1` | Maximum concurrent task dispatches |
 | `reviewRequiredByDefault` | boolean | `true` | Whether tasks require review before completing |
 | `enforceTaskImmutability` | boolean | `false` | Prevent task-definition drift across saves |
+
+## Review Configuration (`review`)
+
+Controls reject-retry behavior after review decisions.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `rejectPolicy` | `"blocked" \| "ready_retry"` | `"ready_retry"` | Whether a reject blocks immediately or returns the task to `ready` |
+| `maxRejectRetries` | integer (>= 1) | `3` | Maximum reject-driven retries before the task becomes blocked |
 
 ## ACP Configuration (`acp`)
 
@@ -44,23 +54,14 @@ Controls the primary automation path.
 | `defaultTimeoutSeconds` | integer | - | Default execution timeout |
 | `experimentalControlPlaneAdapter` | boolean | `false` | Force use of the public ACP control-plane adapter even if runtime probing is incomplete |
 
-## Subagent Configuration (`subagent`)
-
-Controls the legacy bridge-backed subagent runner.
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Explicitly opt in to legacy bridge-backed subagent dispatch |
-
 ## Bridge Configuration (`bridge`)
 
-Controls legacy bridge compatibility settings.
+Controls legacy compatibility settings that remain readable after ACP bridge removal.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `enabled` | boolean | `false` | Legacy umbrella alias. Still readable, but prefer `subagentEnabled` below |
+| `enabled` | boolean | `false` | Legacy umbrella alias. Still readable, but not used for runtime capability |
 | `acpFallbackEnabled` | boolean | `false` | Legacy ACP bridge flag. Ignored for runtime capability |
-| `subagentEnabled` | boolean | `false` | Enable legacy bridge-backed subagent execution |
 | `nodePath` | string | - | Path to Node.js binary. Usually `$(which node)` |
 | `openclawRoot` | string | - | Path to OpenClaw installation root |
 | `versionAllow` | string[] | `[]` | Allowed OpenClaw versions for bridge compatibility |
@@ -69,8 +70,7 @@ Notes:
 
 - `bridge.enabled=true` is still accepted as a deprecated umbrella alias.
 - New configs should not rely on `bridge.acpFallbackEnabled`; it is guidance-only after ACP bridge removal.
-- New configs should prefer `bridge.subagentEnabled` only when they intentionally retain the legacy subagent path.
-- `defaultRunner="subagent"` requires both `subagent.enabled=true` and `bridge.subagentEnabled=true`.
+- New configs should not add bridge settings unless you are intentionally preserving historical metadata for old installs.
 
 ## Journal Configuration (`journal`)
 
@@ -138,6 +138,58 @@ This enables CLI and tools with the default `auto` runner policy. Because ACP is
 
 Use this on OpenClaw builds where the public ACP control-plane path is available. On supported installs, `auto` resolves to `acp`.
 
+## Autopilot Configuration (`autopilot`)
+
+Controls the supervised control plane layered over the existing workflow runtime.
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable autopilot control-plane commands and service loop behavior |
+| `mode` | `"supervised"` | `"supervised"` | Current autopilot operating mode |
+| `tickSeconds` | integer (>= 1) | `15` | Service-loop tick interval |
+| `leaseSeconds` | integer (>= 1) | `45` | Lease TTL that prevents overlapping active ticks |
+| `maxDispatchPerTick` | integer (>= 1) | `2` | Maximum dispatches the control plane can admit per tick |
+| `reviewPolicy.mode` | `"manual_only" \| "auto_safe" \| "auto_allowlist"` | `"manual_only"` | How autopilot should handle review-closure decisions |
+| `reviewPolicy.allowlistTags` | string[] | `[]` | Tags allowed for auto-approval when `reviewPolicy.mode = "auto_allowlist"` |
+| `reviewPolicy.denyTags` | string[] | `["high-risk", "security", "prod"]` | Tags that always block autopilot auto-approval |
+| `recoveryPolicy.stuckRunMinutes` | integer (>= 1) | `20` | Running task threshold before the recovery planner treats it as stuck |
+| `recoveryPolicy.idleSessionMinutes` | integer (>= 1) | `60` | Active session threshold before the recovery planner treats it as stale |
+| `recoveryPolicy.maxRecoveriesPerTask` | integer (>= 1) | `1` | Maximum automated recoveries allowed per task |
+| `recoveryPolicy.cancelBeforeRetry` | boolean | `true` | Cancel active runtime state before retrying a recovered task |
+| `recoveryPolicy.degradedFailureRate` | number | `0.5` | Failure-rate threshold that pushes autopilot into degraded mode |
+| `recoveryPolicy.degradedMinTerminalRuns` | integer (>= 1) | `3` | Minimum recent terminal runs before degraded-mode failure rate is evaluated |
+| `recoveryPolicy.degradedTerminalWindow` | integer (>= 1) | `6` | Terminal-run sample window used for degraded-mode evaluation |
+
+## Autopilot Example
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-swarm-layer": {
+        "config": {
+          "defaultRunner": "auto",
+          "acp": {
+            "enabled": true,
+            "defaultAgentId": "codex",
+            "allowedAgents": ["codex"]
+          },
+          "autopilot": {
+            "enabled": true,
+            "tickSeconds": 15,
+            "leaseSeconds": 45,
+            "maxDispatchPerTick": 2,
+            "reviewPolicy": {
+              "mode": "manual_only"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ## Legacy ACP Bridge Config (Ignored)
 
 ```json
@@ -157,7 +209,7 @@ Use this on OpenClaw builds where the public ACP control-plane path is available
             "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.4.5"]
+            "versionAllow": ["2026.4.8"]
           }
         }
       }
@@ -167,32 +219,6 @@ Use this on OpenClaw builds where the public ACP control-plane path is available
 ```
 
 This config is still readable, but it no longer enables ACP automation. Keep it only until you clean up stale config.
-
-## Subagent Legacy Opt-In Configuration
-
-```json
-{
-  "plugins": {
-    "entries": {
-      "openclaw-swarm-layer": {
-        "config": {
-          "subagent": {
-            "enabled": true
-          },
-          "bridge": {
-            "subagentEnabled": true,
-            "nodePath": "$(which node)",
-            "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.4.5"]
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-`subagent` remains a legacy bridge-backed opt-in path. Keep it opt-in and do not treat it as the normal default path.
 
 ## Journaling Example
 
@@ -263,4 +289,5 @@ This config is still readable, but it no longer enables ACP automation. Keep it 
 
 - `openclaw swarm doctor --json` — inspect ACP readiness, default-runner resolution, and compatibility fallback posture.
 - `openclaw swarm status --project <path>` — inspect current workflow runtime posture.
+- `openclaw swarm autopilot status --project <path>` — inspect autopilot health, lease, and decision state.
 - `openclaw swarm report --project <path>` — write the workflow report and journals.

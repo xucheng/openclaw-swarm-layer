@@ -590,47 +590,6 @@ describe("SwarmOrchestrator", () => {
     expect(result.action).toBe("dispatched");
   });
 
-  it("rejects subagent dispatch when subagent is disabled", async () => {
-    const { projectRoot, stateStore } = await setupProject();
-    const orchestrator = createOrchestrator({ stateStore });
-
-    const result = await orchestrator.runOnce({ projectRoot, runnerOverride: "subagent" });
-    const runs = await stateStore.loadRuns(projectRoot);
-
-    expect(result.ok).toBe(false);
-    expect(result.action).toBe("noop");
-    expect(result.selectedRunner).toBe("subagent");
-    expect(result.message).toContain("legacy bridge-backed opt-in path");
-    expect(runs).toEqual([]);
-  });
-
-  it("rejects subagent dispatch when subagent is enabled but bridge support is not enabled", async () => {
-    const { projectRoot } = await setupProject();
-    const stateStore = new StateStore({
-      subagent: { enabled: true },
-    });
-    await stateStore.initProject(projectRoot);
-    await stateStore.saveWorkflow(projectRoot, {
-      version: 1,
-      projectRoot,
-      activeSpecId: "spec-1",
-      lifecycle: "planned",
-      tasks: planTasksFromSpec(makeSpec(projectRoot), {
-        defaultRunner: "manual",
-        reviewRequiredByDefault: true,
-      }),
-      reviewQueue: [],
-    });
-    const orchestrator = createOrchestrator({ stateStore });
-
-    const result = await orchestrator.runOnce({ projectRoot, runnerOverride: "subagent" });
-
-    expect(result.ok).toBe(false);
-    expect(result.action).toBe("noop");
-    expect(result.selectedRunner).toBe("subagent");
-    expect(result.message).toContain("enable bridge.subagentEnabled=true");
-  });
-
   it("surfaces ACP as the selected runner when workflow default resolves from auto", async () => {
     const projectRoot = await makeTempProject();
     const stateStore = new StateStore({

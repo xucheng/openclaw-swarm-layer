@@ -15,6 +15,14 @@ function assert(condition: unknown, message: string): asserts condition {
   }
 }
 
+function isCurrentSessionRunner(value: unknown): value is "acp" {
+  return value === "acp";
+}
+
+function isPersistedSessionRunner(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
 export function createSessionSummary(session: SessionRecord): string {
   const parts = [
     `${session.runner}/${session.mode}`,
@@ -57,21 +65,24 @@ export class SessionStore {
     if (!session) {
       return null;
     }
-    this.assertValidSession(session);
+    this.assertValidSession(session, { allowLegacyRunnerTypes: true });
     return session;
   }
 
   async listSessions(projectRoot: string): Promise<SessionRecord[]> {
     const paths = await this.initProject(projectRoot);
     const sessions = await readDirectoryJsonFiles<SessionRecord>(paths.sessionsDir);
-    sessions.forEach((session) => this.assertValidSession(session));
+    sessions.forEach((session) => this.assertValidSession(session, { allowLegacyRunnerTypes: true }));
     return sessions;
   }
 
-  assertValidSession(session: SessionRecord): void {
+  assertValidSession(session: SessionRecord, options?: { allowLegacyRunnerTypes?: boolean }): void {
     assert(isObject(session), "session must be an object");
     assert(typeof session.sessionId === "string" && session.sessionId.length > 0, "session.sessionId is required");
-    assert(session.runner === "acp" || session.runner === "subagent", "session.runner is invalid");
+    assert(
+      options?.allowLegacyRunnerTypes ? isPersistedSessionRunner(session.runner) : isCurrentSessionRunner(session.runner),
+      "session.runner is invalid",
+    );
     assert(typeof session.projectRoot === "string" && session.projectRoot.length > 0, "session.projectRoot is required");
     assert(isObject(session.scope), "session.scope must be an object");
     assert(session.mode === "oneshot" || session.mode === "persistent", "session.mode is invalid");

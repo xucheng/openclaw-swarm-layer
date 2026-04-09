@@ -4,7 +4,7 @@ import { AutopilotStore } from "../autopilot/autopilot-store.js";
 import { buildAutopilotHealthSummary } from "../autopilot/metrics.js";
 import { createDefaultAutopilotState, type AutopilotState } from "../autopilot/types.js";
 import type { SwarmPluginConfig } from "../config.js";
-import { describeAcpExecutionPosture, describeSubagentPosture, resolveRuntimePolicySnapshot } from "../config.js";
+import { describeAcpExecutionPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { ensureDir } from "../lib/json-file.js";
 import { resolveSwarmPaths } from "../lib/paths.js";
 import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes } from "../runtime/acp-bridge-exit-gate.js";
@@ -83,8 +83,6 @@ function buildRuntimePolicyLines(workflow: WorkflowState, stateStore: StateStore
     `- Default runner resolution: ${runtime.configuredDefaultRunner} -> ${runtime.resolvedDefaultRunner} on this install`,
     `- Manual runner fallback: available`,
     `- ACP execution posture: ${describeAcpExecutionPosture(stateStore.config)}`,
-    `- Subagent enabled: ${runtime.subagentEnabled ? "yes" : "no"}`,
-    `- Subagent posture: ${describeSubagentPosture(stateStore.config)}`,
   ];
 }
 

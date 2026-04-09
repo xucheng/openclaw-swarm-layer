@@ -16,7 +16,7 @@
   ],
   "properties": {
     "sessionId": { "type": "string", "minLength": 1 },
-    "runner": { "type": "string", "enum": ["acp", "subagent"] },
+    "runner": { "type": "string", "minLength": 1 },
     "projectRoot": { "type": "string", "minLength": 1 },
     "scope": {
       "type": "object",

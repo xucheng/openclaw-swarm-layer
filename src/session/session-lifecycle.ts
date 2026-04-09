@@ -8,7 +8,7 @@ export function deriveSessionId(runRecord: Pick<RunRecord, "runner" | "sessionRe
   if (!runRecord.sessionRef?.sessionKey) {
     return null;
   }
-  if (runRecord.runner.type !== "acp" && runRecord.runner.type !== "subagent") {
+  if (runRecord.runner.type !== "acp") {
     return null;
   }
   return `${runRecord.runner.type}-${encodeSessionKey(runRecord.sessionRef.sessionKey)}`;
@@ -62,7 +62,7 @@ export function buildSessionRecordFromRun(
   existing?: SessionRecord | null,
 ): SessionRecord | null {
   const sessionId = deriveSessionId(runRecord);
-  if (!sessionId || !runRecord.sessionRef?.sessionKey || (runRecord.runner.type !== "acp" && runRecord.runner.type !== "subagent")) {
+  if (!sessionId || !runRecord.sessionRef?.sessionKey || runRecord.runner.type !== "acp") {
     return null;
   }
 

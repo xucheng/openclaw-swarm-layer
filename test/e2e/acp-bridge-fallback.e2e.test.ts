@@ -19,7 +19,6 @@ describe("e2e: ACP legacy bridge config", () => {
         bridge: {
           enabled: false,
           acpFallbackEnabled: true,
-          subagentEnabled: false,
           openclawRoot: "/opt/openclaw",
           versionAllow: ["2026.3.13"],
         },

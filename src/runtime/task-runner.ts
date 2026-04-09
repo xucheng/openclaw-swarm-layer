@@ -40,7 +40,7 @@ export type RunnerSyncResult = {
 };
 
 export interface TaskRunner {
-  kind: "manual" | "acp" | "subagent";
+  kind: "manual" | "acp";
   plan(input: RunnerPlanInput): Promise<RunnerPlan>;
   run(input: RunnerRunInput): Promise<RunnerRunResult>;
   sync?(input: RunnerSyncInput): Promise<RunnerSyncResult>;

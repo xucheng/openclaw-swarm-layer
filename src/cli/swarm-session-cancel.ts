@@ -1,7 +1,7 @@
 import { applyAcpRunStatusToWorkflow } from "../review/review-gate.js";
 import { writeWorkflowReport } from "../reporting/reporter.js";
 import { buildSessionRecordFromRun } from "../session/session-lifecycle.js";
-import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, resolveSubagentAdapter, type SwarmCliContext } from "./context.js";
+import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
 
 function resolveCancelledAt(result: { cancelledAt?: string } | { killedAt?: string }): string | undefined {
   const normalized = result as { cancelledAt?: string; killedAt?: string };
@@ -25,10 +25,7 @@ export async function runSwarmSessionCancel(
     throw new Error(`Run record has no session key: ${options.run}`);
   }
 
-  const cancelled =
-    runRecord.runner.type === "subagent"
-      ? await resolveSubagentAdapter(context).killSubagentRun(runRecord.sessionRef.sessionKey, options.reason)
-      : await sessionAdapter.cancelAcpSession(runRecord.sessionRef.sessionKey, options.reason);
+  const cancelled = await sessionAdapter.cancelAcpSession(runRecord.sessionRef.sessionKey, options.reason);
   const nextRun = {
     ...runRecord,
     status: "cancelled" as const,

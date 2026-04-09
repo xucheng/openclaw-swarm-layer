@@ -1,17 +1,15 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import type { OpenClawPluginService, OpenClawPluginServiceContext } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig } from "../config.js";
-import { getSubagentRunnerDisabledMessage, resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
+import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
 import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
 import { applyAcpRunStatusToWorkflow, deriveWorkflowLifecycle, enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
 import { ManualRunner } from "../runtime/manual-runner.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
-import { UnsupportedOpenClawSubagentAdapter, type OpenClawSubagentAdapter } from "../runtime/openclaw-subagent-adapter.js";
 import { appendRetryHistory, shouldRetry } from "../runtime/retry-engine.js";
 import { RunnerRegistry } from "../runtime/runner-registry.js";
-import { SubagentRunner } from "../runtime/subagent-runner.js";
 import type { TaskRunner } from "../runtime/task-runner.js";
 import { runBootstrap } from "../session/session-bootstrap.js";
 import { buildBudgetUsageFromRun, checkBudgetExceeded } from "../session/session-budget.js";
@@ -129,7 +127,6 @@ type OrchestratorDeps = {
   manualRunner?: ManualRunner;
   runnerRegistry?: RunnerRegistry;
   sessionAdapter?: OpenClawSessionAdapter;
-  subagentAdapter?: OpenClawSubagentAdapter;
 };
 
 type SwarmServiceLoopLike = {
@@ -153,12 +150,9 @@ function pickTask(tasks: TaskNode[], taskId?: string): TaskNode | undefined {
 }
 
 function resolveRunnerUnavailableMessage(
-  runner: RunnerType,
-  stateStore: Pick<StateStore, "config">,
+  _runner: RunnerType,
+  _stateStore: Pick<StateStore, "config">,
 ): string | undefined {
-  if (runner === "subagent") {
-    return getSubagentRunnerDisabledMessage(stateStore.config);
-  }
   return undefined;
 }
 
@@ -180,7 +174,6 @@ export class SwarmOrchestrator {
     private readonly manualRunner: ManualRunner = new ManualRunner(),
     private readonly runnerRegistry: RunnerRegistry = new RunnerRegistry([new ManualRunner(), new AcpRunner()]),
     private readonly sessionAdapter: OpenClawSessionAdapter = new UnsupportedOpenClawSessionAdapter(),
-    private readonly subagentAdapter: OpenClawSubagentAdapter = new UnsupportedOpenClawSubagentAdapter(),
   ) {}
 
   async runOnce(input: RunOnceInput): Promise<RunOnceResult> {
@@ -425,7 +418,7 @@ export class SwarmOrchestrator {
     return this.runOnce({
       projectRoot: input.projectRoot,
       taskId: task.taskId,
-      runnerOverride: task.runner.type === "manual" ? undefined : (task.runner.type as "acp" | "subagent"),
+      runnerOverride: task.runner.type === "manual" ? undefined : (task.runner.type as "acp"),
     });
   }
 
@@ -489,10 +482,7 @@ export class SwarmOrchestrator {
       throw new Error(`Run record has no session key: ${input.runId}`);
     }
 
-    const cancelled =
-      runRecord.runner.type === "subagent"
-        ? await this.subagentAdapter.killSubagentRun(runRecord.sessionRef.sessionKey, input.reason)
-        : await this.sessionAdapter.cancelAcpSession(runRecord.sessionRef.sessionKey, input.reason);
+    const cancelled = await this.sessionAdapter.cancelAcpSession(runRecord.sessionRef.sessionKey, input.reason);
     const terminalStatus = input.terminalStatus ?? "cancelled";
     const endedAt = resolveCancelledAt(cancelled) ?? new Date().toISOString();
     const nextRun: RunRecord = {
@@ -805,11 +795,9 @@ export function createOrchestrator(deps?: OrchestratorDeps): SwarmOrchestrator {
   const sessionStore = deps?.sessionStore ?? new SessionStore(stateStore.config);
   const manualRunner = deps?.manualRunner ?? new ManualRunner();
   const sessionAdapter = deps?.sessionAdapter ?? new UnsupportedOpenClawSessionAdapter();
-  const subagentAdapter = deps?.subagentAdapter ?? new UnsupportedOpenClawSubagentAdapter();
   const configuredRunners: TaskRunner[] = [
     manualRunner,
     new AcpRunner(stateStore.config, sessionAdapter),
-    new SubagentRunner(subagentAdapter),
   ];
   return new SwarmOrchestrator(
     stateStore,
@@ -817,6 +805,5 @@ export function createOrchestrator(deps?: OrchestratorDeps): SwarmOrchestrator {
     manualRunner,
     deps?.runnerRegistry ?? new RunnerRegistry(configuredRunners),
     sessionAdapter,
-    subagentAdapter,
   );
 }

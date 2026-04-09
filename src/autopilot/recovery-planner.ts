@@ -141,7 +141,7 @@ export function planAutopilotRecovery(input: RecoveryPlannerInput): AutopilotRec
         kind: "escalate",
         sessionId: session.sessionId,
         runId: session.lastRunId,
-        reason: `idle subagent session exceeded stale threshold but no safe close surface is available`,
+        reason: `idle session exceeded stale threshold but no safe close surface is available`,
       });
     }
   }

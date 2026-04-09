@@ -26,7 +26,7 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "type": "string", "enum": ["manual", "acp", "subagent"] },
+        "type": { "type": "string", "minLength": 1 },
         "agentId": { "type": "string" },
         "cwd": { "type": "string" },
         "mode": { "type": "string", "enum": ["run", "session"] },
