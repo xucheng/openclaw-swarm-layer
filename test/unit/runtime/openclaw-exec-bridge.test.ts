@@ -195,20 +195,68 @@ describe("openclaw exec bridge", () => {
     fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.24" }));
     fs.writeFileSync(path.join(distDir, "entry.js"), "export {};\n");
 
-    expect(resolveOpenClawRootFromExecPath(path.join(distDir, "entry.js"))).toBe(openclawRoot);
+    expect(resolveOpenClawRootFromExecPath(path.join(distDir, "entry.js"))).toBe(fs.realpathSync(openclawRoot));
   });
 
-  it("prefers the OpenClaw package root under the configured state dir", () => {
+  it("follows a symlinked launcher to the active OpenClaw package root", () => {
+    const tmpPrefix = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-symlink-"));
+    const binDir = path.join(tmpPrefix, "state", "bin");
+    const openclawRoot = path.join(tmpPrefix, "active", "lib", "node_modules", "openclaw");
+    const launcher = path.join(openclawRoot, "openclaw.mjs");
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.4.26" }));
+    fs.writeFileSync(launcher, "#!/usr/bin/env node\n");
+    fs.symlinkSync(launcher, path.join(binDir, "openclaw"));
+
+    expect(resolveOpenClawRootFromExecPath(path.join(binDir, "openclaw"))).toBe(fs.realpathSync(openclawRoot));
+  });
+
+  it("falls back to the OpenClaw package root under the configured state dir", () => {
     const tmpStateDir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-state-root-"));
     const openclawRoot = path.join(tmpStateDir, "lib", "node_modules", "openclaw");
     const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    const previousArgv1 = process.argv[1];
     fs.mkdirSync(path.join(openclawRoot, "dist", "plugin-sdk"), { recursive: true });
     fs.writeFileSync(path.join(openclawRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.3.24" }));
 
     process.env.OPENCLAW_STATE_DIR = tmpStateDir;
+    process.argv[1] = path.join(tmpStateDir, "bin", "not-openclaw");
     try {
       expect(resolveOpenClawRoot()).toBe(openclawRoot);
     } finally {
+      process.argv[1] = previousArgv1;
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+    }
+  });
+
+  it("keeps the state-dir runtime root when the active launcher package lacks bundled acpx", () => {
+    const tmpPrefix = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-acpx-root-"));
+    const activeRoot = path.join(tmpPrefix, "active", "lib", "node_modules", "openclaw");
+    const stateDir = path.join(tmpPrefix, "state");
+    const stateRoot = path.join(stateDir, "lib", "node_modules", "openclaw");
+    const launcher = path.join(activeRoot, "openclaw.mjs");
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    const previousArgv1 = process.argv[1];
+
+    fs.mkdirSync(path.join(activeRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.writeFileSync(path.join(activeRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.4.26" }));
+    fs.writeFileSync(launcher, "#!/usr/bin/env node\n");
+    fs.mkdirSync(path.join(stateRoot, "dist", "plugin-sdk"), { recursive: true });
+    fs.mkdirSync(path.join(stateRoot, "node_modules", "acpx"), { recursive: true });
+    fs.writeFileSync(path.join(stateRoot, "package.json"), JSON.stringify({ name: "openclaw", version: "2026.4.15" }));
+    fs.writeFileSync(path.join(stateRoot, "node_modules", "acpx", "package.json"), JSON.stringify({ name: "acpx" }));
+
+    process.env.OPENCLAW_STATE_DIR = stateDir;
+    process.argv[1] = launcher;
+    try {
+      expect(resolveOpenClawRoot()).toBe(stateRoot);
+    } finally {
+      process.argv[1] = previousArgv1;
       if (previousStateDir === undefined) {
         delete process.env.OPENCLAW_STATE_DIR;
       } else {

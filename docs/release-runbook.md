@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.1`
+- Current release line: `0.5.2`
 
 ## Preflight
 
@@ -60,19 +60,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
+Expected version for this release: `0.5.2`.
+
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.1
-git push origin v0.5.1
-gh release create v0.5.1 --title "v0.5.1" --notes-file /tmp/openclaw-swarm-layer-v0.5.1-notes.md
+git tag v0.5.2
+git push origin v0.5.2
+gh release create v0.5.2 --title "v0.5.2" --notes-file docs/release-notes/v0.5.2.md
 ```
 
 Recommended release notes source:
 
-- copy the `0.5.1` section from [CHANGELOG.md](../CHANGELOG.md)
+- use [docs/release-notes/v0.5.2.md](release-notes/v0.5.2.md)
+- keep the `0.5.2` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -90,11 +93,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.1 \
+  --version 0.5.2 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.1 \
+  --source-ref v0.5.2 \
   --source-commit <git-sha> \
-  --changelog "Hotfix the ACP autopilot service loop so background supervised runs use the same runtime-backed session adapter as the CLI."
+  --changelog "Update for OpenClaw 2026.4.26: current SDK subpaths, runtime config snapshots, descriptor-only CLI registration, and mini manual/ACP smoke validation."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -113,8 +116,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.1 \
-  --changelog "Refresh release metadata after the ACP autopilot service-loop hotfix."
+  --version 0.5.2 \
+  --changelog "Refresh the Swarm Layer skill for OpenClaw 2026.4.26 compatibility, current release metadata, and mini smoke validation."
 ```
 
 Optional tags to keep aligned with the current listing:

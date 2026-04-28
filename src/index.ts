@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginDefinition } from "openclaw/plugin-sdk/plugin-entry";
 import { resolvePluginConfigFromApi, swarmPluginConfigSchema } from "./config.js";
 import { registerSwarmCli } from "./cli/register-swarm-cli.js";
 import { registerSwarmService } from "./services/orchestrator.js";
@@ -8,7 +8,7 @@ const plugin = {
   id: "openclaw-swarm-layer",
   name: "OpenClaw Swarm Layer",
   description: "Spec-driven workflow orchestrator for OpenClaw.",
-  version: "0.5.1",
+  version: "0.5.2",
   configSchema: swarmPluginConfigSchema,
   register(api: OpenClawPluginApi) {
     const config = resolvePluginConfigFromApi(api);
@@ -22,13 +22,6 @@ const plugin = {
       registerSwarmService(api);
     }
   },
-} satisfies {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  configSchema: typeof swarmPluginConfigSchema;
-  register(api: OpenClawPluginApi): void;
-};
+} satisfies OpenClawPluginDefinition;
 
 export default plugin;

@@ -40,10 +40,13 @@ const serviceConfig = {
 const runtime = {
   version: "2026.4.8",
   config: {
+    current: () => ({} as any),
     loadConfig: () => ({} as any),
+    mutateConfigFile: vi.fn(),
+    replaceConfigFile: vi.fn(),
     writeConfigFile: vi.fn(async () => undefined),
   },
-};
+} as any;
 
 function makeRuntimeAdapter(): OpenClawSessionAdapter {
   return {

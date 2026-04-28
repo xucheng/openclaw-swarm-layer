@@ -6,7 +6,7 @@
 
 Current status:
 
-- gate satisfied on the local `OpenClaw 2026.4.8` install as of 2026-04-08
+- gate satisfied on the mini `OpenClaw 2026.4.26` install as of 2026-04-28
 - ACP bridge removal is complete for the ACP runner
 - `remainingBridgeDependencies` is now `[]` for ACP
 
@@ -113,7 +113,8 @@ Purpose:
 
 Current local evidence:
 
-- a real smoke spec resolves `selectedRunner = "acp"` on `OpenClaw 2026.4.8`
+- a real smoke spec resolves `selectedRunner = "acp"` on `OpenClaw 2026.4.26`
+- live ACP dispatch accepted an `acpx` session and `swarm session status` synchronized it to `completed`
 
 ### 5. Swarm live ACP run
 

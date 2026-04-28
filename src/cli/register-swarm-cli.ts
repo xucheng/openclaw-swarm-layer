@@ -1,4 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { resolvePluginConfigFromApi } from "../config.js";
 import { StateStore } from "../state/state-store.js";
 import { type SwarmCliContext } from "./context.js";
@@ -34,13 +34,24 @@ function bindCommand(command: any, action: CommandAction): void {
 }
 
 export function registerSwarmCli(api: OpenClawPluginApi): void {
-  api.registerCli((ctx) => {
-    registerSwarmCliCommands(ctx, {
-      config: resolvePluginConfigFromApi(api),
-      stateStore: new StateStore(resolvePluginConfigFromApi(api), { runtimeVersion: api.runtime?.version }),
-      runtime: api.runtime,
-    });
-  }, { commands: ["swarm"] });
+  api.registerCli(
+    (ctx) => {
+      registerSwarmCliCommands(ctx, {
+        config: resolvePluginConfigFromApi(api),
+        stateStore: new StateStore(resolvePluginConfigFromApi(api), { runtimeVersion: api.runtime?.version }),
+        runtime: api.runtime,
+      });
+    },
+    {
+      descriptors: [
+        {
+          name: "swarm",
+          description: "Swarm workflow commands",
+          hasSubcommands: true,
+        },
+      ],
+    },
+  );
 }
 
 export function registerSwarmCliCommands(

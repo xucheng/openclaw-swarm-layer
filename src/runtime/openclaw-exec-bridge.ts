@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -151,6 +151,13 @@ function isOpenClawPackageRoot(candidate: string): boolean {
   return existsSync(path.join(candidate, "package.json")) && existsSync(path.join(candidate, "dist", "plugin-sdk"));
 }
 
+function hasBundledAcpxRuntimeDependency(openclawRoot: string): boolean {
+  return (
+    existsSync(path.join(openclawRoot, "node_modules", "acpx", "package.json")) ||
+    existsSync(path.join(openclawRoot, "dist", "extensions", "acpx", "node_modules", "acpx", "package.json"))
+  );
+}
+
 function findEnclosingOpenClawPackageRoot(candidatePath: string): string | null {
   let cursor = path.dirname(path.resolve(candidatePath));
   while (true) {
@@ -165,16 +172,26 @@ function findEnclosingOpenClawPackageRoot(candidatePath: string): string | null 
   }
 }
 
+function resolvePathForHostDetection(candidatePath: string): string {
+  try {
+    return realpathSync(candidatePath);
+  } catch {
+    return path.resolve(candidatePath);
+  }
+}
+
 export function resolveOpenClawRootFromExecPath(execPath: string = process.execPath): string | null {
-  const enclosedRoot = findEnclosingOpenClawPackageRoot(execPath);
+  const hostPath = resolvePathForHostDetection(execPath);
+  const enclosedRoot = findEnclosingOpenClawPackageRoot(hostPath);
   if (enclosedRoot) {
     return enclosedRoot;
   }
-  const execDir = path.dirname(path.resolve(execPath));
+  const execDir = path.dirname(hostPath);
   const prefixes = dedupeStrings([
     path.resolve(execDir, ".."),
     path.resolve(execDir, "..", ".."),
     path.resolve(execDir, "..", "..", ".."),
+    path.resolve(execDir, "..", "..", "..", ".."),
   ]);
 
   for (const prefix of prefixes) {
@@ -199,17 +216,26 @@ export function resolveOpenClawRoot(override?: string): string {
   if (envRoot) {
     return path.resolve(envRoot);
   }
+  const hostRoots = dedupeStrings([
+    ...(process.argv[1] ? [resolveOpenClawRootFromExecPath(process.argv[1])] : []),
+    resolveOpenClawRootFromExecPath(),
+  ].filter((entry): entry is string => Boolean(entry)));
   const stateDirRoot = path.join(resolveOpenClawStateDir(), "lib", "node_modules", "openclaw");
-  if (isOpenClawPackageRoot(stateDirRoot)) {
+  const hasStateRoot = isOpenClawPackageRoot(stateDirRoot);
+  const stateRootHasAcpx = hasStateRoot && hasBundledAcpxRuntimeDependency(stateDirRoot);
+  const hostRootWithAcpx = hostRoots.find((entry) => hasBundledAcpxRuntimeDependency(entry));
+
+  if (hostRootWithAcpx) {
+    return hostRootWithAcpx;
+  }
+  if (stateRootHasAcpx) {
     return stateDirRoot;
   }
-  const argvPathRoot = process.argv[1] ? resolveOpenClawRootFromExecPath(process.argv[1]) : null;
-  if (argvPathRoot) {
-    return argvPathRoot;
+  if (hostRoots[0]) {
+    return hostRoots[0];
   }
-  const execPathRoot = resolveOpenClawRootFromExecPath();
-  if (execPathRoot) {
-    return execPathRoot;
+  if (isOpenClawPackageRoot(stateDirRoot)) {
+    return stateDirRoot;
   }
   const require = getRequire();
   let sdkEntryPath: string;

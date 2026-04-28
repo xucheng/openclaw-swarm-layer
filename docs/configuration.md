@@ -209,7 +209,7 @@ Controls the supervised control plane layered over the existing workflow runtime
             "acpFallbackEnabled": true,
             "nodePath": "$(which node)",
             "openclawRoot": "$(npm root -g)/openclaw",
-            "versionAllow": ["2026.4.8"]
+            "versionAllow": ["2026.4.26"]
           }
         }
       }

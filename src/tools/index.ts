@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/core";
 import { runSwarmPlan } from "../cli/swarm-plan.js";
 import { runSwarmReview } from "../cli/swarm-review.js";
 import { runSwarmRun } from "../cli/swarm-run.js";
@@ -18,6 +18,26 @@ function jsonResult(payload: unknown) {
   };
 }
 
+type ProjectParams = { project: string };
+type PlanParams = ProjectParams & { spec: string };
+type RunParams = ProjectParams & {
+  task?: string;
+  dryRun?: boolean;
+  parallel?: number;
+  allReady?: boolean;
+};
+type ReviewParams = ProjectParams & {
+  task: string;
+  approve?: boolean;
+  reject?: boolean;
+  note?: string;
+};
+type SessionRunParams = ProjectParams & { run: string; reason?: string };
+
+function toolParams<T>(params: unknown): T {
+  return params as T;
+}
+
 export function registerSwarmTools(api: OpenClawPluginApi): void {
   const config = resolvePluginConfigFromApi(api);
   const stateStore = new StateStore(config, { runtimeVersion: api.runtime?.version });
@@ -32,7 +52,8 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         project: Type.String(),
       }),
       async execute(_toolCallId, params) {
-        return jsonResult(await runSwarmStatus({ project: params.project }, toolContext));
+        const input = toolParams<ProjectParams>(params);
+        return jsonResult(await runSwarmStatus({ project: input.project }, toolContext));
       },
     },
     { optional: true },
@@ -47,7 +68,8 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         project: Type.String(),
       }),
       async execute(_toolCallId, params) {
-        return jsonResult(await runSwarmAutopilotStatus({ project: params.project }, toolContext));
+        const input = toolParams<ProjectParams>(params);
+        return jsonResult(await runSwarmAutopilotStatus({ project: input.project }, toolContext));
       },
     },
     { optional: true },
@@ -63,7 +85,8 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         spec: Type.String(),
       }),
       async execute(_toolCallId, params) {
-        return jsonResult(await runSwarmPlan({ project: params.project, spec: params.spec }, toolContext));
+        const input = toolParams<PlanParams>(params);
+        return jsonResult(await runSwarmPlan({ project: input.project, spec: input.spec }, toolContext));
       },
     },
     { optional: true },
@@ -82,14 +105,15 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         allReady: Type.Optional(Type.Boolean()),
       }),
       async execute(_toolCallId, params) {
+        const input = toolParams<RunParams>(params);
         return jsonResult(
           await runSwarmRun(
             {
-              project: params.project,
-              task: params.task,
-              dryRun: params.dryRun,
-              parallel: params.parallel,
-              allReady: params.allReady,
+              project: input.project,
+              task: input.task,
+              dryRun: input.dryRun,
+              parallel: input.parallel,
+              allReady: input.allReady,
             },
             toolContext,
           ),
@@ -112,14 +136,15 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         note: Type.Optional(Type.String()),
       }),
       async execute(_toolCallId, params) {
+        const input = toolParams<ReviewParams>(params);
         return jsonResult(
           await runSwarmReview(
             {
-              project: params.project,
-              task: params.task,
-              approve: params.approve,
-              reject: params.reject,
-              note: params.note,
+              project: input.project,
+              task: input.task,
+              approve: input.approve,
+              reject: input.reject,
+              note: input.note,
             },
             toolContext,
           ),
@@ -139,7 +164,8 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         run: Type.String(),
       }),
       async execute(_toolCallId, params) {
-        return jsonResult(await runSwarmSessionStatus({ project: params.project, run: params.run }, toolContext));
+        const input = toolParams<SessionRunParams>(params);
+        return jsonResult(await runSwarmSessionStatus({ project: input.project, run: input.run }, toolContext));
       },
     },
     { optional: true },
@@ -156,8 +182,9 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         reason: Type.Optional(Type.String()),
       }),
       async execute(_toolCallId, params) {
+        const input = toolParams<SessionRunParams>(params);
         return jsonResult(
-          await runSwarmSessionCancel({ project: params.project, run: params.run, reason: params.reason }, toolContext),
+          await runSwarmSessionCancel({ project: input.project, run: input.run, reason: input.reason }, toolContext),
         );
       },
     },
@@ -175,8 +202,9 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         reason: Type.Optional(Type.String()),
       }),
       async execute(_toolCallId, params) {
+        const input = toolParams<SessionRunParams>(params);
         return jsonResult(
-          await runSwarmSessionClose({ project: params.project, run: params.run, reason: params.reason }, toolContext),
+          await runSwarmSessionClose({ project: input.project, run: input.run, reason: input.reason }, toolContext),
         );
       },
     },

@@ -1,5 +1,9 @@
-import type { OpenClawPluginApi, PluginRuntime } from "openclaw/plugin-sdk";
-import type { OpenClawPluginService, OpenClawPluginServiceContext } from "openclaw/plugin-sdk/core";
+import type {
+  OpenClawPluginApi,
+  OpenClawPluginService,
+  OpenClawPluginServiceContext,
+  PluginRuntime,
+} from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig } from "../config.js";
 import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";

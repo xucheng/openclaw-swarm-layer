@@ -190,6 +190,44 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     expect(ensureBackendRegistered).toHaveBeenCalledWith(expect.any(String), { acp: { enabled: true } });
   });
 
+  it("prefers the current runtime config snapshot when available", async () => {
+    const ensureBackendRegistered = vi.fn(async () => undefined);
+    const current = vi.fn(() => ({ acp: { enabled: true }, marker: "current" }));
+    const loadConfig = vi.fn(() => ({ acp: { enabled: true }, marker: "legacy" }));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      {
+        ...runtime,
+        config: { current, loadConfig },
+      } as any,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession: vi.fn(async ({ sessionKey }) => ({ handle: { sessionKey, backend: "acpx" } })),
+          runTurn: vi.fn(async () => undefined),
+          getSessionStatus: vi.fn(),
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      ensureBackendRegistered,
+    );
+
+    await adapter.spawnAcpSession({
+      task: "Run tests",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+    });
+
+    expect(current).toHaveBeenCalledTimes(1);
+    expect(loadConfig).not.toHaveBeenCalled();
+    expect(ensureBackendRegistered).toHaveBeenCalledWith(expect.any(String), {
+      acp: { enabled: true },
+      marker: "current",
+    });
+  });
+
   it("spawns and queries ACP sessions through the manager", async () => {
     const initializeSession = vi.fn(async ({ sessionKey }) => ({
       handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1", agentSessionId: "agent-1" },

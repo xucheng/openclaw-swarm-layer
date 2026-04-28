@@ -64,6 +64,11 @@ Expect:
 - status shows configured default, resolved default, and gate notes
 - dry-run selects ACP when ACP is actually available on the install
 
+Release `0.5.2` was validated on mini `OpenClaw 2026.4.26` with both:
+
+- manual workflow: `init -> plan -> run --runner manual -> review --approve -> report`
+- live ACP workflow: `init -> plan -> run -> session status -> session close`
+
 ## Full Live Smoke Matrix
 
 Run these before claiming bridge-free ACP readiness:

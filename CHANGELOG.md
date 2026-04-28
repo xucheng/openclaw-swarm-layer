@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.2 (2026-04-28)
+
+OpenClaw `2026.4.26` compatibility and release packaging update.
+
+- Updated the plugin SDK imports to the current public subpaths, including `plugin-sdk/plugin-entry` for the plugin entrypoint and `plugin-sdk/core` for runtime, tool, CLI, and service types
+- Switched ACP runtime config reads to prefer `runtime.config.current()` while retaining `loadConfig()` fallback for older hosts
+- Registered the `swarm` CLI through descriptor metadata only, avoiding duplicate CLI command listings in current OpenClaw plugin registry output
+- Adjusted tool parameter handling for the current SDK execute signature, where params are typed as `unknown`
+- Hardened OpenClaw host-root detection for symlinked launchers and mixed install layouts, while preserving mini installs that keep the bundled `acpx` runtime dependency under the OpenClaw state package
+- Synced package metadata, plugin manifest metadata, in-plugin version metadata, README release badge, release runbook, and release notes to `openclaw-swarm-layer@0.5.2`
+
+### Verification
+
+- `npm run build` green
+- `npm run test:unit` green: 59 unit test files / 359 unit tests
+- `npm run test:e2e` green: 19 e2e files / 25 e2e tests
+- `npm pack --dry-run` green
+- mini host `OpenClaw 2026.4.26` smoke green:
+  - manual workflow: `init -> plan -> run --runner manual -> review --approve -> report`
+  - live ACP workflow: `init -> plan -> run -> session status -> session close`
+
 ## 0.5.1 (2026-04-09)
 
 ACP autopilot service-loop hotfix and release-prep alignment update.

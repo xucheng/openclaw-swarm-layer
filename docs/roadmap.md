@@ -216,7 +216,9 @@ Target posture after closeout:
 - zero `child_process` in source or dist
 - historical persisted state (workflow, run, session JSON) remains readable
 
-Current status: complete (2026-04-08). `M7.0-M7.2` are implemented. The post-M7 verification baseline is 59 unit test files / 354 unit tests plus 19 e2e files / 25 e2e tests with `npm run build` and `npm test` green, clean `plugins install -l`, zero `child_process`, and a local ACP control-plane smoke completed through review/report/autopilot tick on OpenClaw 2026.4.8.
+Current status: complete (2026-04-08). `M7.0-M7.2` are implemented. The post-M7 verification baseline was 59 unit test files / 354 unit tests plus 19 e2e files / 25 e2e tests with `npm run build` and `npm test` green, clean `plugins install -l`, zero `child_process`, and a local ACP control-plane smoke completed through review/report/autopilot tick on OpenClaw 2026.4.8.
+
+Release `0.5.2` refresh (2026-04-28): OpenClaw 2026.4.26 compatibility validated with 59 unit test files / 359 unit tests, 19 e2e files / 25 e2e tests, and mini-host manual plus live ACP smoke.
 
 ## Assessment Timeline
 

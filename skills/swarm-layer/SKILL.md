@@ -7,6 +7,8 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-
 
 Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
+Current release baseline: `openclaw-swarm-layer@0.5.2`, validated on `OpenClaw 2026.4.26` with manual review/report smoke and live ACP session smoke.
+
 ## What It Does
 
 - **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
@@ -136,6 +138,8 @@ First-time install, ACP configuration, project initialization, or config trouble
 node --version     # >= 22
 openclaw --version # >= 2026.3.22
 ```
+
+The `0.5.2` release was smoke-tested on `OpenClaw 2026.4.26`.
 
 ### 2. Install Plugin
 ```bash

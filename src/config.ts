@@ -1,5 +1,4 @@
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import type { OpenClawPluginConfigSchema } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi, OpenClawPluginConfigSchema } from "openclaw/plugin-sdk/core";
 import { supportsPublicAcpRuntime } from "./runtime/openclaw-version.js";
 
 export type WorkspaceMode = "shared" | "isolated";

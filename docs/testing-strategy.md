@@ -23,6 +23,8 @@ Must cover:
 
 Current baseline:
 
+- `npm run test:unit`: 59 files / 359 tests
+- `npm run test:e2e`: 19 files / 25 tests
 - init -> plan -> status
 - run -> review -> report
 - ACP dry-run scaffold
@@ -50,6 +52,8 @@ Minimum artifact expectations:
 - when journaling is enabled: top-level `<obsidianRoot>/<project>-swarm-report.md` plus project journal files under `<obsidianRoot>/<project>/`
 
 A smoke run can be partial by stage. The full journal shape appears only after the corresponding lifecycle step has executed.
+
+Release `0.5.2` live validation on mini `OpenClaw 2026.4.26` covered manual review/report completion and live ACP session acceptance/status/close.
 
 ## Regression Rule
 

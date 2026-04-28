@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { SwarmPluginConfig } from "../config.js";
-import type { PluginRuntime } from "openclaw/plugin-sdk";
+import type { PluginRuntime } from "openclaw/plugin-sdk/core";
 import type { OpenClawSessionAdapter, AcpAcceptedSession, AcpSessionStatus } from "./openclaw-session-adapter.js";
 import type { AcpSpawnParams } from "./acp-mapping.js";
 import { supportsPublicAcpRuntime } from "./openclaw-version.js";
@@ -52,6 +52,10 @@ type CompatibleAcpSdkLoadOptions = {
   importModule?: SdkImporter;
   resolveOpenClawRoot?: () => string;
 };
+type RuntimeConfigSnapshotReader = Pick<PluginRuntime, "config">["config"] & {
+  current?: () => unknown;
+  loadConfig?: () => unknown;
+};
 
 const PUBLIC_ACP_RUNTIME_UNAVAILABLE_PATTERNS = [
   "getAcpSessionManager at runtime",
@@ -61,6 +65,17 @@ const PUBLIC_ACP_RUNTIME_UNAVAILABLE_PATTERNS = [
 
 function defaultImportModule(specifier: string): Promise<SdkLike> {
   return import(specifier) as Promise<SdkLike>;
+}
+
+function readRuntimeConfigSnapshot(runtime: Pick<PluginRuntime, "config">): unknown {
+  const config = runtime.config as RuntimeConfigSnapshotReader;
+  if (typeof config.current === "function") {
+    return config.current();
+  }
+  if (typeof config.loadConfig === "function") {
+    return config.loadConfig();
+  }
+  throw new Error("OpenClaw runtime config snapshot is unavailable for ACP control-plane execution");
 }
 
 function buildHostSdkImportSpecifiers(runtimeVersion?: string | null, rootResolver: () => string = resolveOpenClawRoot): string[] {
@@ -154,7 +169,7 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
     if (!shouldUsePublicSessionAdapter(this.runtime, this.config)) {
       throw new Error("OpenClaw public ACP session adapter is disabled for this runtime/config combination");
     }
-    const cfg = this.runtime.config.loadConfig();
+    const cfg = readRuntimeConfigSnapshot(this.runtime);
     await this.ensureBackendRegistered(resolveOpenClawRoot(), cfg);
     const sdk = await this.sdkLoader();
     const manager = sdk.getAcpSessionManager?.();
