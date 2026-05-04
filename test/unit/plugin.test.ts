@@ -1,4 +1,6 @@
 import plugin from "../../src/index.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function createApi(overrides?: Partial<Record<string, unknown>>) {
   return {
@@ -37,5 +39,28 @@ describe("plugin registration", () => {
 
     expect(api.registerCli).not.toHaveBeenCalled();
     expect(api.registerService).not.toHaveBeenCalled();
+  });
+});
+
+describe("plugin manifest", () => {
+  it("declares the startup tool contracts required by OpenClaw", () => {
+    const manifest = JSON.parse(readFileSync(resolve("openclaw.plugin.json"), "utf8"));
+    const expectedTools = [
+      "swarm_status",
+      "swarm_autopilot_status",
+      "swarm_task_plan",
+      "swarm_run",
+      "swarm_review_gate",
+      "swarm_session_status",
+      "swarm_session_cancel",
+      "swarm_session_close",
+    ];
+
+    expect(manifest.activation).toEqual({ onStartup: true });
+    expect(manifest.contracts?.tools).toEqual(expectedTools);
+    expect(Object.keys(manifest.toolMetadata ?? {})).toEqual(expectedTools);
+    for (const tool of expectedTools) {
+      expect(manifest.toolMetadata[tool]).toEqual({ optional: true });
+    }
   });
 });

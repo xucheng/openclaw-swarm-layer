@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.2`
+- Current release line: `0.5.3`
 
 ## Preflight
 
@@ -60,22 +60,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.2`.
+Expected version for this release: `0.5.3`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.2
-git push origin v0.5.2
-gh release create v0.5.2 --title "v0.5.2" --notes-file docs/release-notes/v0.5.2.md
+git tag v0.5.3
+git push origin v0.5.3
+gh release create v0.5.3 --title "v0.5.3" --notes-file docs/release-notes/v0.5.3.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.2.md](release-notes/v0.5.2.md)
-- keep the `0.5.2` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.3.md](release-notes/v0.5.3.md)
+- keep the `0.5.3` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -93,11 +93,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.2 \
+  --version 0.5.3 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.2 \
+  --source-ref v0.5.3 \
   --source-commit <git-sha> \
-  --changelog "Update for OpenClaw 2026.4.26: current SDK subpaths, runtime config snapshots, descriptor-only CLI registration, and mini manual/ACP smoke validation."
+  --changelog "Update for OpenClaw 2026.5.3-1: declare startup tool contracts and optional tool metadata required by the current plugin runtime."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -116,8 +116,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.2 \
-  --changelog "Refresh the Swarm Layer skill for OpenClaw 2026.4.26 compatibility, current release metadata, and mini smoke validation."
+  --version 0.5.3 \
+  --changelog "Refresh the Swarm Layer skill for OpenClaw 2026.5.3-1 compatibility, current release metadata, and startup tool-contract guidance."
 ```
 
 Optional tags to keep aligned with the current listing:

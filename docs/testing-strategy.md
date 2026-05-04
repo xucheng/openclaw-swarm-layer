@@ -53,7 +53,7 @@ Minimum artifact expectations:
 
 A smoke run can be partial by stage. The full journal shape appears only after the corresponding lifecycle step has executed.
 
-Release `0.5.2` live validation on mini `OpenClaw 2026.4.26` covered manual review/report completion and live ACP session acceptance/status/close.
+Release `0.5.3` validation on OpenClaw `2026.5.3-1` covers startup tool-contract manifest checks, plugin doctor health, full unit regression, and full e2e regression.
 
 ## Regression Rule
 

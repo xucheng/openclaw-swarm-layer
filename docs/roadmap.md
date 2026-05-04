@@ -218,7 +218,7 @@ Target posture after closeout:
 
 Current status: complete (2026-04-08). `M7.0-M7.2` are implemented. The post-M7 verification baseline was 59 unit test files / 354 unit tests plus 19 e2e files / 25 e2e tests with `npm run build` and `npm test` green, clean `plugins install -l`, zero `child_process`, and a local ACP control-plane smoke completed through review/report/autopilot tick on OpenClaw 2026.4.8.
 
-Release `0.5.2` refresh (2026-04-28): OpenClaw 2026.4.26 compatibility validated with 59 unit test files / 359 unit tests, 19 e2e files / 25 e2e tests, and mini-host manual plus live ACP smoke.
+Release `0.5.3` refresh (2026-05-04): OpenClaw 2026.5.3-1 compatibility validated with 59 unit test files / 360 unit tests, 19 e2e files / 25 e2e tests, startup tool-contract manifest checks, and plugin doctor/runtime health smoke.
 
 ## Assessment Timeline
 

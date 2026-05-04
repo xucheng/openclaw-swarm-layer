@@ -1,11 +1,52 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
   ],
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "swarm_status",
+      "swarm_autopilot_status",
+      "swarm_task_plan",
+      "swarm_run",
+      "swarm_review_gate",
+      "swarm_session_status",
+      "swarm_session_cancel",
+      "swarm_session_close"
+    ]
+  },
+  "toolMetadata": {
+    "swarm_status": {
+      "optional": true
+    },
+    "swarm_autopilot_status": {
+      "optional": true
+    },
+    "swarm_task_plan": {
+      "optional": true
+    },
+    "swarm_run": {
+      "optional": true
+    },
+    "swarm_review_gate": {
+      "optional": true
+    },
+    "swarm_session_status": {
+      "optional": true
+    },
+    "swarm_session_cancel": {
+      "optional": true
+    },
+    "swarm_session_close": {
+      "optional": true
+    }
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

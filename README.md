@@ -6,11 +6,11 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.2-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-359%20unit%20%7C%2025%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-360%20unit%20%7C%2025%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -37,7 +37,7 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 ## Prerequisites
 
 - **Node.js** >= 22
-- **OpenClaw** >= 2026.3.22 (tested against `2026.4.26`)
+- **OpenClaw** >= 2026.3.22 (tested against `2026.5.3-1`)
 
 ## Installation
 
@@ -137,13 +137,13 @@ openclaw swarm report --project /path/to/your/project --json
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (359 tests, 59 files)
+npm run test:unit      # Unit tests only (360 tests, 59 files)
 npm run test:e2e       # E2E tests only (25 tests, 19 files)
 npm run test:watch     # Watch mode
 npm run release:check  # Build + full regression + npm pack dry-run + ClawHub package prep
 ```
 
-Current release validation also includes a mini-host smoke on `OpenClaw 2026.4.26`: manual `init -> plan -> run -> review -> report` and live ACP `init -> plan -> run -> session status -> session close`.
+Current release validation also includes OpenClaw `2026.5.3-1` smoke coverage on the mini and Volcengine hosts: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, and runtime health.
 
 ## Documentation
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.3 (2026-05-04)
+
+OpenClaw `2026.5.3-1` compatibility update for the current plugin runtime manifest contract.
+
+- Declared startup activation in `openclaw.plugin.json` so the Swarm Layer service and tool surface are loaded during gateway startup
+- Declared all eight registered swarm tools under `contracts.tools`, matching OpenClaw `2026.5.3-1` requirements before registering agent tools
+- Added optional `toolMetadata` for each registered swarm tool so manifest metadata mirrors runtime registration
+- Added manifest regression coverage to keep startup activation, tool contracts, and optional tool metadata aligned with runtime tools
+- Synced package metadata, plugin manifest metadata, in-plugin version metadata, README release badge, release runbook, ClawHub skill baseline, and release notes to `openclaw-swarm-layer@0.5.3`
+
+### Verification
+
+- `npx vitest run test/unit/plugin.test.ts` green: 3 tests
+- `npm run test:unit` green: 59 unit test files / 360 unit tests
+- `npm run test:e2e` green: 19 e2e files / 25 e2e tests
+- `npm run release:check` green: build, full regression, npm pack dry-run, and ClawHub package staging
+- OpenClaw `2026.5.3-1` host smoke green: plugin loaded, `openclaw-swarm-layer` doctor clean, `health.plugins.errors=[]`
+
 ## 0.5.2 (2026-04-28)
 
 OpenClaw `2026.4.26` compatibility and release packaging update.
