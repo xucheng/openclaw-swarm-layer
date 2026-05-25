@@ -82,6 +82,32 @@ Run these before claiming bridge-free ACP readiness:
 10. `openclaw swarm report --project <path> --json`
 11. `openclaw swarm autopilot tick --project <path> --json`
 
+## Autopilot Watcher Smoke
+
+Local:
+
+```bash
+npm run smoke:autopilot-watcher
+SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher
+```
+
+Mac mini:
+
+```bash
+rsync -a --exclude node_modules --exclude dist --exclude .git /Users/xucheng/repo/tools/openclaw-swarm-layer/ mini:/Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke/
+ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; cd /Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
+```
+
+Rollback:
+
+```jsonc
+{
+  "autopilot": {
+    "watcherMode": "polling"
+  }
+}
+```
+
 ## Artifact Expectations
 
 Local artifacts:
