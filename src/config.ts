@@ -68,12 +68,27 @@ export type SwarmAutopilotRecoveryPolicy = {
   degradedTerminalWindow: number;
 };
 
+export type SwarmAutopilotWatcherMode = "polling" | "watch" | "hybrid";
+
+export type SwarmAutopilotWatcherLibrary = "auto" | "parcel" | "node";
+
+export type SwarmAutopilotWatcherConfig = {
+  debounceMs: number;
+  safetyTickMs: number;
+  safetyResyncMs: number;
+  library: SwarmAutopilotWatcherLibrary;
+  ignoreInitial: boolean;
+  useFsEventsCoalescing: boolean;
+};
+
 export type SwarmAutopilotConfig = {
   enabled: boolean;
   mode: "supervised";
   tickSeconds: number;
   leaseSeconds: number;
   maxDispatchPerTick: number;
+  watcherMode: SwarmAutopilotWatcherMode;
+  watcher: SwarmAutopilotWatcherConfig;
   reviewPolicy: SwarmAutopilotReviewPolicy;
   recoveryPolicy: SwarmAutopilotRecoveryPolicy;
 };
@@ -102,6 +117,16 @@ export type SwarmPluginConfig = {
   bridge: SwarmBridgeConfig;
   bootstrap: SwarmBootstrapConfig;
   autopilot: SwarmAutopilotConfig;
+};
+
+export type SwarmAutopilotConfigInput = Partial<Omit<SwarmAutopilotConfig, "watcher" | "reviewPolicy" | "recoveryPolicy">> & {
+  watcher?: Partial<SwarmAutopilotWatcherConfig>;
+  reviewPolicy?: Partial<SwarmAutopilotReviewPolicy>;
+  recoveryPolicy?: Partial<SwarmAutopilotRecoveryPolicy>;
+};
+
+export type SwarmPluginConfigInput = Partial<Omit<SwarmPluginConfig, "autopilot">> & {
+  autopilot?: SwarmAutopilotConfigInput;
 };
 
 export const defaultSwarmPluginConfig: SwarmPluginConfig = {
@@ -156,6 +181,15 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
     tickSeconds: 15,
     leaseSeconds: 45,
     maxDispatchPerTick: 2,
+    watcherMode: "polling",
+    watcher: {
+      debounceMs: 100,
+      safetyTickMs: 300000,
+      safetyResyncMs: 3600000,
+      library: "auto",
+      ignoreInitial: true,
+      useFsEventsCoalescing: false,
+    },
     reviewPolicy: {
       mode: "manual_only",
       allowlistTags: [],
@@ -390,6 +424,19 @@ export const swarmPluginConfigJsonSchema = {
         tickSeconds: { type: "integer", minimum: 1, default: 15 },
         leaseSeconds: { type: "integer", minimum: 1, default: 45 },
         maxDispatchPerTick: { type: "integer", minimum: 1, default: 2 },
+        watcherMode: { type: "string", enum: ["polling", "watch", "hybrid"], default: "polling" },
+        watcher: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            debounceMs: { type: "integer", minimum: 1, default: 100 },
+            safetyTickMs: { type: "integer", minimum: 1000, default: 300000 },
+            safetyResyncMs: { type: "integer", minimum: 1, default: 3600000 },
+            library: { type: "string", enum: ["auto", "parcel", "node"], default: "auto" },
+            ignoreInitial: { type: "boolean", default: true },
+            useFsEventsCoalescing: { type: "boolean", default: false },
+          },
+        },
         reviewPolicy: {
           type: "object",
           additionalProperties: false,
@@ -634,6 +681,8 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
           "tickSeconds",
           "leaseSeconds",
           "maxDispatchPerTick",
+          "watcherMode",
+          "watcher",
           "reviewPolicy",
           "recoveryPolicy",
         ]);
@@ -655,6 +704,66 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
         ] as const) {
           if (value !== undefined && (!Number.isInteger(value) || Number(value) < 1)) {
             errors.push(`autopilot.${key} must be an integer >= 1`);
+          }
+        }
+        if (
+          autopilot.watcherMode !== undefined &&
+          autopilot.watcherMode !== "polling" &&
+          autopilot.watcherMode !== "watch" &&
+          autopilot.watcherMode !== "hybrid"
+        ) {
+          errors.push('autopilot.watcherMode must be one of: "polling", "watch", "hybrid"');
+        }
+        if (autopilot.watcher !== undefined) {
+          if (!isObject(autopilot.watcher)) {
+            errors.push("autopilot.watcher must be an object");
+          } else {
+            const watcher = autopilot.watcher;
+            const allowedWatcherKeys = new Set([
+              "debounceMs",
+              "safetyTickMs",
+              "safetyResyncMs",
+              "library",
+              "ignoreInitial",
+              "useFsEventsCoalescing",
+            ]);
+            for (const key of Object.keys(watcher)) {
+              if (!allowedWatcherKeys.has(key)) {
+                errors.push(`Unrecognized key: "autopilot.watcher.${key}"`);
+              }
+            }
+            if (
+              watcher.debounceMs !== undefined &&
+              (!Number.isInteger(watcher.debounceMs) || Number(watcher.debounceMs) < 1)
+            ) {
+              errors.push("autopilot.watcher.debounceMs must be an integer >= 1");
+            }
+            if (
+              watcher.safetyTickMs !== undefined &&
+              (!Number.isInteger(watcher.safetyTickMs) || Number(watcher.safetyTickMs) < 1000)
+            ) {
+              errors.push("autopilot.watcher.safetyTickMs must be an integer >= 1000");
+            }
+            if (
+              watcher.safetyResyncMs !== undefined &&
+              (!Number.isInteger(watcher.safetyResyncMs) || Number(watcher.safetyResyncMs) < 1)
+            ) {
+              errors.push("autopilot.watcher.safetyResyncMs must be an integer >= 1");
+            }
+            if (
+              watcher.library !== undefined &&
+              watcher.library !== "auto" &&
+              watcher.library !== "parcel" &&
+              watcher.library !== "node"
+            ) {
+              errors.push('autopilot.watcher.library must be one of: "auto", "parcel", "node"');
+            }
+            if (watcher.ignoreInitial !== undefined && typeof watcher.ignoreInitial !== "boolean") {
+              errors.push("autopilot.watcher.ignoreInitial must be a boolean");
+            }
+            if (watcher.useFsEventsCoalescing !== undefined && typeof watcher.useFsEventsCoalescing !== "boolean") {
+              errors.push("autopilot.watcher.useFsEventsCoalescing must be a boolean");
+            }
           }
         }
         if (autopilot.reviewPolicy !== undefined) {
@@ -881,6 +990,56 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
         input.autopilot.maxDispatchPerTick > 0
           ? Math.floor(input.autopilot.maxDispatchPerTick)
           : defaultSwarmPluginConfig.autopilot.maxDispatchPerTick,
+      watcherMode:
+        isObject(input.autopilot) &&
+        (input.autopilot.watcherMode === "polling" ||
+          input.autopilot.watcherMode === "watch" ||
+          input.autopilot.watcherMode === "hybrid")
+          ? input.autopilot.watcherMode
+          : defaultSwarmPluginConfig.autopilot.watcherMode,
+      watcher: {
+        debounceMs:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          typeof input.autopilot.watcher.debounceMs === "number" &&
+          input.autopilot.watcher.debounceMs > 0
+            ? Math.floor(input.autopilot.watcher.debounceMs)
+            : defaultSwarmPluginConfig.autopilot.watcher.debounceMs,
+        safetyTickMs:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          typeof input.autopilot.watcher.safetyTickMs === "number" &&
+          input.autopilot.watcher.safetyTickMs >= 1000
+            ? Math.floor(input.autopilot.watcher.safetyTickMs)
+            : defaultSwarmPluginConfig.autopilot.watcher.safetyTickMs,
+        safetyResyncMs:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          typeof input.autopilot.watcher.safetyResyncMs === "number" &&
+          input.autopilot.watcher.safetyResyncMs > 0
+            ? Math.floor(input.autopilot.watcher.safetyResyncMs)
+            : defaultSwarmPluginConfig.autopilot.watcher.safetyResyncMs,
+        library:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          (input.autopilot.watcher.library === "auto" ||
+            input.autopilot.watcher.library === "parcel" ||
+            input.autopilot.watcher.library === "node")
+            ? input.autopilot.watcher.library
+            : defaultSwarmPluginConfig.autopilot.watcher.library,
+        ignoreInitial:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          typeof input.autopilot.watcher.ignoreInitial === "boolean"
+            ? input.autopilot.watcher.ignoreInitial
+            : defaultSwarmPluginConfig.autopilot.watcher.ignoreInitial,
+        useFsEventsCoalescing:
+          isObject(input.autopilot) &&
+          isObject(input.autopilot.watcher) &&
+          typeof input.autopilot.watcher.useFsEventsCoalescing === "boolean"
+            ? input.autopilot.watcher.useFsEventsCoalescing
+            : defaultSwarmPluginConfig.autopilot.watcher.useFsEventsCoalescing,
+      },
       reviewPolicy: {
         mode:
           isObject(input.autopilot) &&

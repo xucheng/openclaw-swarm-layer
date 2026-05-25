@@ -1,4 +1,4 @@
-import type { AcpAutomationResolutionHints, SwarmPluginConfig } from "../config.js";
+import type { AcpAutomationResolutionHints, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
 import type { SpecDoc, TaskNode } from "../types.js";
 import { injectEvaluatorTasks } from "./evaluator-injection.js";
@@ -11,7 +11,7 @@ function taskIdForPhase(phaseId: string, index: number): string {
 
 export function planTasksFromSpec(
   spec: SpecDoc,
-  config?: Partial<SwarmPluginConfig>,
+  config?: SwarmPluginConfigInput,
   hints?: AcpAutomationResolutionHints,
 ): TaskNode[] {
   const resolvedConfig = resolveSwarmPluginConfig(config);

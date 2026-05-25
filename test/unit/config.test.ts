@@ -1,4 +1,10 @@
-import { describeAcpExecutionPosture, resolveSwarmPluginConfig, resolveWorkflowDefaultRunner, swarmPluginConfigSchema } from "../../src/config.js";
+import {
+  describeAcpExecutionPosture,
+  resolveSwarmPluginConfig,
+  resolveWorkflowDefaultRunner,
+  swarmPluginConfigSchema,
+  type SwarmPluginConfigInput,
+} from "../../src/config.js";
 
 describe("swarm plugin config", () => {
   it("resolves defaults and accepts obsidianRoot", () => {
@@ -18,6 +24,15 @@ describe("swarm plugin config", () => {
       tickSeconds: 15,
       leaseSeconds: 45,
       maxDispatchPerTick: 2,
+      watcherMode: "polling",
+      watcher: {
+        debounceMs: 100,
+        safetyTickMs: 300000,
+        safetyResyncMs: 3600000,
+        library: "auto",
+        ignoreInitial: true,
+        useFsEventsCoalescing: false,
+      },
       reviewPolicy: {
         mode: "manual_only",
         allowlistTags: [],
@@ -64,6 +79,87 @@ describe("swarm plugin config", () => {
     expect(resolved.autopilot.reviewPolicy.mode).toBe("auto_allowlist");
     expect(resolved.autopilot.recoveryPolicy.cancelBeforeRetry).toBe(false);
     expect(resolved.autopilot.recoveryPolicy.degradedFailureRate).toBe(0.75);
+  });
+
+  it("resolves autopilot watcher defaults", () => {
+    const resolved = resolveSwarmPluginConfig({});
+    expect(resolved.autopilot.watcherMode).toBe("polling");
+    expect(resolved.autopilot.watcher).toEqual({
+      debounceMs: 100,
+      safetyTickMs: 300000,
+      safetyResyncMs: 3600000,
+      library: "auto",
+      ignoreInitial: true,
+      useFsEventsCoalescing: false,
+    });
+  });
+
+  it("accepts nested autopilot watcher config", () => {
+    const resolved = resolveSwarmPluginConfig({
+      autopilot: {
+        watcherMode: "hybrid",
+        watcher: {
+          debounceMs: 50,
+          safetyTickMs: 120000,
+          safetyResyncMs: 600000,
+          library: "node",
+          ignoreInitial: false,
+          useFsEventsCoalescing: true,
+        },
+      },
+    });
+
+    expect(resolved.autopilot.watcherMode).toBe("hybrid");
+    expect(resolved.autopilot.watcher.debounceMs).toBe(50);
+    expect(resolved.autopilot.watcher.safetyTickMs).toBe(120000);
+    expect(resolved.autopilot.watcher.safetyResyncMs).toBe(600000);
+    expect(resolved.autopilot.watcher.library).toBe("node");
+    expect(resolved.autopilot.watcher.ignoreInitial).toBe(false);
+    expect(resolved.autopilot.watcher.useFsEventsCoalescing).toBe(true);
+  });
+
+  it("accepts partial nested autopilot input types", () => {
+    const input = {
+      autopilot: {
+        watcher: { debounceMs: 50 },
+        reviewPolicy: { mode: "auto_safe" },
+        recoveryPolicy: { degradedFailureRate: 0.25 },
+      },
+    } satisfies SwarmPluginConfigInput;
+
+    const resolved = resolveSwarmPluginConfig(input);
+    expect(resolved.autopilot.watcher.debounceMs).toBe(50);
+    expect(resolved.autopilot.reviewPolicy.mode).toBe("auto_safe");
+    expect(resolved.autopilot.recoveryPolicy.degradedFailureRate).toBe(0.25);
+  });
+
+  it("rejects invalid autopilot watcher config", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      autopilot: {
+        watcherMode: "fast",
+        watcher: {
+          debounceMs: 0,
+          safetyTickMs: 999,
+          safetyResyncMs: 0,
+          library: "bad",
+          ignoreInitial: "yes",
+          useFsEventsCoalescing: "no",
+        },
+      },
+    });
+
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) {
+      expect(result.errors).toEqual([
+        'autopilot.watcherMode must be one of: "polling", "watch", "hybrid"',
+        "autopilot.watcher.debounceMs must be an integer >= 1",
+        "autopilot.watcher.safetyTickMs must be an integer >= 1000",
+        "autopilot.watcher.safetyResyncMs must be an integer >= 1",
+        'autopilot.watcher.library must be one of: "auto", "parcel", "node"',
+        "autopilot.watcher.ignoreInitial must be a boolean",
+        "autopilot.watcher.useFsEventsCoalescing must be a boolean",
+      ]);
+    }
   });
 
   it("accepts nested acp config", () => {

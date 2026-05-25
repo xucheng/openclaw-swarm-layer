@@ -149,6 +149,13 @@ Controls the supervised control plane layered over the existing workflow runtime
 | `tickSeconds` | integer (>= 1) | `15` | Service-loop tick interval |
 | `leaseSeconds` | integer (>= 1) | `45` | Lease TTL that prevents overlapping active ticks |
 | `maxDispatchPerTick` | integer (>= 1) | `2` | Maximum dispatches the control plane can admit per tick |
+| `watcherMode` | `"polling" \| "watch" \| "hybrid"` | `"polling"` | Selects the service loop driver. `polling` is the rollback path, `watch` is event-driven, and `hybrid` combines watcher events with a low-frequency poll. |
+| `watcher.debounceMs` | integer (>= 1) | `100` | Change-event debounce window before a watcher tick is invoked |
+| `watcher.safetyTickMs` | integer (>= 1000) | `300000` | Safety tick interval used by watcher modes |
+| `watcher.safetyResyncMs` | integer (>= 1) | `3600000` | Maximum snapshot age before startup falls back to full cache load |
+| `watcher.library` | `"auto" \| "parcel" \| "node"` | `"auto"` | Watcher backend preference |
+| `watcher.ignoreInitial` | boolean | `true` | Suppress initial backend events after cache warmup |
+| `watcher.useFsEventsCoalescing` | boolean | `false` | macOS-specific option passed to the native watcher when supported |
 | `reviewPolicy.mode` | `"manual_only" \| "auto_safe" \| "auto_allowlist"` | `"manual_only"` | How autopilot should handle review-closure decisions |
 | `reviewPolicy.allowlistTags` | string[] | `[]` | Tags allowed for auto-approval when `reviewPolicy.mode = "auto_allowlist"` |
 | `reviewPolicy.denyTags` | string[] | `["high-risk", "security", "prod"]` | Tags that always block autopilot auto-approval |

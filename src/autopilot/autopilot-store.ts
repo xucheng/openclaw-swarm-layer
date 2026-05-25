@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { resolveSwarmPluginConfig, type SwarmPluginConfig } from "../config.js";
+import { resolveSwarmPluginConfig, type SwarmPluginConfig, type SwarmPluginConfigInput } from "../config.js";
 import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { resolveSwarmPaths } from "../lib/paths.js";
 import { createDefaultAutopilotState, type AutopilotDecision, type AutopilotState } from "./types.js";
@@ -17,7 +17,7 @@ function assert(condition: unknown, message: string): asserts condition {
 export class AutopilotStore {
   readonly config: SwarmPluginConfig;
 
-  constructor(config?: Partial<SwarmPluginConfig>) {
+  constructor(config?: SwarmPluginConfigInput) {
     this.config = resolveSwarmPluginConfig(config);
   }
 

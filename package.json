@@ -67,5 +67,8 @@
   },
   "peerDependencies": {
     "openclaw": "^2026.3.22"
+  },
+  "optionalDependencies": {
+    "@parcel/watcher": "^2.5.6"
   }
 }

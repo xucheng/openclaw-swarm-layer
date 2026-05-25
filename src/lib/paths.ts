@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { SwarmPluginConfig } from "../config.js";
+import type { SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 
 export type SwarmPaths = {
   projectRoot: string;
@@ -35,7 +35,7 @@ export function resolveProjectRoot(projectRoot: string, config?: Pick<SwarmPlugi
   return path.resolve(source);
 }
 
-export function resolveSwarmPaths(projectRoot: string, config?: Partial<SwarmPluginConfig>): SwarmPaths {
+export function resolveSwarmPaths(projectRoot: string, config?: SwarmPluginConfigInput): SwarmPaths {
   const resolvedProjectRoot = resolveProjectRoot(projectRoot, config);
   const swarmRoot = config?.stateRoot
     ? path.resolve(config.stateRoot, path.basename(resolvedProjectRoot))

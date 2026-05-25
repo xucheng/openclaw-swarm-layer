@@ -1,5 +1,5 @@
 import type { PluginRuntime } from "openclaw/plugin-sdk/core";
-import type { SwarmPluginConfig } from "../config.js";
+import type { SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolveSwarmPluginConfig } from "../config.js";
 import { UnsupportedOpenClawSessionAdapter, type OpenClawSessionAdapter } from "../runtime/openclaw-session-adapter.js";
 import { createSessionAdapter } from "../runtime/real-openclaw-session-adapter.js";
@@ -7,7 +7,7 @@ import { SessionStore } from "../session/session-store.js";
 import { StateStore } from "../state/state-store.js";
 
 export type SwarmCliContext = {
-  config?: Partial<SwarmPluginConfig>;
+  config?: SwarmPluginConfigInput;
   stateStore?: StateStore;
   sessionStore?: SessionStore;
   sessionAdapter?: OpenClawSessionAdapter;

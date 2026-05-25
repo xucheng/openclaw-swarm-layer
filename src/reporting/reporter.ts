@@ -3,7 +3,7 @@ import path from "node:path";
 import { AutopilotStore } from "../autopilot/autopilot-store.js";
 import { buildAutopilotHealthSummary } from "../autopilot/metrics.js";
 import { createDefaultAutopilotState, type AutopilotState } from "../autopilot/types.js";
-import type { SwarmPluginConfig } from "../config.js";
+import type { SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { describeAcpExecutionPosture, resolveRuntimePolicySnapshot } from "../config.js";
 import { ensureDir } from "../lib/json-file.js";
 import { resolveSwarmPaths } from "../lib/paths.js";
@@ -209,7 +209,7 @@ export function buildWorkflowReport(
 export async function writeWorkflowReport(
   projectRoot: string,
   workflow: WorkflowState,
-  config?: Partial<SwarmPluginConfig>,
+  config?: SwarmPluginConfigInput,
   stateStore = new StateStore(config),
 ): Promise<ReportWriteResult> {
   const resolvedConfig = config ?? stateStore.config;

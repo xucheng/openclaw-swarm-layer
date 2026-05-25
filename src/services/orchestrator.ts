@@ -4,7 +4,7 @@ import type {
   OpenClawPluginServiceContext,
   PluginRuntime,
 } from "openclaw/plugin-sdk/core";
-import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig } from "../config.js";
+import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
 import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
@@ -762,7 +762,7 @@ export class SwarmOrchestrator {
 }
 
 export function createSwarmService(
-  config?: Partial<SwarmPluginConfig>,
+  config?: SwarmPluginConfigInput,
   runtimeVersion?: string | null,
   deps?: SwarmServiceDeps,
 ): OpenClawPluginService {

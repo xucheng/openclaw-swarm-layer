@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { AcpAutomationResolutionHints, SwarmPluginConfig } from "../config.js";
+import type { AcpAutomationResolutionHints, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolveDefaultAllowedRunners, resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
 import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { validateTaskImmutability } from "../planning/immutability-guard.js";
@@ -71,7 +71,7 @@ function assertTask(task: unknown, options?: { allowLegacyRunnerTypes?: boolean 
 
 export function createEmptyWorkflowState(
   projectRoot: string,
-  config: Partial<SwarmPluginConfig> = {},
+  config: SwarmPluginConfigInput = {},
   hints?: AcpAutomationResolutionHints,
 ): WorkflowState {
   const resolvedConfig = resolveSwarmPluginConfig(config);
@@ -92,7 +92,7 @@ export class StateStore {
   readonly config: SwarmPluginConfig;
   readonly runtimeVersion?: string | null;
 
-  constructor(config?: Partial<SwarmPluginConfig>, hints?: AcpAutomationResolutionHints) {
+  constructor(config?: SwarmPluginConfigInput, hints?: AcpAutomationResolutionHints) {
     this.config = resolveSwarmPluginConfig(config);
     this.runtimeVersion = hints?.runtimeVersion;
   }

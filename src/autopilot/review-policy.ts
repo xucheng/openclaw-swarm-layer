@@ -83,7 +83,9 @@ function buildRejectOptions(config: Pick<SwarmPluginConfig, "review">): ReviewDe
 export function applyAutopilotReviewPolicy(
   workflow: WorkflowState,
   runs: RunRecord[],
-  config: Pick<SwarmPluginConfig, "autopilot" | "review">,
+  config: Pick<SwarmPluginConfig, "review"> & {
+    autopilot: Partial<SwarmPluginConfig["autopilot"]> & Pick<SwarmPluginConfig["autopilot"], "reviewPolicy">;
+  },
 ): AutopilotReviewResult {
   let nextWorkflow = workflow;
   const decisions: AutopilotReviewDecision[] = [];
