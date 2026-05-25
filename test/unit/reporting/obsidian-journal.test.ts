@@ -16,8 +16,10 @@ function makePaths(base: string, obsidian?: string): SwarmPaths {
   return {
     projectRoot: base,
     swarmRoot: base,
+    autopilotDir: path.join(base, ".autopilot"),
     workflowStatePath: path.join(base, "workflow-state.json"),
     autopilotStatePath: path.join(base, "autopilot-state.json"),
+    autopilotWatcherSnapshotPath: path.join(base, ".autopilot", "watcher.snapshot"),
     specsDir: path.join(base, "specs"),
     runsDir: path.join(base, "runs"),
     sessionsDir: path.join(base, "sessions"),

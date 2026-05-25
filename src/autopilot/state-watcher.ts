@@ -1,0 +1,296 @@
+import { EventEmitter } from "node:events";
+import fs from "node:fs";
+import fsp from "node:fs/promises";
+import path from "node:path";
+import type { SwarmAutopilotWatcherConfig } from "../config.js";
+import { ensureDir } from "../lib/json-file.js";
+import type { SwarmPaths } from "../lib/paths.js";
+
+export type StateWatcherEventKind = "workflow" | "autopilot" | "progress" | "run" | "spec" | "session";
+export type StateWatcherOperation = "create" | "update" | "delete";
+
+export type StateWatcherEvent = {
+  kind: StateWatcherEventKind;
+  op: StateWatcherOperation;
+  paths: string[];
+  at: string;
+  seq: number;
+};
+
+export type RawStateWatcherEvent = {
+  type: string;
+  path: string;
+};
+
+type ParcelWatcherModule = {
+  subscribe(
+    dir: string,
+    callback: (err: Error | null, events: RawStateWatcherEvent[]) => void,
+    opts?: Record<string, unknown>,
+  ): Promise<{ unsubscribe(): Promise<void> }>;
+  getEventsSince?(dir: string, snapshotPath: string): Promise<RawStateWatcherEvent[]>;
+  writeSnapshot?(dir: string, snapshotPath: string): Promise<unknown>;
+};
+
+type NodeWatcherHandle = {
+  close(): void;
+  on(event: "error", handler: (error: Error) => void): unknown;
+};
+
+type NodeWatch = (
+  dir: string,
+  options: { persistent: boolean },
+  listener: (eventType: string, fileName: string | Buffer | null) => void,
+) => NodeWatcherHandle;
+
+type WatchSubscription = { unsubscribe(): Promise<void> };
+
+type StateWatcherDependencies = {
+  loadParcelWatcher?: () => Promise<ParcelWatcherModule>;
+  watch?: NodeWatch;
+};
+
+export class StateWatcher extends EventEmitter {
+  private readonly loadParcelWatcher: () => Promise<ParcelWatcherModule>;
+  private readonly watch: NodeWatch;
+  private subscriptions: WatchSubscription[] = [];
+  private nodeWatchers: NodeWatcherHandle[] = [];
+  private buffer = new Map<string, RawStateWatcherEvent>();
+  private timer?: ReturnType<typeof setTimeout>;
+  private seq = 0;
+  private started = false;
+  private parcelActive = false;
+
+  constructor(
+    private readonly paths: SwarmPaths,
+    private readonly config: Pick<
+      SwarmAutopilotWatcherConfig,
+      "debounceMs" | "safetyResyncMs" | "library" | "ignoreInitial" | "useFsEventsCoalescing"
+    >,
+    dependencies: StateWatcherDependencies = {},
+  ) {
+    super();
+    this.loadParcelWatcher = dependencies.loadParcelWatcher ?? (async () => (await import("@parcel/watcher")) as unknown as ParcelWatcherModule);
+    this.watch = dependencies.watch ?? ((dir, options, listener) => fs.watch(dir, options, listener) as NodeWatcherHandle);
+  }
+
+  override on(event: "change", handler: (event: StateWatcherEvent) => void): this;
+  override on(event: "error", handler: (error: Error, scope: string) => void): this;
+  override on(event: string, handler: (...args: any[]) => void): this {
+    return super.on(event, handler);
+  }
+
+  static classifyPath(paths: SwarmPaths, filePath: string): StateWatcherEventKind | undefined {
+    const normalized = path.resolve(filePath);
+    if (StateWatcher.isInsideDir(normalized, paths.autopilotDir)) return undefined;
+    if (normalized === paths.workflowStatePath) return "workflow";
+    if (normalized === paths.autopilotStatePath) return "autopilot";
+    if (normalized === paths.progressFilePath) return "progress";
+    if (StateWatcher.isInsideDir(normalized, paths.runsDir) && normalized.endsWith(".json")) return "run";
+    if (StateWatcher.isInsideDir(normalized, paths.specsDir) && normalized.endsWith(".json")) return "spec";
+    if (StateWatcher.isInsideDir(normalized, paths.sessionsDir) && normalized.endsWith(".json")) return "session";
+    return undefined;
+  }
+
+  lastSeq(): number {
+    return this.seq;
+  }
+
+  async start(): Promise<void> {
+    if (this.started) return;
+    this.started = true;
+    await ensureDir(this.paths.autopilotDir);
+    await this.replaySnapshot();
+
+    if (this.config.library === "node") {
+      await this.startNodeWatchers();
+      return;
+    }
+
+    try {
+      await this.startParcelWatcher();
+    } catch (error) {
+      this.started = false;
+      if (this.config.library === "parcel") {
+        this.clearPending();
+        throw error;
+      }
+      this.started = true;
+      this.emitWatcherError(error instanceof Error ? error : new Error(String(error)), this.paths.swarmRoot);
+      await this.startNodeWatchers();
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (!this.started) return;
+    this.started = false;
+    this.clearPending();
+    await Promise.all(this.subscriptions.map((subscription) => subscription.unsubscribe()));
+    this.subscriptions = [];
+    for (const watcher of this.nodeWatchers) {
+      watcher.close();
+    }
+    this.nodeWatchers = [];
+    if (this.parcelActive) {
+      await this.writeSnapshot();
+      this.parcelActive = false;
+    }
+  }
+
+  pushRawEventsForTest(events: RawStateWatcherEvent[]): void {
+    this.pushRawEvents(events);
+  }
+
+  private async startParcelWatcher(): Promise<void> {
+    const watcher = await this.loadParcelWatcher();
+    const subscription = await watcher.subscribe(
+      this.paths.swarmRoot,
+      (err, events) => {
+        if (err) {
+          this.emitWatcherError(err, this.paths.swarmRoot);
+          return;
+        }
+        this.pushRawEvents(events);
+      },
+      {
+        ignore: [this.paths.autopilotDir],
+        useFsEventsCoalescing: this.config.useFsEventsCoalescing,
+      },
+    );
+    this.subscriptions.push(subscription);
+    this.parcelActive = true;
+  }
+
+  private async startNodeWatchers(): Promise<void> {
+    await Promise.all([
+      ensureDir(this.paths.swarmRoot),
+      ensureDir(this.paths.runsDir),
+      ensureDir(this.paths.specsDir),
+      ensureDir(this.paths.sessionsDir),
+    ]);
+    const dirs = [this.paths.swarmRoot, this.paths.runsDir, this.paths.specsDir, this.paths.sessionsDir];
+    for (const dir of dirs) {
+      const watcher = this.watch(dir, { persistent: false }, (eventType, fileName) => {
+        if (!fileName) return;
+        this.pushRawEvents([{ type: eventType, path: path.join(dir, fileName.toString()) }]);
+      });
+      watcher.on("error", (error) => this.emitWatcherError(error, dir));
+      this.nodeWatchers.push(watcher);
+    }
+  }
+
+  private async replaySnapshot(): Promise<void> {
+    if (this.config.library === "node") return;
+    if (!(await this.isSnapshotFresh())) return;
+    try {
+      const watcher = await this.loadParcelWatcher();
+      const events = await watcher.getEventsSince?.(this.paths.swarmRoot, this.paths.autopilotWatcherSnapshotPath);
+      if (events && events.length > 0) {
+        this.pushRawEvents(events);
+      }
+    } catch (error) {
+      this.emitWatcherError(error instanceof Error ? error : new Error(String(error)), this.paths.autopilotWatcherSnapshotPath);
+    }
+  }
+
+  private async writeSnapshot(): Promise<void> {
+    if (this.config.library === "node") return;
+    try {
+      const watcher = await this.loadParcelWatcher();
+      await watcher.writeSnapshot?.(this.paths.swarmRoot, this.paths.autopilotWatcherSnapshotPath);
+    } catch (error) {
+      this.emitWatcherError(error instanceof Error ? error : new Error(String(error)), this.paths.autopilotWatcherSnapshotPath);
+    }
+  }
+
+  private async isSnapshotFresh(): Promise<boolean> {
+    try {
+      const stat = await fsp.stat(this.paths.autopilotWatcherSnapshotPath);
+      return Date.now() - stat.mtimeMs <= this.config.safetyResyncMs;
+    } catch {
+      return false;
+    }
+  }
+
+  private pushRawEvents(events: RawStateWatcherEvent[]): void {
+    for (const event of events) {
+      if (this.shouldIgnore(event.path)) continue;
+      const kind = StateWatcher.classifyPath(this.paths, event.path);
+      if (!kind) continue;
+      this.buffer.set(path.resolve(event.path), event);
+    }
+    if (this.buffer.size === 0 || this.timer) return;
+    this.timer = setTimeout(() => this.flush(), this.config.debounceMs);
+  }
+
+  private clearPending(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
+    this.buffer.clear();
+  }
+
+  private emitWatcherError(error: Error, scope: string): void {
+    if (this.listenerCount("error") > 0) {
+      this.emit("error", error, scope);
+    }
+  }
+
+  private flush(): void {
+    this.timer = undefined;
+    const grouped = new Map<StateWatcherEventKind, RawStateWatcherEvent[]>();
+    for (const event of this.buffer.values()) {
+      const kind = StateWatcher.classifyPath(this.paths, event.path);
+      if (!kind) continue;
+      const existing = grouped.get(kind) ?? [];
+      existing.push(event);
+      grouped.set(kind, existing);
+    }
+    this.buffer.clear();
+
+    for (const [kind, events] of grouped) {
+      this.seq += 1;
+      this.emit("change", {
+        kind,
+        op: this.coalesceOperation(events),
+        paths: Array.from(new Set(events.map((event) => path.resolve(event.path)))).sort(),
+        at: new Date().toISOString(),
+        seq: this.seq,
+      } satisfies StateWatcherEvent);
+    }
+  }
+
+  private coalesceOperation(events: RawStateWatcherEvent[]): StateWatcherOperation {
+    const operations = new Set(events.map((event) => this.normalizeOperation(event.type)));
+    if (operations.size === 1) {
+      return Array.from(operations)[0];
+    }
+    return "update";
+  }
+
+  private normalizeOperation(type: string): StateWatcherOperation {
+    if (type === "create" || type === "delete" || type === "update") {
+      return type;
+    }
+    return "update";
+  }
+
+  private shouldIgnore(filePath: string): boolean {
+    const normalized = path.resolve(filePath);
+    const basename = path.basename(normalized);
+    return (
+      StateWatcher.isInsideDir(normalized, this.paths.autopilotDir) ||
+      basename.endsWith(".lock") ||
+      basename.startsWith(".tmp") ||
+      basename.startsWith(".~atomic-") ||
+      basename.includes(".tmp-") ||
+      basename.endsWith(".bak")
+    );
+  }
+
+  private static isInsideDir(filePath: string, dirPath: string): boolean {
+    const relative = path.relative(path.resolve(dirPath), path.resolve(filePath));
+    return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
+  }
+}

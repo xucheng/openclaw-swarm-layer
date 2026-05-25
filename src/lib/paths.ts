@@ -4,8 +4,10 @@ import type { SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 export type SwarmPaths = {
   projectRoot: string;
   swarmRoot: string;
+  autopilotDir: string;
   workflowStatePath: string;
   autopilotStatePath: string;
+  autopilotWatcherSnapshotPath: string;
   specsDir: string;
   runsDir: string;
   sessionsDir: string;
@@ -49,8 +51,10 @@ export function resolveSwarmPaths(projectRoot: string, config?: SwarmPluginConfi
   return {
     projectRoot: resolvedProjectRoot,
     swarmRoot,
+    autopilotDir: path.join(swarmRoot, ".autopilot"),
     workflowStatePath: path.join(swarmRoot, "workflow-state.json"),
     autopilotStatePath: path.join(swarmRoot, "autopilot-state.json"),
+    autopilotWatcherSnapshotPath: path.join(swarmRoot, ".autopilot", "watcher.snapshot"),
     specsDir: path.join(swarmRoot, "specs"),
     runsDir: path.join(swarmRoot, "runs"),
     sessionsDir: path.join(swarmRoot, "sessions"),
