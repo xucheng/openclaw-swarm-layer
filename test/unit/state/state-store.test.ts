@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { StateStore, createEmptyWorkflowState } from "../../../src/state/state-store.js";
 import type { WorkflowReader } from "../../../src/state/workflow-reader.js";
-import type { ProgressSummary, RunRecord, SpecDoc } from "../../../src/types.js";
+import type { ProgressSummary, RunRecord, SpecDoc, WorkflowState } from "../../../src/types.js";
 
 async function makeTempProject(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-state-"));
@@ -295,5 +295,55 @@ describe("StateStore", () => {
     expect(reader.onSpecWritten).toHaveBeenCalledWith(projectRoot, spec);
     expect(reader.onRunWritten).toHaveBeenCalledWith(projectRoot, runRecord);
     expect(reader.onProgressWritten).toHaveBeenCalledWith(projectRoot, progress);
+  });
+
+  it("uses injected reader state for workflow immutability checks", async () => {
+    const projectRoot = await makeTempProject();
+    const existingWorkflow: WorkflowState = {
+      version: 1,
+      projectRoot,
+      lifecycle: "planned",
+      tasks: [
+        {
+          taskId: "task-1",
+          specId: "spec-1",
+          title: "Original title",
+          description: "Task description",
+          kind: "coding",
+          deps: [],
+          status: "ready",
+          workspace: { mode: "shared" },
+          runner: { type: "manual" },
+          review: { required: false },
+        },
+      ],
+      reviewQueue: [],
+    };
+    const mutatedWorkflow: WorkflowState = {
+      ...existingWorkflow,
+      tasks: [
+        {
+          ...existingWorkflow.tasks[0]!,
+          title: "Mutated title",
+        },
+      ],
+    };
+    const reader: WorkflowReader = {
+      initProject: vi.fn(async () => new StateStore().initProject(projectRoot)),
+      loadWorkflow: vi.fn(async () => existingWorkflow),
+      loadSpecs: vi.fn(async () => []),
+      loadRuns: vi.fn(async () => []),
+      loadRun: vi.fn(async () => null),
+      loadProgress: vi.fn(async () => null),
+      loadSessions: vi.fn(async () => []),
+      onWorkflowWritten: vi.fn(),
+    };
+    const store = new StateStore({ enforceTaskImmutability: true }, undefined, reader);
+
+    await expect(store.saveWorkflow(projectRoot, mutatedWorkflow)).rejects.toThrow(
+      "Task immutability violation: Immutable field changed: task-1.title",
+    );
+    expect(reader.loadWorkflow).toHaveBeenCalledWith(projectRoot);
+    expect(reader.onWorkflowWritten).not.toHaveBeenCalled();
   });
 });

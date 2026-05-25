@@ -1,7 +1,7 @@
 import path from "node:path";
 import type { AcpAutomationResolutionHints, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolveDefaultAllowedRunners, resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
-import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+import { writeJsonFileAtomic } from "../lib/json-file.js";
 import { validateTaskImmutability } from "../planning/immutability-guard.js";
 import { resolveSwarmPaths, type SwarmPaths } from "../lib/paths.js";
 import type { ProgressSummary, RunRecord, SessionRecord, SpecDoc, TaskNode, WorkflowState, WorkflowStatusSummary } from "../types.js";
@@ -131,7 +131,7 @@ export class StateStore {
 
     // Immutability guard: check task fields haven't been illegally mutated
     if (this.config.enforceTaskImmutability) {
-      const existing = await readJsonFile<WorkflowState>(paths.workflowStatePath);
+      const existing = await this.reader.loadWorkflow(projectRoot);
       if (existing && existing.tasks && existing.tasks.length > 0) {
         const check = validateTaskImmutability(existing.tasks, workflow.tasks);
         if (!check.ok) {

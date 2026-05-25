@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import type { SwarmPluginConfig } from "../config.js";
 import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
@@ -78,15 +77,5 @@ export class FsWorkflowReader implements WorkflowReader {
   async loadSessions(projectRoot: string): Promise<SessionRecord[]> {
     const paths = await this.initProject(projectRoot);
     return readDirectoryJsonFiles<SessionRecord>(paths.sessionsDir);
-  }
-
-  async deleteFileIfExists(filePath: string): Promise<void> {
-    try {
-      await fs.unlink(filePath);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-    }
   }
 }
