@@ -52,6 +52,18 @@ describe("StateWatcher", () => {
     expect(StateWatcher.classifyPath(paths, path.join(paths.autopilotDir, "watcher.snapshot"))).toBeUndefined();
   });
 
+  it("classifies watcher paths that arrive through a realpath-equivalent symlink", async () => {
+    const realRoot = await makeTempProject();
+    const symlinkRoot = path.join(os.tmpdir(), `swarm-layer-state-watcher-link-${Date.now()}`);
+    await fs.symlink(realRoot, symlinkRoot);
+    const paths = resolveSwarmPaths(symlinkRoot, {});
+    await fs.mkdir(paths.runsDir, { recursive: true });
+
+    const realRunPath = path.join(await fs.realpath(paths.runsDir), "run-1.json");
+
+    expect(StateWatcher.classifyPath(paths, realRunPath)).toBe("run");
+  });
+
   it("debounces raw events into coalesced normalized changes", async () => {
     vi.useFakeTimers();
     const paths = resolveSwarmPaths("/tmp/project", {});
@@ -322,7 +334,12 @@ describe("StateWatcher", () => {
 
     expect(getEventsSince).toHaveBeenCalledWith(paths.swarmRoot, paths.autopilotWatcherSnapshotPath);
     expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({ kind: "workflow", op: "update", paths: [paths.workflowStatePath], seq: 1 });
+    expect(changes[0]).toMatchObject({
+      kind: "workflow",
+      op: "update",
+      paths: [path.join(await fs.realpath(path.dirname(paths.workflowStatePath)), path.basename(paths.workflowStatePath))],
+      seq: 1,
+    });
     expect(unsubscribe).toHaveBeenCalledTimes(1);
     expect(writeSnapshot).toHaveBeenCalledWith(paths.swarmRoot, paths.autopilotWatcherSnapshotPath);
   });

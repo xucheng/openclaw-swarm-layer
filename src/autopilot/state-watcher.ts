@@ -86,11 +86,11 @@ export class StateWatcher extends EventEmitter {
   }
 
   static classifyPath(paths: SwarmPaths, filePath: string): StateWatcherEventKind | undefined {
-    const normalized = path.resolve(filePath);
+    const normalized = StateWatcher.normalizePath(filePath);
     if (StateWatcher.isInsideDir(normalized, paths.autopilotDir)) return undefined;
-    if (normalized === paths.workflowStatePath) return "workflow";
-    if (normalized === paths.autopilotStatePath) return "autopilot";
-    if (normalized === paths.progressFilePath) return "progress";
+    if (normalized === StateWatcher.normalizePath(paths.workflowStatePath)) return "workflow";
+    if (normalized === StateWatcher.normalizePath(paths.autopilotStatePath)) return "autopilot";
+    if (normalized === StateWatcher.normalizePath(paths.progressFilePath)) return "progress";
     if (StateWatcher.isInsideDir(normalized, paths.runsDir) && normalized.endsWith(".json")) return "run";
     if (StateWatcher.isInsideDir(normalized, paths.specsDir) && normalized.endsWith(".json")) return "spec";
     if (StateWatcher.isInsideDir(normalized, paths.sessionsDir) && normalized.endsWith(".json")) return "session";
@@ -271,7 +271,7 @@ export class StateWatcher extends EventEmitter {
       if (this.shouldIgnore(event.path)) continue;
       const kind = StateWatcher.classifyPath(this.paths, event.path);
       if (!kind) continue;
-      this.buffer.set(path.resolve(event.path), event);
+      this.buffer.set(StateWatcher.normalizePath(event.path), event);
     }
     if (this.buffer.size === 0 || this.timer) return;
     this.timer = setTimeout(() => this.flush(), this.config.debounceMs);
@@ -316,7 +316,7 @@ export class StateWatcher extends EventEmitter {
       this.emit("change", {
         kind,
         op: this.coalesceOperation(events),
-        paths: Array.from(new Set(events.map((event) => path.resolve(event.path)))).sort(),
+        paths: Array.from(new Set(events.map((event) => StateWatcher.normalizePath(event.path)))).sort(),
         at: new Date().toISOString(),
         seq: this.seq,
       } satisfies StateWatcherEvent);
@@ -339,7 +339,7 @@ export class StateWatcher extends EventEmitter {
   }
 
   private shouldIgnore(filePath: string): boolean {
-    const normalized = path.resolve(filePath);
+    const normalized = StateWatcher.normalizePath(filePath);
     const basename = path.basename(normalized);
     return (
       StateWatcher.isInsideDir(normalized, this.paths.autopilotDir) ||
@@ -352,7 +352,20 @@ export class StateWatcher extends EventEmitter {
   }
 
   private static isInsideDir(filePath: string, dirPath: string): boolean {
-    const relative = path.relative(path.resolve(dirPath), path.resolve(filePath));
+    const relative = path.relative(StateWatcher.normalizePath(dirPath), StateWatcher.normalizePath(filePath));
     return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
+  }
+
+  private static normalizePath(filePath: string): string {
+    const resolved = path.resolve(filePath);
+    try {
+      return fs.realpathSync.native(resolved);
+    } catch {
+      try {
+        return path.join(fs.realpathSync.native(path.dirname(resolved)), path.basename(resolved));
+      } catch {
+        return resolved;
+      }
+    }
   }
 }
