@@ -135,7 +135,7 @@ type OrchestratorDeps = {
 };
 
 type SwarmServiceLoopLike = {
-  start(projectRoot: string): void;
+  start(projectRoot: string): void | Promise<void>;
   stop(): Promise<void>;
 };
 
@@ -787,10 +787,15 @@ export function createSwarmService(
         new AutopilotServiceLoop(
           new AutopilotController(stateStore, autopilotStore, createOrchestrator({ stateStore, sessionAdapter })),
           autopilotStore,
-          stateStore.config.autopilot.tickSeconds * 1000,
+          {
+            mode: "polling",
+            pollingIntervalMs: stateStore.config.autopilot.tickSeconds * 1000,
+            debounceMs: stateStore.config.autopilot.watcher.debounceMs,
+            safetyTickMs: stateStore.config.autopilot.watcher.safetyTickMs,
+          },
           ctx.logger,
         );
-      loop.start(projectRoot);
+      await loop.start(projectRoot);
     },
     async stop() {
       await loop?.stop();

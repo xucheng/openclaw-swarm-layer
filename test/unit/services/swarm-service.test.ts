@@ -118,7 +118,7 @@ describe("swarm service", () => {
   it("wires the default service loop to use the runtime ACP session adapter", async () => {
     const runtimeAdapter = makeRuntimeAdapter();
     vi.spyOn(realAdapterModule, "createSessionAdapter").mockReturnValue(runtimeAdapter);
-    const startSpy = vi.spyOn(AutopilotServiceLoop.prototype, "start").mockImplementation(() => undefined);
+    const startSpy = vi.spyOn(AutopilotServiceLoop.prototype, "start").mockResolvedValue(undefined);
     const stopSpy = vi.spyOn(AutopilotServiceLoop.prototype, "stop").mockResolvedValue(undefined);
 
     const service = createSwarmService(serviceConfig, runtime.version, { runtime });
@@ -135,7 +135,7 @@ describe("swarm service", () => {
   it("passes api.runtime through registerSwarmService", async () => {
     const runtimeAdapter = makeRuntimeAdapter();
     vi.spyOn(realAdapterModule, "createSessionAdapter").mockReturnValue(runtimeAdapter);
-    const startSpy = vi.spyOn(AutopilotServiceLoop.prototype, "start").mockImplementation(() => undefined);
+    const startSpy = vi.spyOn(AutopilotServiceLoop.prototype, "start").mockResolvedValue(undefined);
     const stopSpy = vi.spyOn(AutopilotServiceLoop.prototype, "stop").mockResolvedValue(undefined);
     const registerService = vi.fn();
 

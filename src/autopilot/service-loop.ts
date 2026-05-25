@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { OpenClawPluginServiceContext } from "openclaw/plugin-sdk/core";
 import { AutopilotStore } from "./autopilot-store.js";
 import { AutopilotController } from "./controller.js";
+import type { AutopilotTickSource } from "./types.js";
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
@@ -17,72 +18,188 @@ const defaultScheduler: AutopilotServiceLoopScheduler = {
   now: () => new Date().toISOString(),
 };
 
+export type AutopilotServiceLoopMode = "polling" | "watch" | "hybrid";
+
+export type AutopilotServiceLoopWatcher = {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  on(event: "change", handler: () => void): unknown;
+  on(event: "error", handler: (error: Error, scope: string) => void): unknown;
+};
+
+export type AutopilotServiceLoopOptions = {
+  mode: AutopilotServiceLoopMode;
+  pollingIntervalMs: number;
+  debounceMs: number;
+  safetyTickMs: number;
+  watcher?: AutopilotServiceLoopWatcher;
+};
+
 export class AutopilotServiceLoop {
-  private timer?: TimerHandle;
+  private pollingTimer?: TimerHandle;
+  private safetyTimer?: TimerHandle;
+  private debounceTimer?: TimerHandle;
+  private debounceSource?: AutopilotTickSource;
+  private followUpSource?: AutopilotTickSource;
   private projectRoot?: string;
   private running = false;
   private inFlight?: Promise<void>;
+  private watcherListenersAttached = false;
 
   constructor(
     private readonly controller: Pick<AutopilotController, "tick">,
     private readonly autopilotStore: AutopilotStore,
-    private readonly intervalMs: number,
+    private readonly options: AutopilotServiceLoopOptions,
     private readonly logger?: Pick<OpenClawPluginServiceContext["logger"], "info" | "warn" | "error">,
     private readonly scheduler: AutopilotServiceLoopScheduler = defaultScheduler,
   ) {}
 
-  start(projectRoot: string): void {
+  async start(projectRoot: string): Promise<void> {
     if (this.running) {
       return;
     }
     this.running = true;
     this.projectRoot = projectRoot;
-    this.scheduleNext(0);
+    try {
+      if (this.options.mode === "polling") {
+        this.schedulePolling(0);
+        return;
+      }
+
+      if (!this.options.watcher) {
+        throw new Error(`autopilot watcherMode=${this.options.mode} requires a StateWatcher`);
+      }
+
+      this.attachWatcherListeners(this.options.watcher);
+      await this.options.watcher.start();
+      if (!this.running) {
+        return;
+      }
+      this.scheduleSafety(this.options.safetyTickMs);
+      if (this.options.mode === "hybrid") {
+        this.schedulePolling(this.hybridPollingIntervalMs());
+      }
+    } catch (error) {
+      this.running = false;
+      this.projectRoot = undefined;
+      this.clearTimers();
+      throw error;
+    }
   }
 
   async stop(): Promise<void> {
     this.running = false;
-    if (this.timer) {
-      this.scheduler.clearTimeout(this.timer);
-      this.timer = undefined;
-    }
+    this.followUpSource = undefined;
+    this.clearTimers();
+    await this.options.watcher?.stop();
     await this.inFlight;
+    this.projectRoot = undefined;
   }
 
-  private scheduleNext(delayMs: number): void {
+  private attachWatcherListeners(watcher: AutopilotServiceLoopWatcher): void {
+    if (this.watcherListenersAttached) {
+      return;
+    }
+    watcher.on("change", () => this.trigger("watcher"));
+    watcher.on("error", (error, scope) => {
+      this.logger?.warn?.(`[swarm-autopilot] watcher error scope=${scope}: ${error.message}`);
+      this.trigger("safety");
+    });
+    this.watcherListenersAttached = true;
+  }
+
+  private schedulePolling(delayMs: number): void {
     if (!this.running || !this.projectRoot) {
       return;
     }
-    this.timer = this.scheduler.setTimeout(() => {
-      void this.runOnce();
+    this.pollingTimer = this.scheduler.setTimeout(() => {
+      this.pollingTimer = undefined;
+      void this.runOnce("polling").finally(() => {
+        if (this.running && (this.options.mode === "polling" || this.options.mode === "hybrid")) {
+          this.schedulePolling(this.options.mode === "hybrid" ? this.hybridPollingIntervalMs() : this.options.pollingIntervalMs);
+        }
+      });
     }, delayMs);
   }
 
-  private async runOnce(): Promise<void> {
-    if (!this.running || !this.projectRoot || this.inFlight) {
+  private scheduleSafety(delayMs: number): void {
+    if (!this.running || !this.projectRoot || this.options.mode === "polling") {
       return;
     }
-    this.inFlight = this.executeTick(this.projectRoot)
-      .catch(async (error) => {
-        await this.recordFailure(this.projectRoot as string, error);
-      })
-      .finally(() => {
-        this.inFlight = undefined;
-        if (this.running) {
-          this.scheduleNext(this.intervalMs);
+    this.safetyTimer = this.scheduler.setTimeout(() => {
+      this.safetyTimer = undefined;
+      void this.runOnce("safety").finally(() => {
+        if (this.running && this.options.mode !== "polling") {
+          this.scheduleSafety(this.options.safetyTickMs);
         }
       });
-    await this.inFlight;
+    }, delayMs);
   }
 
-  private async executeTick(projectRoot: string): Promise<void> {
-    const result = await this.controller.tick({ projectRoot });
+  private trigger(source: AutopilotTickSource): void {
+    if (!this.running || !this.projectRoot) {
+      return;
+    }
+    this.debounceSource = source;
+    if (this.debounceTimer) {
+      return;
+    }
+    this.debounceTimer = this.scheduler.setTimeout(() => {
+      const debouncedSource = this.debounceSource ?? source;
+      this.debounceTimer = undefined;
+      this.debounceSource = undefined;
+      void this.runOnce(debouncedSource);
+    }, this.options.debounceMs);
+  }
+
+  private async runOnce(source: AutopilotTickSource): Promise<void> {
+    if (!this.running || !this.projectRoot) {
+      return;
+    }
+    if (this.inFlight) {
+      this.followUpSource = source;
+      await this.inFlight;
+      return;
+    }
+
+    const projectRoot = this.projectRoot;
+    let chain: Promise<void>;
+    chain = this.runTickChain(projectRoot, source).finally(() => {
+      if (this.inFlight === chain) {
+        this.inFlight = undefined;
+      }
+    });
+    this.inFlight = chain;
+    await chain;
+  }
+
+  private async runTickChain(projectRoot: string, initialSource: AutopilotTickSource): Promise<void> {
+    let source: AutopilotTickSource | undefined = initialSource;
+    while (this.running && source) {
+      const activeSource = source;
+      source = undefined;
+      try {
+        await this.executeTick(projectRoot, activeSource);
+      } catch (error) {
+        await this.recordFailure(projectRoot, error, activeSource);
+      }
+      if (!this.running) {
+        this.followUpSource = undefined;
+        return;
+      }
+      source = this.followUpSource;
+      this.followUpSource = undefined;
+    }
+  }
+
+  private async executeTick(projectRoot: string, source: AutopilotTickSource): Promise<void> {
+    const result = await this.controller.tick({ projectRoot, source });
     this.logger?.info?.(
-      `[swarm-autopilot] tick action=${result.action} project=${projectRoot} summary=${result.summary}`,
+      `[swarm-autopilot] tick source=${source} action=${result.action} project=${projectRoot} summary=${result.summary}`,
     );
   }
 
-  private async recordFailure(projectRoot: string, error: unknown): Promise<void> {
+  private async recordFailure(projectRoot: string, error: unknown, source: AutopilotTickSource): Promise<void> {
     const current = await this.autopilotStore.getState(projectRoot);
     const at = this.scheduler.now();
     const summary = error instanceof Error ? error.message : String(error);
@@ -90,12 +207,13 @@ export class AutopilotServiceLoop {
       ...current,
       runtimeState: "idle" as const,
       lease: undefined,
-      nextTickAt: new Date(new Date(at).getTime() + this.intervalMs).toISOString(),
+      nextTickAt: new Date(new Date(at).getTime() + this.options.pollingIntervalMs).toISOString(),
       lastDecision: {
         at,
         action: "noop" as const,
         summary: `service loop error: ${summary}`,
         reason: "autopilot service loop tick failed",
+        source,
         targets: [],
       },
     };
@@ -105,5 +223,21 @@ export class AutopilotServiceLoop {
       ...nextState.lastDecision,
     });
     this.logger?.error?.(`[swarm-autopilot] tick failed project=${projectRoot}: ${summary}`);
+  }
+
+  private clearTimers(): void {
+    for (const timer of [this.pollingTimer, this.safetyTimer, this.debounceTimer]) {
+      if (timer) {
+        this.scheduler.clearTimeout(timer);
+      }
+    }
+    this.pollingTimer = undefined;
+    this.safetyTimer = undefined;
+    this.debounceTimer = undefined;
+    this.debounceSource = undefined;
+  }
+
+  private hybridPollingIntervalMs(): number {
+    return this.options.pollingIntervalMs * 5;
   }
 }
