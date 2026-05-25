@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.5 (2026-05-25)
+
+Remote install-smoke hotfix for OpenClaw package installs on npm 11.
+
+- Marked the `openclaw` peer dependency as optional so npm does not materialize a registry `node_modules/openclaw` copy during plugin dependency installation
+- Preserved the peer dependency declaration so OpenClaw can still create the plugin-local `openclaw` symlink expected by `openclaw/plugin-sdk/*` imports
+
+### Verification
+
+- `npm run release:check` green
+- `npm run smoke:autopilot-watcher` green
+- `SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher` green
+- Remote npm install smoke confirms the package no longer auto-installs the `openclaw` peer
+- Remote OpenClaw npm-pack install smoke loads `openclaw-swarm-layer@0.5.5`
+
 ## 0.5.4 (2026-05-25)
 
 Autopilot filesystem watcher release with the existing polling loop preserved as the default rollback path.

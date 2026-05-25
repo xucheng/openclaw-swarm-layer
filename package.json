@@ -1,7 +1,7 @@
 {
   "name": "openclaw-swarm-layer",
   "displayName": "OpenClaw Swarm Layer",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "license": "MIT",
   "author": "Xu Cheng",
@@ -68,6 +68,11 @@
   },
   "peerDependencies": {
     "openclaw": "^2026.3.22"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
   },
   "optionalDependencies": {
     "@parcel/watcher": "^2.5.6"

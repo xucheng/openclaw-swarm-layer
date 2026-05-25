@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.4`
+- Current release line: `0.5.5`
 
 ## Preflight
 
@@ -60,22 +60,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.4`.
+Expected version for this release: `0.5.5`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.4
-git push origin v0.5.4
-gh release create v0.5.4 --title "v0.5.4" --notes-file docs/release-notes/v0.5.4.md
+git tag v0.5.5
+git push origin v0.5.5
+gh release create v0.5.5 --title "v0.5.5" --notes-file docs/release-notes/v0.5.5.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.4.md](release-notes/v0.5.4.md)
-- keep the `0.5.4` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.5.md](release-notes/v0.5.5.md)
+- keep the `0.5.5` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -93,11 +93,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.4 \
+  --version 0.5.5 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.4 \
+  --source-ref v0.5.5 \
   --source-commit <git-sha> \
-  --changelog "Add autopilot filesystem watcher modes with polling rollback, watcher-source metrics, and node/parcel smoke coverage."
+  --changelog "Fix npm 11 package installs by marking the OpenClaw peer dependency optional while preserving host peer linking."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -116,8 +116,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.4 \
-  --changelog "Refresh the Swarm Layer skill for autopilot watcher mode, current release metadata, and release validation guidance."
+  --version 0.5.5 \
+  --changelog "Refresh the Swarm Layer skill for the npm 11 install-smoke hotfix and current release metadata."
 ```
 
 Optional tags to keep aligned with the current listing:
