@@ -5,7 +5,7 @@ import type {
   PluginRuntime,
 } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
-import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot } from "../config.js";
+import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot, resolveSwarmPluginConfig } from "../config.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
 import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
 import { applyAcpRunStatusToWorkflow, deriveWorkflowLifecycle, enqueueReview } from "../review/review-gate.js";
@@ -21,11 +21,14 @@ import { buildBudgetUsageFromRun, checkBudgetExceeded } from "../session/session
 import { buildSessionRecordFromRun } from "../session/session-lifecycle.js";
 import { selectReusableSessionForTask } from "../session/session-selector.js";
 import { SessionStore } from "../session/session-store.js";
-import { StateStore } from "../state/state-store.js";
+import { StateCache } from "../state/state-cache.js";
+import { createEmptyWorkflowState, StateStore } from "../state/state-store.js";
+import { FsWorkflowReader, type WorkflowReader } from "../state/workflow-reader.js";
 import type { BootstrapResult, RunRecord, SessionRecord, TaskNode, WorkflowState } from "../types.js";
 import { AutopilotController } from "../autopilot/controller.js";
 import { AutopilotStore } from "../autopilot/autopilot-store.js";
-import { AutopilotServiceLoop } from "../autopilot/service-loop.js";
+import { AutopilotServiceLoop, type AutopilotServiceLoopOptions } from "../autopilot/service-loop.js";
+import { StateWatcher } from "../autopilot/state-watcher.js";
 
 export type RunOnceInput = {
   projectRoot: string;
@@ -135,7 +138,7 @@ type OrchestratorDeps = {
 };
 
 type SwarmServiceLoopLike = {
-  start(projectRoot: string): void | Promise<void>;
+  start(projectRoot: string): Promise<void>;
   stop(): Promise<void>;
 };
 
@@ -147,6 +150,7 @@ type SwarmServiceDeps = {
     autopilotStore: AutopilotStore;
     logger: OpenClawPluginServiceContext["logger"];
     sessionAdapter: OpenClawSessionAdapter;
+    loopOptions: AutopilotServiceLoopOptions;
   }) => SwarmServiceLoopLike;
 };
 
@@ -776,23 +780,45 @@ export function createSwarmService(
         return;
       }
 
-      const stateStore = new StateStore(config, { runtimeVersion });
+      const resolvedConfig = resolveSwarmPluginConfig(config);
+      const baseReader = new FsWorkflowReader(resolvedConfig, (root) =>
+        createEmptyWorkflowState(root, resolvedConfig, { runtimeVersion }),
+      );
+      let stateReader: WorkflowReader | undefined;
+      let watcher: StateWatcher | undefined;
+
+      if (resolvedConfig.autopilot.watcherMode !== "polling") {
+        const cache = new StateCache(baseReader);
+        await cache.start(projectRoot);
+        watcher = new StateWatcher(baseReader.resolvePaths(projectRoot), resolvedConfig.autopilot.watcher);
+        watcher.on("change", (event) => {
+          void cache.applyChange(event).catch((error) => {
+            const message = error instanceof Error ? error.message : String(error);
+            ctx.logger.warn(`[swarm-autopilot] state cache refresh failed: ${message}`);
+          });
+        });
+        stateReader = cache;
+      }
+
+      const stateStore = new StateStore(resolvedConfig, { runtimeVersion }, stateReader);
       const autopilotStore = new AutopilotStore(stateStore.config);
       const sessionAdapter =
         deps?.sessionAdapter ??
         createSessionAdapter(deps?.runtime, { acp: stateStore.config.acp }) ??
         new UnsupportedOpenClawSessionAdapter();
+      const loopOptions: AutopilotServiceLoopOptions = {
+        mode: stateStore.config.autopilot.watcherMode,
+        pollingIntervalMs: stateStore.config.autopilot.tickSeconds * 1000,
+        debounceMs: stateStore.config.autopilot.watcher.debounceMs,
+        safetyTickMs: stateStore.config.autopilot.watcher.safetyTickMs,
+        watcher,
+      };
       loop =
-        deps?.createLoop?.({ stateStore, autopilotStore, logger: ctx.logger, sessionAdapter }) ??
+        deps?.createLoop?.({ stateStore, autopilotStore, logger: ctx.logger, sessionAdapter, loopOptions }) ??
         new AutopilotServiceLoop(
           new AutopilotController(stateStore, autopilotStore, createOrchestrator({ stateStore, sessionAdapter })),
           autopilotStore,
-          {
-            mode: "polling",
-            pollingIntervalMs: stateStore.config.autopilot.tickSeconds * 1000,
-            debounceMs: stateStore.config.autopilot.watcher.debounceMs,
-            safetyTickMs: stateStore.config.autopilot.watcher.safetyTickMs,
-          },
+          loopOptions,
           ctx.logger,
         );
       await loop.start(projectRoot);
