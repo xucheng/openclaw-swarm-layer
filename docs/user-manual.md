@@ -23,7 +23,7 @@
 - Node.js >= 22
 - OpenClaw >= 2026.3.22（ACP public control-plane 默认路径）
 
-当前测试基线：OpenClaw `2026.5.3-1`。`0.5.3` 发布前已完成启动工具契约、插件 doctor、runtime health、unit 回归和 e2e 回归检查。
+当前测试基线：OpenClaw `2026.5.3-1`。`0.5.4` 发布前已完成启动工具契约、插件 doctor、runtime health、unit 回归、e2e 回归和 autopilot watcher smoke 检查。
 
 ### 安装插件
 
@@ -117,6 +117,12 @@ openclaw swarm --help
             "tickSeconds": 15,
             "leaseSeconds": 45,
             "maxDispatchPerTick": 2,
+            "watcherMode": "hybrid",
+            "watcher": {
+              "debounceMs": 100,
+              "safetyTickMs": 300000,
+              "library": "auto"
+            },
             "reviewPolicy": {
               "mode": "manual_only"
             }

@@ -7,7 +7,7 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-
 
 Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
-Current release baseline: `openclaw-swarm-layer@0.5.3`, validated on `OpenClaw 2026.5.3-1` with startup tool contracts, plugin doctor checks, and runtime health smoke.
+Current release baseline: `openclaw-swarm-layer@0.5.4`, validated on `OpenClaw 2026.5.3-1` with startup tool contracts, plugin doctor checks, runtime health smoke, and autopilot watcher smoke.
 
 ## What It Does
 
@@ -22,7 +22,7 @@ Current release baseline: `openclaw-swarm-layer@0.5.3`, validated on `OpenClaw 2
 - **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
 - **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
 - **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
-- **Autopilot control plane** — Supervised `status/start/pause/resume/stop/tick` flows with lease-backed decisions and degraded-mode holds
+- **Autopilot control plane** — Supervised `status/start/pause/resume/stop/tick` flows with lease-backed decisions, optional watcher-driven ticks, and degraded-mode holds
 - **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
 
 ## What It Does NOT Do
@@ -139,7 +139,7 @@ node --version     # >= 22
 openclaw --version # >= 2026.3.22
 ```
 
-The `0.5.3` release was smoke-tested on `OpenClaw 2026.5.3-1`.
+The `0.5.4` release was smoke-tested on `OpenClaw 2026.5.3-1`.
 
 ### 2. Install Plugin
 ```bash
@@ -240,6 +240,24 @@ openclaw swarm autopilot stop --project . --mode graceful
 ```
 
 Use autopilot when you want the workflow to keep progressing under policy control instead of manually calling `run`, `session status`, and recovery commands one by one.
+
+Optional watcher mode:
+
+```json
+{
+  "autopilot": {
+    "enabled": true,
+    "watcherMode": "hybrid",
+    "watcher": {
+      "debounceMs": 100,
+      "safetyTickMs": 300000,
+      "library": "auto"
+    }
+  }
+}
+```
+
+Use `watcherMode: "polling"` as the rollback path.
 
 ### Runner Selection
 | Runner | Use When |

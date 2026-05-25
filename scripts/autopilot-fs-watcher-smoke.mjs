@@ -107,7 +107,6 @@ if (latencyMs > 500) {
 console.log(
   JSON.stringify({
     ok: true,
-    projectRoot,
     watcherLibrary: writerStore.config.autopilot.watcher.library,
     latencyMs: Math.round(latencyMs),
     runCount: runs.length,

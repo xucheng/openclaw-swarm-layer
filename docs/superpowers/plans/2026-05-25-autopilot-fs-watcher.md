@@ -12,8 +12,8 @@
 
 ## Source Findings
 
-- The local development repo is `/Users/xucheng/repo/tools/openclaw-swarm-layer`; use it for implementation.
-- The Mac mini deployment repo at `/Users/bot/Projects/openclaw-swarm-layer` is older, so use it only for remote smoke after local build and tests pass.
+- The local development repo is the repository checkout; use it for implementation.
+- The remote deployment checkout may lag behind the local repo, so use remote hosts only for staging smoke after local build and tests pass.
 - Current hot path:
   - `src/autopilot/service-loop.ts` schedules a recurring timeout and invokes `controller.tick()` every `tickSeconds`.
   - `src/autopilot/controller.ts` reads `workflow-state.json` at the start, then rereads workflow and runs several times during one tick.
@@ -31,7 +31,7 @@ Create:
 - `test/unit/state/state-cache.test.ts` - cache invalidation and write-through coverage.
 - `test/unit/autopilot/state-watcher.test.ts` - event mapping and debounce coverage.
 - `test/e2e/autopilot-fs-watcher.e2e.test.ts` - real filesystem latency test.
-- `scripts/autopilot-fs-watcher-smoke.mjs` - local and Mac mini smoke/perf harness.
+- `scripts/autopilot-fs-watcher-smoke.mjs` - local and remote staging smoke/perf harness.
 
 Modify:
 - `package.json` and `package-lock.json` - add optional watcher dependency and smoke script.
@@ -2089,11 +2089,11 @@ npm run smoke:autopilot-watcher
 SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher
 ```
 
-Mac mini:
+Remote staging host:
 
 ```bash
-rsync -a --exclude node_modules --exclude dist --exclude .git /Users/xucheng/repo/tools/openclaw-swarm-layer/ mini:/Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke/
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; cd /Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
+rsync -a --exclude node_modules --exclude dist --exclude .git /path/to/openclaw-swarm-layer/ <remote-host>:/path/to/openclaw-swarm-layer-fs-watcher-smoke/
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; cd /path/to/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
 ```
 
 Rollback:
@@ -2125,27 +2125,27 @@ git add scripts/autopilot-fs-watcher-smoke.mjs package.json docs/operator-runboo
 git commit -m "chore: add autopilot watcher smoke harness"
 ```
 
-## Task 10: Mac Mini Runtime Smoke
+## Task 10: Remote Staging Runtime Smoke
 
 **Files:**
-- No source files unless smoke discovers a Mac-only bug.
+- No source files unless smoke discovers a host-specific bug.
 
-- [ ] **Step 1: Sync to Mac mini staging**
+- [ ] **Step 1: Sync to remote staging**
 
 Run from local repo:
 
 ```bash
-rsync -a --exclude node_modules --exclude dist --exclude .git /Users/xucheng/repo/tools/openclaw-swarm-layer/ mini:/Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke/
+rsync -a --exclude node_modules --exclude dist --exclude .git /path/to/openclaw-swarm-layer/ <remote-host>:/path/to/openclaw-swarm-layer-fs-watcher-smoke/
 ```
 
-Expected: staging directory on Mac mini mirrors the local working tree.
+Expected: staging directory on the remote host mirrors the local working tree.
 
-- [ ] **Step 2: Build and run smoke on Mac mini**
+- [ ] **Step 2: Build and run smoke on the remote host**
 
 Run:
 
 ```bash
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; cd /Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run build && npm run test:unit -- test/unit/autopilot/state-watcher.test.ts test/unit/state/state-cache.test.ts test/unit/autopilot/service-loop.test.ts && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; cd /path/to/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run build && npm run test:unit -- test/unit/autopilot/state-watcher.test.ts test/unit/state/state-cache.test.ts test/unit/autopilot/service-loop.test.ts && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
 ```
 
 Expected:
@@ -2159,15 +2159,15 @@ Expected:
 Only run this after the staged smoke passes:
 
 ```bash
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; openclaw status --deep'
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; openclaw status --deep'
 ```
 
-Record current gateway PID and CPU. Then verify that the production plugin entry points at `/Users/bot/Projects/openclaw-swarm-layer`; if it does not, stop here and keep the staging smoke as the remote validation. If it does, sync the local branch into that repo only after making a git commit in the local repo and a backup branch on Mac mini:
+Record current gateway PID and CPU. Then verify that the production plugin entry points at the expected deployment checkout; if it does not, stop here and keep the staging smoke as the remote validation. If it does, sync the local branch into that repo only after making a git commit in the local repo and a backup branch on the remote host:
 
 ```bash
-ssh mini 'cd /Users/bot/Projects/openclaw-swarm-layer && git status --short && git branch backup/autopilot-fs-watcher-before-smoke'
-rsync -a --exclude node_modules --exclude dist --exclude .git /Users/xucheng/repo/tools/openclaw-swarm-layer/ mini:/Users/bot/Projects/openclaw-swarm-layer/
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; cd /Users/bot/Projects/openclaw-swarm-layer && npm ci && npm run build'
+ssh <remote-host> 'cd /path/to/openclaw-swarm-layer && git status --short && git branch backup/autopilot-fs-watcher-before-smoke'
+rsync -a --exclude node_modules --exclude dist --exclude .git /path/to/openclaw-swarm-layer/ <remote-host>:/path/to/openclaw-swarm-layer/
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; cd /path/to/openclaw-swarm-layer && npm ci && npm run build'
 ```
 
 Then set:
@@ -2197,8 +2197,8 @@ Then set:
 Then run:
 
 ```bash
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; openclaw status --deep'
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; openclaw swarm autopilot status --project /Users/bot/Projects/openclaw-swarm-layer --json'
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; openclaw status --deep'
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; openclaw swarm autopilot status --project /path/to/openclaw-swarm-layer --json'
 ```
 
 Expected:
@@ -2219,11 +2219,11 @@ Local smoke:
 npm run smoke:autopilot-watcher
 SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher
 
-Mac mini staging:
+Remote staging:
 npm run smoke:autopilot-watcher
 SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher
 
-Mac mini runtime:
+Remote runtime:
 openclaw status --deep before/after, gateway PID, idle CPU after 10 minutes
 ```
 
@@ -2301,7 +2301,7 @@ git commit -m "docs: document autopilot watcher release notes"
 
 ## Self-Review
 
-- Spec coverage: The plan covers config flag, watcher, cache, reactive loop, snapshot path, tests, rollback, observability through tick source, local development, and Mac mini smoke. Phase 2-4 default flips are intentionally not included as code tasks; they require dogfooding data after this implementation lands.
+- Spec coverage: The plan covers config flag, watcher, cache, reactive loop, snapshot path, tests, rollback, observability through tick source, local development, and remote staging smoke. Phase 2-4 default flips are intentionally not included as code tasks; they require dogfooding data after this implementation lands.
 - Placeholder scan: No unresolved placeholders remain.
 - Type consistency: `AutopilotTickSource`, `StateWatcherEvent`, `WorkflowReader`, `StateCache`, and `AutopilotServiceLoopOptions` are introduced before later tasks reference them.
 - Risk callout: `StateCache.refresh()` for specs currently reloads all specs for one spec event. This is acceptable because the observed incident is in historical runs; if specs become large, add `loadSpec(projectRoot, specId)` in a follow-up.

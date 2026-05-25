@@ -64,7 +64,7 @@ Expect:
 - status shows configured default, resolved default, and gate notes
 - dry-run selects ACP when ACP is actually available on the install
 
-Release `0.5.3` was validated on OpenClaw `2026.5.3-1` with plugin startup, tool-contract manifest, plugin doctor, and runtime health checks. The previous full manual and live ACP workflow smoke remains covered by the `0.5.2` release validation.
+Release `0.5.4` was validated on OpenClaw `2026.5.3-1` with plugin startup, tool-contract manifest, plugin doctor, runtime health checks, full unit/e2e regression, and autopilot watcher smoke. The previous full manual and live ACP workflow smoke remains covered by the `0.5.2` release validation.
 
 ## Full Live Smoke Matrix
 
@@ -91,11 +91,11 @@ npm run smoke:autopilot-watcher
 SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher
 ```
 
-Mac mini:
+Remote staging host:
 
 ```bash
-rsync -a --exclude node_modules --exclude dist --exclude .git /Users/xucheng/repo/tools/openclaw-swarm-layer/ mini:/Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke/
-ssh mini 'export PATH=/opt/homebrew/opt/node/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; cd /Users/bot/Projects/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
+rsync -a --exclude node_modules --exclude dist --exclude .git /path/to/openclaw-swarm-layer/ <remote-host>:/path/to/openclaw-swarm-layer-fs-watcher-smoke/
+ssh <remote-host> 'export PATH=/path/to/node/bin:/usr/local/bin:/usr/bin:/bin; cd /path/to/openclaw-swarm-layer-fs-watcher-smoke && npm ci && npm run smoke:autopilot-watcher && SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher'
 ```
 
 Rollback:

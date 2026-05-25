@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
@@ -271,6 +271,45 @@
             "type": "integer",
             "minimum": 1,
             "default": 2
+          },
+          "watcherMode": {
+            "type": "string",
+            "enum": ["polling", "watch", "hybrid"],
+            "default": "polling"
+          },
+          "watcher": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "debounceMs": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 100
+              },
+              "safetyTickMs": {
+                "type": "integer",
+                "minimum": 1000,
+                "default": 300000
+              },
+              "safetyResyncMs": {
+                "type": "integer",
+                "minimum": 1,
+                "default": 3600000
+              },
+              "library": {
+                "type": "string",
+                "enum": ["auto", "parcel", "node"],
+                "default": "auto"
+              },
+              "ignoreInitial": {
+                "type": "boolean",
+                "default": true
+              },
+              "useFsEventsCoalescing": {
+                "type": "boolean",
+                "default": false
+              }
+            }
           },
           "reviewPolicy": {
             "type": "object",

@@ -63,4 +63,25 @@ describe("plugin manifest", () => {
       expect(manifest.toolMetadata[tool]).toEqual({ optional: true });
     }
   });
+
+  it("declares autopilot watcher config in the manifest schema", () => {
+    const manifest = JSON.parse(readFileSync(resolve("openclaw.plugin.json"), "utf8"));
+    const autopilotProperties = manifest.configSchema.properties.autopilot.properties;
+
+    expect(autopilotProperties.watcherMode).toEqual({
+      type: "string",
+      enum: ["polling", "watch", "hybrid"],
+      default: "polling",
+    });
+    expect(autopilotProperties.watcher.properties.library).toEqual({
+      type: "string",
+      enum: ["auto", "parcel", "node"],
+      default: "auto",
+    });
+    expect(autopilotProperties.watcher.properties.safetyTickMs).toEqual({
+      type: "integer",
+      minimum: 1000,
+      default: 300000,
+    });
+  });
 });

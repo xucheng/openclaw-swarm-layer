@@ -186,6 +186,12 @@ Controls the supervised control plane layered over the existing workflow runtime
             "tickSeconds": 15,
             "leaseSeconds": 45,
             "maxDispatchPerTick": 2,
+            "watcherMode": "hybrid",
+            "watcher": {
+              "debounceMs": 100,
+              "safetyTickMs": 300000,
+              "library": "auto"
+            },
             "reviewPolicy": {
               "mode": "manual_only"
             }

@@ -53,7 +53,7 @@ Minimum artifact expectations:
 
 A smoke run can be partial by stage. The full journal shape appears only after the corresponding lifecycle step has executed.
 
-Release `0.5.3` validation on OpenClaw `2026.5.3-1` covers startup tool-contract manifest checks, plugin doctor health, full unit regression, and full e2e regression.
+Release `0.5.4` validation on OpenClaw `2026.5.3-1` covers startup tool-contract manifest checks, plugin doctor health, full unit regression, full e2e regression, and autopilot watcher smoke.
 
 ## Regression Rule
 

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.4 (2026-05-25)
+
+Autopilot filesystem watcher release with the existing polling loop preserved as the default rollback path.
+
+- Added `autopilot.watcherMode` with `polling`, `watch`, and `hybrid` modes
+- Added a state watcher, workflow reader abstraction, and per-project state cache for event-driven autopilot ticks
+- Added watcher source metadata to autopilot decisions and tick-source metrics
+- Added node and parcel watcher smoke coverage plus an e2e filesystem regression
+- Synced package metadata, plugin manifest metadata, in-plugin version metadata, README, runbook, ClawHub skill baseline, and release notes to `openclaw-swarm-layer@0.5.4`
+
+### Verification
+
+- `npm run build` green
+- `npm run test:unit` green: 62 unit test files / 421 unit tests
+- `npm run test:e2e` green: 20 e2e files / 26 e2e tests
+- `npm run smoke:autopilot-watcher` green
+- `SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher` green
+- `npm pack --dry-run` green
+
 ## 0.5.3 (2026-05-04)
 
 OpenClaw `2026.5.3-1` compatibility update for the current plugin runtime manifest contract.
@@ -35,7 +54,7 @@ OpenClaw `2026.4.26` compatibility and release packaging update.
 - `npm run test:unit` green: 59 unit test files / 359 unit tests
 - `npm run test:e2e` green: 19 e2e files / 25 e2e tests
 - `npm pack --dry-run` green
-- mini host `OpenClaw 2026.4.26` smoke green:
+- remote host `OpenClaw 2026.4.26` smoke green:
   - manual workflow: `init -> plan -> run --runner manual -> review --approve -> report`
   - live ACP workflow: `init -> plan -> run -> session status -> session close`
 

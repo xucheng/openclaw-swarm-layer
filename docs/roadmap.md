@@ -220,6 +220,8 @@ Current status: complete (2026-04-08). `M7.0-M7.2` are implemented. The post-M7 
 
 Release `0.5.3` refresh (2026-05-04): OpenClaw 2026.5.3-1 compatibility validated with 59 unit test files / 360 unit tests, 19 e2e files / 25 e2e tests, startup tool-contract manifest checks, and plugin doctor/runtime health smoke.
 
+Release `0.5.4` refresh (2026-05-25): autopilot filesystem watcher mode validated with 62 unit test files / 421 unit tests, 20 e2e files / 26 e2e tests, node/parcel watcher smoke, npm pack dry-run, and remote staging watcher smoke.
+
 ## Assessment Timeline
 
 - `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline

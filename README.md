@@ -6,11 +6,11 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.3-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.4-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-360%20unit%20%7C%2025%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-421%20unit%20%7C%2026%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -22,7 +22,7 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 
 - **Spec-driven planning** — Markdown spec with goals and phased tasks → dependency-ordered task graph
 - **ACP-first execution** — ACP is the only default-capable automated runner; capability-aware `auto` resolution
-- **Supervised autopilot** — Deterministic control-plane tick, lease-backed service loop, and operator-visible start/pause/resume/stop controls
+- **Supervised autopilot** — Deterministic control-plane ticks, optional watcher-driven service loop, and operator-visible start/pause/resume/stop controls
 - **Persistent sessions** — Reuse, thread binding, follow-up, steer, cancel, and close flows
 - **Review gates** — Explicit approve/reject with structured quality rubrics (weighted multi-dimension scoring)
 - **Sprint contracts** — Verifiable acceptance criteria per task with GAN-inspired evaluator injection
@@ -132,18 +132,38 @@ openclaw swarm report --project /path/to/your/project --json
 
 `defaultRunner: "auto"` resolves to `acp` when ACP automation is available, otherwise falls back to `manual`.
 
+## Autopilot Watcher Mode
+
+Autopilot defaults to the existing polling loop. Version `0.5.4` adds optional filesystem watcher modes that can drive ticks from workflow-state changes while keeping `polling` as the rollback path.
+
+```json
+{
+  "autopilot": {
+    "enabled": true,
+    "watcherMode": "hybrid",
+    "watcher": {
+      "debounceMs": 100,
+      "safetyTickMs": 300000,
+      "library": "auto"
+    }
+  }
+}
+```
+
+Use `watcherMode: "watch"` for event-driven operation, `hybrid` for watcher events plus low-frequency safety polling, and `polling` to return to the pre-0.5.4 behavior.
+
 ## Development
 
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (360 tests, 59 files)
-npm run test:e2e       # E2E tests only (25 tests, 19 files)
+npm run test:unit      # Unit tests only (421 tests, 62 files)
+npm run test:e2e       # E2E tests only (26 tests, 20 files)
 npm run test:watch     # Watch mode
 npm run release:check  # Build + full regression + npm pack dry-run + ClawHub package prep
 ```
 
-Current release validation also includes OpenClaw `2026.5.3-1` smoke coverage on the mini and Volcengine hosts: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, and runtime health.
+Current release validation also includes OpenClaw `2026.5.3-1` smoke coverage on local and remote staging environments: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, and node/parcel autopilot watcher smoke.
 
 ## Documentation
 

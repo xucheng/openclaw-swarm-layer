@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.3`
+- Current release line: `0.5.4`
 
 ## Preflight
 
@@ -60,22 +60,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.3`.
+Expected version for this release: `0.5.4`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.3
-git push origin v0.5.3
-gh release create v0.5.3 --title "v0.5.3" --notes-file docs/release-notes/v0.5.3.md
+git tag v0.5.4
+git push origin v0.5.4
+gh release create v0.5.4 --title "v0.5.4" --notes-file docs/release-notes/v0.5.4.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.3.md](release-notes/v0.5.3.md)
-- keep the `0.5.3` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.4.md](release-notes/v0.5.4.md)
+- keep the `0.5.4` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -93,11 +93,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.3 \
+  --version 0.5.4 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.3 \
+  --source-ref v0.5.4 \
   --source-commit <git-sha> \
-  --changelog "Update for OpenClaw 2026.5.3-1: declare startup tool contracts and optional tool metadata required by the current plugin runtime."
+  --changelog "Add autopilot filesystem watcher modes with polling rollback, watcher-source metrics, and node/parcel smoke coverage."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -116,8 +116,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.3 \
-  --changelog "Refresh the Swarm Layer skill for OpenClaw 2026.5.3-1 compatibility, current release metadata, and startup tool-contract guidance."
+  --version 0.5.4 \
+  --changelog "Refresh the Swarm Layer skill for autopilot watcher mode, current release metadata, and release validation guidance."
 ```
 
 Optional tags to keep aligned with the current listing:
