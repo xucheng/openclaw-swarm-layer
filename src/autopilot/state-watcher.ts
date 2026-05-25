@@ -59,6 +59,7 @@ export class StateWatcher extends EventEmitter {
   private timer?: ReturnType<typeof setTimeout>;
   private seq = 0;
   private started = false;
+  private generation = 0;
   private parcelActive = false;
 
   constructor(
@@ -99,53 +100,70 @@ export class StateWatcher extends EventEmitter {
   async start(): Promise<void> {
     if (this.started) return;
     this.started = true;
-    await ensureDir(this.paths.autopilotDir);
-    await this.replaySnapshot();
-
-    if (this.config.library === "node") {
-      await this.startNodeWatchers();
-      return;
-    }
+    const generation = ++this.generation;
 
     try {
-      await this.startParcelWatcher();
-    } catch (error) {
-      this.started = false;
-      if (this.config.library === "parcel") {
-        this.clearPending();
-        throw error;
+      await ensureDir(this.paths.autopilotDir);
+      await this.replaySnapshot();
+
+      if (this.config.library === "node") {
+        await this.startNodeWatchers(generation);
+        return;
       }
-      this.started = true;
-      this.emitWatcherError(error instanceof Error ? error : new Error(String(error)), this.paths.swarmRoot);
-      await this.startNodeWatchers();
+
+      try {
+        await this.startParcelWatcher(generation);
+      } catch (error) {
+        if (this.config.library === "parcel") {
+          throw error;
+        }
+        this.emitWatcherError(error instanceof Error ? error : new Error(String(error)), this.paths.swarmRoot);
+        await this.startNodeWatchers(generation);
+      }
+    } catch (error) {
+      await this.rollbackFailedStart();
+      throw error;
     }
   }
 
   async stop(): Promise<void> {
     if (!this.started) return;
     this.started = false;
+    this.generation += 1;
     this.clearPending();
-    await Promise.all(this.subscriptions.map((subscription) => subscription.unsubscribe()));
-    this.subscriptions = [];
-    for (const watcher of this.nodeWatchers) {
-      watcher.close();
-    }
-    this.nodeWatchers = [];
-    if (this.parcelActive) {
-      await this.writeSnapshot();
-      this.parcelActive = false;
-    }
+    await this.closeRuntimeResources({ writeParcelSnapshot: true });
   }
 
   pushRawEventsForTest(events: RawStateWatcherEvent[]): void {
     this.pushRawEvents(events);
   }
 
-  private async startParcelWatcher(): Promise<void> {
+  private async rollbackFailedStart(): Promise<void> {
+    this.started = false;
+    this.generation += 1;
+    this.clearPending();
+    await this.closeRuntimeResources({ writeParcelSnapshot: false });
+  }
+
+  private async closeRuntimeResources(options: { writeParcelSnapshot: boolean }): Promise<void> {
+    await Promise.all(this.subscriptions.map((subscription) => subscription.unsubscribe()));
+    this.subscriptions = [];
+    for (const watcher of this.nodeWatchers) {
+      watcher.close();
+    }
+    this.nodeWatchers = [];
+    if (this.parcelActive && options.writeParcelSnapshot) {
+      await this.writeSnapshot();
+    }
+    this.parcelActive = false;
+  }
+
+  private async startParcelWatcher(generation: number): Promise<void> {
     const watcher = await this.loadParcelWatcher();
     const subscription = await watcher.subscribe(
       this.paths.swarmRoot,
       (err, events) => {
+        if (!this.isRuntimeCallbackActive(generation)) return;
         if (err) {
           this.emitWatcherError(err, this.paths.swarmRoot);
           return;
@@ -161,7 +179,7 @@ export class StateWatcher extends EventEmitter {
     this.parcelActive = true;
   }
 
-  private async startNodeWatchers(): Promise<void> {
+  private async startNodeWatchers(generation: number): Promise<void> {
     await Promise.all([
       ensureDir(this.paths.swarmRoot),
       ensureDir(this.paths.runsDir),
@@ -169,13 +187,27 @@ export class StateWatcher extends EventEmitter {
       ensureDir(this.paths.sessionsDir),
     ]);
     const dirs = [this.paths.swarmRoot, this.paths.runsDir, this.paths.specsDir, this.paths.sessionsDir];
-    for (const dir of dirs) {
-      const watcher = this.watch(dir, { persistent: false }, (eventType, fileName) => {
-        if (!fileName) return;
-        this.pushRawEvents([{ type: eventType, path: path.join(dir, fileName.toString()) }]);
-      });
-      watcher.on("error", (error) => this.emitWatcherError(error, dir));
-      this.nodeWatchers.push(watcher);
+    const opened: NodeWatcherHandle[] = [];
+    try {
+      for (const dir of dirs) {
+        const watcher = this.watch(dir, { persistent: false }, (eventType, fileName) => {
+          if (!this.isRuntimeCallbackActive(generation) || !fileName) return;
+          this.pushRawEvents([{ type: eventType, path: path.join(dir, fileName.toString()) }]);
+        });
+        this.nodeWatchers.push(watcher);
+        opened.push(watcher);
+        watcher.on("error", (error) => {
+          if (this.isRuntimeCallbackActive(generation)) {
+            this.emitWatcherError(error, dir);
+          }
+        });
+      }
+    } catch (error) {
+      for (const watcher of opened) {
+        watcher.close();
+      }
+      this.nodeWatchers = this.nodeWatchers.filter((watcher) => !opened.includes(watcher));
+      throw error;
     }
   }
 
@@ -221,6 +253,10 @@ export class StateWatcher extends EventEmitter {
     }
     if (this.buffer.size === 0 || this.timer) return;
     this.timer = setTimeout(() => this.flush(), this.config.debounceMs);
+  }
+
+  private isRuntimeCallbackActive(generation: number): boolean {
+    return this.started && this.generation === generation;
   }
 
   private clearPending(): void {

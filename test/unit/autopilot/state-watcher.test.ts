@@ -123,6 +123,62 @@ describe("StateWatcher", () => {
     expect(close).toHaveBeenCalledTimes(4);
   });
 
+  it("ignores runtime callbacks that arrive after stop", async () => {
+    vi.useFakeTimers();
+    const projectRoot = await makeTempProject();
+    const paths = resolveSwarmPaths(projectRoot, {});
+    const callbacks: Array<(eventType: string, fileName: string | Buffer | null) => void> = [];
+    const close = vi.fn();
+    const watch = vi.fn((_dir: string, _options: { persistent: boolean }, listener: (eventType: string, fileName: string | Buffer | null) => void) => {
+      callbacks.push(listener);
+      return Object.assign(new EventEmitter(), { close });
+    });
+    const watcher = new StateWatcher(paths, createWatcherConfig({ debounceMs: 25 }), { watch });
+    const changes: StateWatcherEvent[] = [];
+    watcher.on("change", (event) => changes.push(event));
+
+    await watcher.start();
+    await watcher.stop();
+    callbacks[1]("change", "run-1.json");
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(changes).toEqual([]);
+    expect(watcher.lastSeq()).toBe(0);
+    expect(close).toHaveBeenCalledTimes(4);
+  });
+
+  it("rolls back partial node watcher startup and allows retry", async () => {
+    const paths = resolveSwarmPaths(await makeTempProject(), {});
+    const startupError = new Error("watch failed");
+    const closes: Array<ReturnType<typeof vi.fn>> = [];
+    let failSecondWatcher = true;
+    let callInAttempt = 0;
+    const watch = vi.fn(() => {
+      callInAttempt += 1;
+      if (failSecondWatcher && callInAttempt === 2) {
+        throw startupError;
+      }
+      const close = vi.fn();
+      closes.push(close);
+      return Object.assign(new EventEmitter(), { close });
+    });
+    const watcher = new StateWatcher(paths, createWatcherConfig(), { watch });
+
+    await expect(watcher.start()).rejects.toThrow(startupError);
+    expect(closes).toHaveLength(1);
+    expect(closes[0]).toHaveBeenCalledTimes(1);
+
+    failSecondWatcher = false;
+    callInAttempt = 0;
+    await expect(watcher.start()).resolves.toBeUndefined();
+    await watcher.stop();
+
+    expect(watch).toHaveBeenCalledTimes(6);
+    expect(closes).toHaveLength(5);
+    expect(closes.slice(1)).toHaveLength(4);
+    expect(closes.slice(1).every((close) => close.mock.calls.length === 1)).toBe(true);
+  });
+
   it("falls back to node watchers when parcel startup fails in auto mode", async () => {
     const projectRoot = await makeTempProject();
     const paths = resolveSwarmPaths(projectRoot, {});
