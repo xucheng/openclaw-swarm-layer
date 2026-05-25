@@ -1,8 +1,10 @@
 import type { SwarmPluginConfig } from "../config.js";
+import { createDefaultTickSourceCount } from "./metrics.js";
 
 export type AutopilotMode = "supervised";
 export type AutopilotDesiredState = "running" | "paused" | "stopped";
 export type AutopilotRuntimeState = "idle" | "ticking";
+export type AutopilotTickSource = "manual" | "polling" | "watcher" | "safety";
 
 export type AutopilotDecision = {
   at: string;
@@ -11,6 +13,7 @@ export type AutopilotDecision = {
   reason?: string;
   dryRun?: boolean;
   targets?: string[];
+  source?: AutopilotTickSource;
 };
 
 export type AutopilotLease = {
@@ -30,6 +33,7 @@ export type AutopilotMetrics = {
   cancelCount: number;
   closeCount: number;
   degradedTickCount: number;
+  tickSourceCount: Record<AutopilotTickSource, number>;
 };
 
 export type AutopilotState = {
@@ -69,6 +73,7 @@ export function createDefaultAutopilotState(
       cancelCount: 0,
       closeCount: 0,
       degradedTickCount: 0,
+      tickSourceCount: createDefaultTickSourceCount(),
     },
   };
 }

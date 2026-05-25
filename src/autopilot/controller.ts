@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { buildAutopilotHealthSummary } from "./metrics.js";
+import { buildAutopilotHealthSummary, mergeTickSourceCount } from "./metrics.js";
 import { planAutopilotRecovery } from "./recovery-planner.js";
 import { applyAutopilotReviewPolicy } from "./review-policy.js";
-import type { AutopilotDecision, AutopilotState } from "./types.js";
+import type { AutopilotDecision, AutopilotState, AutopilotTickSource } from "./types.js";
 import { AutopilotStore } from "./autopilot-store.js";
 import { acquireAutopilotLease, releaseAutopilotLease } from "./lease.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
@@ -14,6 +14,7 @@ import type { WorkflowState } from "../types.js";
 export type AutopilotTickInput = {
   projectRoot: string;
   dryRun?: boolean;
+  source?: AutopilotTickSource;
 };
 
 export type AutopilotTickResult = {
@@ -48,6 +49,7 @@ export class AutopilotController {
     const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
     const current = await this.autopilotStore.getState(input.projectRoot);
     const dryRun = input.dryRun === true;
+    const source = input.source ?? "manual";
     const dispatchCap = this.stateStore.config.autopilot.maxDispatchPerTick;
     const initialSnapshot = snapshotWorkflow(workflow);
     const autopilotRunnable = current.desiredState === "running" && !stateStoreAutopilotDisabled(this.stateStore);
@@ -82,6 +84,7 @@ export class AutopilotController {
       summary: initialSummary,
       reason: baseReason,
       dryRun,
+      source,
       targets: [
         ...initialSnapshot.targets.runnableTaskIds,
         ...initialSnapshot.targets.queuedTaskIds,
@@ -366,6 +369,8 @@ export class AutopilotController {
       degradedReason?: string;
     },
   ): Promise<AutopilotState> {
+    const source = decision.source ?? "manual";
+    const currentTickSourceCount = mergeTickSourceCount(current.metrics.tickSourceCount);
     const nextState: AutopilotState = {
       ...current,
       runtimeState: "idle",
@@ -384,6 +389,10 @@ export class AutopilotController {
         cancelCount: current.metrics.cancelCount + increments.cancelCount,
         closeCount: current.metrics.closeCount + increments.closeCount,
         degradedTickCount: current.metrics.degradedTickCount + increments.degradedTickCount,
+        tickSourceCount: {
+          ...currentTickSourceCount,
+          [source]: currentTickSourceCount[source] + 1,
+        },
       },
       degradedReason: increments.degradedReason,
       degradedSince:

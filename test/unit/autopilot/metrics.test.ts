@@ -1,4 +1,8 @@
-import { buildAutopilotHealthSummary } from "../../../src/autopilot/metrics.js";
+import {
+  buildAutopilotHealthSummary,
+  createDefaultTickSourceCount,
+  mergeTickSourceCount,
+} from "../../../src/autopilot/metrics.js";
 import { createDefaultAutopilotState } from "../../../src/autopilot/types.js";
 import { defaultSwarmPluginConfig } from "../../../src/config.js";
 import type { RunRecord } from "../../../src/types.js";
@@ -19,6 +23,27 @@ function makeRun(runId: string, status: RunRecord["status"], events: RunRecord["
 }
 
 describe("autopilot metrics", () => {
+  it("creates independent zeroed tick source counts", () => {
+    const sourceCount = createDefaultTickSourceCount();
+    sourceCount.manual = 2;
+
+    expect(createDefaultTickSourceCount()).toEqual({
+      manual: 0,
+      polling: 0,
+      watcher: 0,
+      safety: 0,
+    });
+  });
+
+  it("merges partial tick source counts onto zero defaults", () => {
+    expect(mergeTickSourceCount({ watcher: 3 })).toEqual({
+      manual: 0,
+      polling: 0,
+      watcher: 3,
+      safety: 0,
+    });
+  });
+
   it("marks health as degraded when recent terminal failure rate breaches policy", () => {
     const state = createDefaultAutopilotState("/tmp/project", defaultSwarmPluginConfig);
     const summary = buildAutopilotHealthSummary(

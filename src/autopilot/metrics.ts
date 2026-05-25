@@ -1,9 +1,10 @@
 import type { SwarmPluginConfig } from "../config.js";
 import type { RunRecord } from "../types.js";
-import type { AutopilotState } from "./types.js";
+import type { AutopilotState, AutopilotTickSource } from "./types.js";
 
 const TERMINAL_RUN_STATUSES = new Set<RunRecord["status"]>(["completed", "failed", "timed_out", "cancelled"]);
 const FAILURE_RUN_STATUSES = new Set<RunRecord["status"]>(["failed", "timed_out", "cancelled"]);
+const AUTOPILOT_TICK_SOURCES: readonly AutopilotTickSource[] = ["manual", "polling", "watcher", "safety"];
 
 export type AutopilotHealthSummary = {
   terminalWindow: number;
@@ -16,6 +17,31 @@ export type AutopilotHealthSummary = {
   degraded: boolean;
   degradedReason?: string;
 };
+
+export function createDefaultTickSourceCount(): Record<AutopilotTickSource, number> {
+  return {
+    manual: 0,
+    polling: 0,
+    watcher: 0,
+    safety: 0,
+  };
+}
+
+export function mergeTickSourceCount(
+  sourceCount?: Partial<Record<AutopilotTickSource, number>>,
+): Record<AutopilotTickSource, number> {
+  const merged = createDefaultTickSourceCount();
+  if (!sourceCount) {
+    return merged;
+  }
+  for (const source of AUTOPILOT_TICK_SOURCES) {
+    const count = sourceCount[source];
+    if (typeof count === "number" && Number.isFinite(count) && count >= 0) {
+      merged[source] = count;
+    }
+  }
+  return merged;
+}
 
 function hasRecoveryIntervention(runRecord: RunRecord): boolean {
   return (runRecord.events ?? []).some((event) => event.type.startsWith("recovery_"));

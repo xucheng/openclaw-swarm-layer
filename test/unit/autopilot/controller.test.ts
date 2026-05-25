@@ -96,10 +96,74 @@ describe("autopilot controller", () => {
     const persisted = await autopilotStore.loadState(projectRoot);
 
     expect(result.action).toBe("dispatch");
+    expect(result.decision.source).toBe("manual");
     expect(persisted?.lastDecision?.action).toBe("dispatch");
+    expect(persisted?.lastDecision?.source).toBe("manual");
     expect(persisted?.metrics.tickCount).toBe(1);
     expect(persisted?.metrics.dispatchCount).toBe(1);
+    expect(persisted?.metrics.tickSourceCount).toEqual({
+      manual: 1,
+      polling: 0,
+      watcher: 0,
+      safety: 0,
+    });
     expect(await autopilotStore.hasDecisionLog(projectRoot)).toBe(true);
+  });
+
+  it("persists watcher tick source metadata", async () => {
+    const projectRoot = await makeTempProject();
+    const stateStore = new StateStore(enabledAutopilotConfig);
+    const autopilotStore = new AutopilotStore(stateStore.config);
+    await seedWorkflow(projectRoot, stateStore);
+
+    const controller = new AutopilotController(stateStore, autopilotStore);
+    const result = await controller.tick({ projectRoot, source: "watcher" });
+    const persisted = await autopilotStore.loadState(projectRoot);
+    const decisionLog = await fs.readFile(result.decisionLogPath, "utf8");
+    const loggedDecision = JSON.parse(decisionLog.trim()) as { source?: string };
+
+    expect(result.decision.source).toBe("watcher");
+    expect(persisted?.lastDecision?.source).toBe("watcher");
+    expect(loggedDecision.source).toBe("watcher");
+    expect(result.autopilot.metrics.tickSourceCount).toEqual({
+      manual: 0,
+      polling: 0,
+      watcher: 1,
+      safety: 0,
+    });
+  });
+
+  it("merges legacy autopilot metrics with zeroed source counts", async () => {
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const initial = autopilotStore.getDefaultState(projectRoot);
+    const paths = autopilotStore.resolvePaths(projectRoot);
+    const legacyMetrics = { ...initial.metrics } as Record<string, unknown>;
+    delete legacyMetrics.tickSourceCount;
+
+    await fs.mkdir(path.dirname(paths.autopilotStatePath), { recursive: true });
+    await fs.writeFile(
+      paths.autopilotStatePath,
+      JSON.stringify({
+        ...initial,
+        metrics: {
+          ...legacyMetrics,
+          tickCount: 3,
+          dispatchCount: 2,
+        },
+      }),
+      "utf8",
+    );
+
+    const loaded = await autopilotStore.loadState(projectRoot);
+
+    expect(loaded?.metrics.tickCount).toBe(3);
+    expect(loaded?.metrics.tickSourceCount).toEqual({
+      manual: 0,
+      polling: 0,
+      watcher: 0,
+      safety: 0,
+    });
   });
 
   it("syncs active ACP runs and auto-approves safe completed reviews", async () => {
