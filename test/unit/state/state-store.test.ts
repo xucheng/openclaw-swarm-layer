@@ -2,7 +2,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { StateStore, createEmptyWorkflowState } from "../../../src/state/state-store.js";
-import type { RunRecord, SpecDoc } from "../../../src/types.js";
+import type { WorkflowReader } from "../../../src/state/workflow-reader.js";
+import type { ProgressSummary, RunRecord, SpecDoc } from "../../../src/types.js";
 
 async function makeTempProject(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-state-"));
@@ -235,5 +236,64 @@ describe("StateStore", () => {
     expect(summary.blockedTasks).toBe(1);
     expect(summary.reviewQueueSize).toBe(1);
     expect(summary.activeSpecId).toBe("spec-1");
+  });
+
+  it("notifies injected reader after writing workflow records", async () => {
+    const projectRoot = await makeTempProject();
+    const workflow = createEmptyWorkflowState(projectRoot);
+    const spec: SpecDoc = {
+      specId: "spec-hook",
+      title: "Hook spec",
+      sourcePath: path.join(projectRoot, "SPEC.md"),
+      projectRoot,
+      goals: [],
+      constraints: [],
+      acceptanceCriteria: [],
+      phases: [],
+    };
+    const runRecord: RunRecord = {
+      runId: "run-hook",
+      taskId: "task-1",
+      attempt: 1,
+      status: "completed",
+      runner: { type: "manual" },
+      workspacePath: projectRoot,
+      startedAt: new Date().toISOString(),
+      artifacts: [],
+    };
+    const progress: ProgressSummary = {
+      version: 1,
+      projectRoot,
+      updatedAt: new Date().toISOString(),
+      completedTasks: [],
+      remainingTasks: [],
+      blockers: [],
+      keyDecisions: [],
+      environmentNotes: [],
+    };
+    const reader: WorkflowReader = {
+      initProject: vi.fn(async () => new StateStore().initProject(projectRoot)),
+      loadWorkflow: vi.fn(async () => workflow),
+      loadSpecs: vi.fn(async () => []),
+      loadRuns: vi.fn(async () => []),
+      loadRun: vi.fn(async () => null),
+      loadProgress: vi.fn(async () => null),
+      loadSessions: vi.fn(async () => []),
+      onWorkflowWritten: vi.fn(),
+      onSpecWritten: vi.fn(),
+      onRunWritten: vi.fn(),
+      onProgressWritten: vi.fn(),
+    };
+    const store = new StateStore({}, undefined, reader);
+
+    await store.saveWorkflow(projectRoot, workflow);
+    await store.writeSpec(projectRoot, spec);
+    await store.writeRun(projectRoot, runRecord);
+    await store.saveProgress(projectRoot, progress);
+
+    expect(reader.onWorkflowWritten).toHaveBeenCalledWith(projectRoot, workflow);
+    expect(reader.onSpecWritten).toHaveBeenCalledWith(projectRoot, spec);
+    expect(reader.onRunWritten).toHaveBeenCalledWith(projectRoot, runRecord);
+    expect(reader.onProgressWritten).toHaveBeenCalledWith(projectRoot, progress);
   });
 });

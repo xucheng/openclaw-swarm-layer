@@ -1,10 +1,11 @@
 import path from "node:path";
 import type { AcpAutomationResolutionHints, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolveDefaultAllowedRunners, resolveSwarmPluginConfig, resolveWorkflowDefaultRunner } from "../config.js";
-import { ensureDir, readDirectoryJsonFiles, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
+import { readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { validateTaskImmutability } from "../planning/immutability-guard.js";
 import { resolveSwarmPaths, type SwarmPaths } from "../lib/paths.js";
 import type { ProgressSummary, RunRecord, SessionRecord, SpecDoc, TaskNode, WorkflowState, WorkflowStatusSummary } from "../types.js";
+import { FsWorkflowReader, type WorkflowReader } from "./workflow-reader.js";
 
 const CURRENT_WORKFLOW_VERSION = 1;
 
@@ -91,10 +92,20 @@ export function createEmptyWorkflowState(
 export class StateStore {
   readonly config: SwarmPluginConfig;
   readonly runtimeVersion?: string | null;
+  private readonly reader: WorkflowReader;
 
-  constructor(config?: SwarmPluginConfigInput, hints?: AcpAutomationResolutionHints) {
+  constructor(
+    config?: SwarmPluginConfigInput,
+    hints?: AcpAutomationResolutionHints,
+    reader?: WorkflowReader,
+  ) {
     this.config = resolveSwarmPluginConfig(config);
     this.runtimeVersion = hints?.runtimeVersion;
+    this.reader =
+      reader ??
+      new FsWorkflowReader(this.config, (projectRoot) =>
+        createEmptyWorkflowState(projectRoot, this.config, { runtimeVersion: this.runtimeVersion }),
+      );
   }
 
   resolvePaths(projectRoot: string): SwarmPaths {
@@ -102,29 +113,11 @@ export class StateStore {
   }
 
   async initProject(projectRoot: string): Promise<SwarmPaths> {
-    const paths = this.resolvePaths(projectRoot);
-    await Promise.all([
-      ensureDir(paths.swarmRoot),
-      ensureDir(paths.specsDir),
-      ensureDir(paths.runsDir),
-      ensureDir(paths.sessionsDir),
-      ensureDir(paths.artifactsDir),
-      ensureDir(paths.logsDir),
-    ]);
-
-    const existing = await readJsonFile<WorkflowState>(paths.workflowStatePath);
-    if (!existing) {
-      await writeJsonFileAtomic(
-        paths.workflowStatePath,
-        createEmptyWorkflowState(paths.projectRoot, this.config, { runtimeVersion: this.runtimeVersion }),
-      );
-    }
-    return paths;
+    return this.reader.initProject(projectRoot);
   }
 
   async loadWorkflow(projectRoot: string): Promise<WorkflowState> {
-    const paths = await this.initProject(projectRoot);
-    const workflow = await readJsonFile<WorkflowState>(paths.workflowStatePath);
+    const workflow = await this.reader.loadWorkflow(projectRoot);
     if (!workflow) {
       throw new Error("workflow-state.json is missing after initialization");
     }
@@ -148,6 +141,7 @@ export class StateStore {
     }
 
     await writeJsonFileAtomic(paths.workflowStatePath, workflow);
+    await this.reader.onWorkflowWritten?.(projectRoot, workflow);
   }
 
   async writeSpec(projectRoot: string, spec: SpecDoc): Promise<string> {
@@ -155,12 +149,12 @@ export class StateStore {
     const paths = await this.initProject(projectRoot);
     const filePath = path.join(paths.specsDir, `${spec.specId}.json`);
     await writeJsonFileAtomic(filePath, spec);
+    await this.reader.onSpecWritten?.(projectRoot, spec);
     return filePath;
   }
 
   async loadSpecs(projectRoot: string): Promise<SpecDoc[]> {
-    const paths = await this.initProject(projectRoot);
-    const specs = await readDirectoryJsonFiles<SpecDoc>(paths.specsDir);
+    const specs = await this.reader.loadSpecs(projectRoot);
     specs.forEach((spec) => this.assertValidSpec(spec));
     return specs;
   }
@@ -170,20 +164,18 @@ export class StateStore {
     const paths = await this.initProject(projectRoot);
     const filePath = path.join(paths.runsDir, `${runRecord.runId}.json`);
     await writeJsonFileAtomic(filePath, runRecord);
+    await this.reader.onRunWritten?.(projectRoot, runRecord);
     return filePath;
   }
 
   async loadRuns(projectRoot: string): Promise<RunRecord[]> {
-    const paths = await this.initProject(projectRoot);
-    const runs = await readDirectoryJsonFiles<RunRecord>(paths.runsDir);
+    const runs = await this.reader.loadRuns(projectRoot);
     runs.forEach((runRecord) => this.assertValidRun(runRecord, { allowLegacyRunnerTypes: true }));
     return runs;
   }
 
   async loadRun(projectRoot: string, runId: string): Promise<RunRecord | null> {
-    const paths = await this.initProject(projectRoot);
-    const filePath = path.join(paths.runsDir, `${runId}.json`);
-    const runRecord = await readJsonFile<RunRecord>(filePath);
+    const runRecord = await this.reader.loadRun(projectRoot, runId);
     if (!runRecord) {
       return null;
     }
@@ -192,18 +184,17 @@ export class StateStore {
   }
 
   async loadProgress(projectRoot: string): Promise<ProgressSummary | null> {
-    const paths = this.resolvePaths(projectRoot);
-    return readJsonFile<ProgressSummary>(paths.progressFilePath);
+    return this.reader.loadProgress(projectRoot);
   }
 
   async saveProgress(projectRoot: string, progress: ProgressSummary): Promise<void> {
     const paths = await this.initProject(projectRoot);
     await writeJsonFileAtomic(paths.progressFilePath, progress);
+    await this.reader.onProgressWritten?.(projectRoot, progress);
   }
 
   async loadSessions(projectRoot: string): Promise<SessionRecord[]> {
-    const paths = await this.initProject(projectRoot);
-    return readDirectoryJsonFiles<SessionRecord>(paths.sessionsDir);
+    return this.reader.loadSessions(projectRoot);
   }
 
   summarizeWorkflow(workflow: WorkflowState): WorkflowStatusSummary {
