@@ -417,4 +417,59 @@ describe("StateCache", () => {
     await expect(cache.loadRun(projectRoot, "run-hook")).resolves.toEqual(runRecord(projectRoot, "run-hook", "accepted"));
     await expect(cache.loadProgress(projectRoot)).resolves.toEqual(progressSummary(projectRoot, "2026-05-25T00:00:03.000Z"));
   });
+
+  it("returns hook-added specs and runs sorted by id", async () => {
+    const projectRoot = await makeTempProject();
+    const config = new StateStore().config;
+    const cache = new StateCache(new FsWorkflowReader(config, (root) => createEmptyWorkflowState(root, config)));
+    await cache.start(projectRoot);
+    const store = new StateStore(config, undefined, cache);
+    const runB = runRecord(projectRoot, "run-b");
+    const runA = runRecord(projectRoot, "run-a");
+    const specB = specDoc(projectRoot, "spec-b");
+    const specA = specDoc(projectRoot, "spec-a");
+
+    await store.writeRun(projectRoot, runB);
+    await store.writeRun(projectRoot, runA);
+    await store.writeSpec(projectRoot, specB);
+    await store.writeSpec(projectRoot, specA);
+
+    await expect(cache.loadRuns(projectRoot)).resolves.toEqual([runA, runB]);
+    await expect(cache.loadSpecs(projectRoot)).resolves.toEqual([specA, specB]);
+  });
+
+  it("returns watcher-added specs, runs, and sessions sorted by id", async () => {
+    const projectRoot = await makeTempProject();
+    const { reader, state, paths } = createMemoryReader(projectRoot, {
+      specs: [],
+      runs: [],
+      sessions: [],
+    });
+    const cache = new StateCache(reader);
+    await cache.start(projectRoot);
+    const runB = runRecord(projectRoot, "run-b");
+    const runA = runRecord(projectRoot, "run-a");
+    const specB = specDoc(projectRoot, "spec-b");
+    const specA = specDoc(projectRoot, "spec-a");
+    const sessionB = sessionRecord(projectRoot, "session-b");
+    const sessionA = sessionRecord(projectRoot, "session-a");
+
+    state.runs = [runB];
+    state.specs = [specB];
+    state.sessions = [sessionB];
+    await cache.applyChange(watcherEvent("run", "create", [path.join(paths.runsDir, "run-b.json")]));
+    await cache.applyChange(watcherEvent("spec", "create", [path.join(paths.specsDir, "spec-b.json")], 2));
+    await cache.applyChange(watcherEvent("session", "create", [path.join(paths.sessionsDir, "session-b.json")], 3));
+
+    state.runs = [runB, runA];
+    state.specs = [specB, specA];
+    state.sessions = [sessionB, sessionA];
+    await cache.applyChange(watcherEvent("run", "create", [path.join(paths.runsDir, "run-a.json")], 4));
+    await cache.applyChange(watcherEvent("spec", "create", [path.join(paths.specsDir, "spec-a.json")], 5));
+    await cache.applyChange(watcherEvent("session", "create", [path.join(paths.sessionsDir, "session-a.json")], 6));
+
+    await expect(cache.loadRuns(projectRoot)).resolves.toEqual([runA, runB]);
+    await expect(cache.loadSpecs(projectRoot)).resolves.toEqual([specA, specB]);
+    await expect(cache.loadSessions(projectRoot)).resolves.toEqual([sessionA, sessionB]);
+  });
 });

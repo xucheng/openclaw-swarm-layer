@@ -12,6 +12,18 @@ function idFromJsonPath(filePath: string): string {
   return path.basename(filePath, ".json");
 }
 
+function compareIds(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function sortedClones<T>(values: Iterable<T>, idOf: (record: T) => string): T[] {
+  return Array.from(values)
+    .sort((left, right) => compareIds(idOf(left), idOf(right)))
+    .map(clone);
+}
+
 export class StateCache implements WorkflowReader {
   private projectRoot?: string;
   private paths?: SwarmPaths;
@@ -72,13 +84,13 @@ export class StateCache implements WorkflowReader {
   async loadSpecs(projectRoot: string): Promise<SpecDoc[]> {
     this.assertProject(projectRoot);
     await this.queue;
-    return Array.from(this.specs.values()).map(clone);
+    return sortedClones(this.specs.values(), (spec) => spec.specId);
   }
 
   async loadRuns(projectRoot: string): Promise<RunRecord[]> {
     this.assertProject(projectRoot);
     await this.queue;
-    return Array.from(this.runs.values()).map(clone);
+    return sortedClones(this.runs.values(), (run) => run.runId);
   }
 
   async loadRun(projectRoot: string, runId: string): Promise<RunRecord | null> {
@@ -97,7 +109,7 @@ export class StateCache implements WorkflowReader {
   async loadSessions(projectRoot: string): Promise<SessionRecord[]> {
     this.assertProject(projectRoot);
     await this.queue;
-    return Array.from(this.sessions.values()).map(clone);
+    return sortedClones(this.sessions.values(), (session) => session.sessionId);
   }
 
   async onWorkflowWritten(projectRoot: string, workflow: WorkflowState): Promise<void> {
