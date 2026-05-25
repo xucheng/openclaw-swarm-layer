@@ -18,6 +18,13 @@ const defaultScheduler: AutopilotServiceLoopScheduler = {
   now: () => new Date().toISOString(),
 };
 
+const sourcePriority: Record<AutopilotTickSource, number> = {
+  manual: 0,
+  polling: 1,
+  watcher: 2,
+  safety: 3,
+};
+
 export type AutopilotServiceLoopMode = "polling" | "watch" | "hybrid";
 
 export type AutopilotServiceLoopWatcher = {
@@ -140,7 +147,7 @@ export class AutopilotServiceLoop {
     if (!this.running || !this.projectRoot) {
       return;
     }
-    this.debounceSource = source;
+    this.debounceSource = this.pickHigherPrioritySource(this.debounceSource, source);
     if (this.debounceTimer) {
       return;
     }
@@ -157,7 +164,7 @@ export class AutopilotServiceLoop {
       return;
     }
     if (this.inFlight) {
-      this.followUpSource = source;
+      this.followUpSource = this.pickHigherPrioritySource(this.followUpSource, source);
       await this.inFlight;
       return;
     }
@@ -207,7 +214,7 @@ export class AutopilotServiceLoop {
       ...current,
       runtimeState: "idle" as const,
       lease: undefined,
-      nextTickAt: new Date(new Date(at).getTime() + this.options.pollingIntervalMs).toISOString(),
+      nextTickAt: new Date(new Date(at).getTime() + this.failureRetryDelayMs(source)).toISOString(),
       lastDecision: {
         at,
         action: "noop" as const,
@@ -239,5 +246,25 @@ export class AutopilotServiceLoop {
 
   private hybridPollingIntervalMs(): number {
     return this.options.pollingIntervalMs * 5;
+  }
+
+  private failureRetryDelayMs(source: AutopilotTickSource): number {
+    if (source === "polling") {
+      return this.options.mode === "hybrid" ? this.hybridPollingIntervalMs() : this.options.pollingIntervalMs;
+    }
+    if (source === "watcher" || source === "safety") {
+      return this.options.safetyTickMs;
+    }
+    return this.options.pollingIntervalMs;
+  }
+
+  private pickHigherPrioritySource(
+    current: AutopilotTickSource | undefined,
+    next: AutopilotTickSource,
+  ): AutopilotTickSource {
+    if (!current) {
+      return next;
+    }
+    return sourcePriority[next] > sourcePriority[current] ? next : current;
   }
 }

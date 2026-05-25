@@ -184,6 +184,33 @@ describe("autopilot service loop", () => {
     await loop.stop();
   });
 
+  it("runs hybrid watcher ticks before low-frequency polling continues", async () => {
+    vi.useFakeTimers();
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const controller = {
+      tick: vi.fn().mockResolvedValue({ ok: true, action: "observe", summary: "hybrid" }),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "hybrid",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 300000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    watcher.emitChange();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(controller.tick).toHaveBeenNthCalledWith(1, { projectRoot, source: "watcher" });
+
+    await vi.advanceTimersByTimeAsync(4900);
+    expect(controller.tick).toHaveBeenNthCalledWith(2, { projectRoot, source: "polling" });
+
+    await loop.stop();
+  });
+
   it("runs safety ticks in watch mode", async () => {
     vi.useFakeTimers();
     const projectRoot = await makeTempProject();
@@ -202,6 +229,111 @@ describe("autopilot service loop", () => {
 
     await loop.start(projectRoot);
     await vi.advanceTimersByTimeAsync(1000);
+
+    expect(controller.tick).toHaveBeenCalledWith({ projectRoot, source: "safety" });
+
+    await loop.stop();
+  });
+
+  it("records watch failures with the safety interval as next tick", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-25T00:00:00.000Z"));
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const controller = {
+      tick: vi.fn().mockRejectedValue(new Error("watch boom")),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "watch",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 3000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    watcher.emitChange();
+    await vi.advanceTimersByTimeAsync(100);
+    await loop.stop();
+
+    const state = await autopilotStore.getState(projectRoot);
+    expect(state.lastDecision?.source).toBe("watcher");
+    expect(state.nextTickAt).toBe("2026-05-25T00:00:03.100Z");
+  });
+
+  it("records hybrid polling failures with the low-frequency polling interval as next tick", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-25T00:00:00.000Z"));
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const controller = {
+      tick: vi.fn().mockRejectedValue(new Error("poll boom")),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "hybrid",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 30000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    await vi.advanceTimersByTimeAsync(5000);
+    await loop.stop();
+
+    const state = await autopilotStore.getState(projectRoot);
+    expect(state.lastDecision?.source).toBe("polling");
+    expect(state.nextTickAt).toBe("2026-05-25T00:00:10.000Z");
+  });
+
+  it("records hybrid safety failures with the safety interval as next tick", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-25T00:00:00.000Z"));
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const controller = {
+      tick: vi.fn().mockRejectedValue(new Error("safety boom")),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "hybrid",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 3000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    await vi.advanceTimersByTimeAsync(3000);
+    await loop.stop();
+
+    const state = await autopilotStore.getState(projectRoot);
+    expect(state.lastDecision?.source).toBe("safety");
+    expect(state.nextTickAt).toBe("2026-05-25T00:00:06.000Z");
+  });
+
+  it("keeps safety source over watcher source in the same debounce window", async () => {
+    vi.useFakeTimers();
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const controller = {
+      tick: vi.fn().mockResolvedValue({ ok: true, action: "observe", summary: "safety first" }),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "watch",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 300000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    watcher.emitError(new Error("watcher failed"), "/tmp/swarm");
+    watcher.emitChange();
+    await vi.advanceTimersByTimeAsync(100);
 
     expect(controller.tick).toHaveBeenCalledWith({ projectRoot, source: "safety" });
 
@@ -237,6 +369,46 @@ describe("autopilot service loop", () => {
       "[swarm-autopilot] watcher error scope=/tmp/swarm: native watcher failed",
     );
     expect(controller.tick).toHaveBeenCalledWith({ projectRoot, source: "safety" });
+
+    await loop.stop();
+  });
+
+  it("keeps safety source over watcher source for one queued follow-up tick", async () => {
+    vi.useFakeTimers();
+    const projectRoot = await makeTempProject();
+    const autopilotStore = new AutopilotStore(enabledAutopilotConfig);
+    const firstTick = createDeferred();
+    const controller = {
+      tick: vi
+        .fn()
+        .mockImplementationOnce(async () => {
+          await firstTick.promise;
+          return { ok: true, action: "observe", summary: "first" };
+        })
+        .mockResolvedValue({ ok: true, action: "observe", summary: "next" }),
+    };
+    const watcher = makeWatcher();
+    const loop = new AutopilotServiceLoop(controller as any, autopilotStore, {
+      mode: "watch",
+      pollingIntervalMs: 1000,
+      debounceMs: 100,
+      safetyTickMs: 300000,
+      watcher: watcher as any,
+    });
+
+    await loop.start(projectRoot);
+    watcher.emitChange();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(controller.tick).toHaveBeenCalledTimes(1);
+
+    watcher.emitError(new Error("watcher failed"), "/tmp/swarm");
+    watcher.emitChange();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(controller.tick).toHaveBeenCalledTimes(1);
+
+    firstTick.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(controller.tick).toHaveBeenNthCalledWith(2, { projectRoot, source: "safety" });
 
     await loop.stop();
   });
