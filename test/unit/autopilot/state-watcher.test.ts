@@ -9,6 +9,16 @@ async function makeTempProject(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "swarm-layer-state-watcher-"));
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (error?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function createWatcherConfig(overrides: Partial<ConstructorParameters<typeof StateWatcher>[1]> = {}): ConstructorParameters<typeof StateWatcher>[1] {
   return {
     debounceMs: 100,
@@ -177,6 +187,70 @@ describe("StateWatcher", () => {
     expect(closes).toHaveLength(5);
     expect(closes.slice(1)).toHaveLength(4);
     expect(closes.slice(1).every((close) => close.mock.calls.length === 1)).toBe(true);
+  });
+
+  it("unsubscribes a parcel subscription that resolves after stop", async () => {
+    vi.useFakeTimers();
+    const paths = resolveSwarmPaths(await makeTempProject(), {});
+    const unsubscribe = vi.fn(async () => undefined);
+    let callback!: (error: Error | null, events: RawStateWatcherEvent[]) => void;
+    const subscribe = vi.fn((_dir, cb: typeof callback) => {
+      callback = cb;
+      return subscription.promise;
+    });
+    const subscription = createDeferred<{ unsubscribe(): Promise<void> }>();
+    const watcher = new StateWatcher(paths, createWatcherConfig({ library: "parcel", debounceMs: 25 }), {
+      loadParcelWatcher: async () => ({
+        subscribe,
+      }),
+    });
+    const changes: StateWatcherEvent[] = [];
+    watcher.on("change", (event) => changes.push(event));
+
+    const startPromise = watcher.start();
+    await vi.waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
+    await watcher.stop();
+
+    subscription.resolve({ unsubscribe });
+    await startPromise;
+    callback(null, [{ type: "update", path: paths.workflowStatePath }]);
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+    expect(changes).toEqual([]);
+    expect(watcher.lastSeq()).toBe(0);
+  });
+
+  it("does not create node watchers when startup becomes stale during setup and remains restartable", async () => {
+    const paths = resolveSwarmPaths(await makeTempProject(), {});
+    const setup = createDeferred<void>();
+    let setupCalls = 0;
+    const close = vi.fn();
+    const watch = vi.fn(() => Object.assign(new EventEmitter(), { close }));
+    const watcher = new StateWatcher(paths, createWatcherConfig(), {
+      watch,
+      ensureDir: async () => {
+        setupCalls += 1;
+        if (setupCalls === 1) {
+          await setup.promise;
+        }
+      },
+    });
+
+    const startPromise = watcher.start();
+    await vi.waitFor(() => expect(setupCalls).toBe(1));
+    await watcher.stop();
+    setup.resolve();
+    await startPromise;
+
+    expect(watch).not.toHaveBeenCalled();
+    expect(close).not.toHaveBeenCalled();
+
+    await watcher.start();
+    await watcher.stop();
+
+    expect(watch).toHaveBeenCalledTimes(4);
+    expect(close).toHaveBeenCalledTimes(4);
   });
 
   it("falls back to node watchers when parcel startup fails in auto mode", async () => {

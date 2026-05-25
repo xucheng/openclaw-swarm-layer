@@ -3,7 +3,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import type { SwarmAutopilotWatcherConfig } from "../config.js";
-import { ensureDir } from "../lib/json-file.js";
+import { ensureDir as defaultEnsureDir } from "../lib/json-file.js";
 import type { SwarmPaths } from "../lib/paths.js";
 
 export type StateWatcherEventKind = "workflow" | "autopilot" | "progress" | "run" | "spec" | "session";
@@ -44,13 +44,16 @@ type NodeWatch = (
 ) => NodeWatcherHandle;
 
 type WatchSubscription = { unsubscribe(): Promise<void> };
+type EnsureDir = (dirPath: string) => Promise<void>;
 
 type StateWatcherDependencies = {
+  ensureDir?: EnsureDir;
   loadParcelWatcher?: () => Promise<ParcelWatcherModule>;
   watch?: NodeWatch;
 };
 
 export class StateWatcher extends EventEmitter {
+  private readonly ensureDir: EnsureDir;
   private readonly loadParcelWatcher: () => Promise<ParcelWatcherModule>;
   private readonly watch: NodeWatch;
   private subscriptions: WatchSubscription[] = [];
@@ -71,6 +74,7 @@ export class StateWatcher extends EventEmitter {
     dependencies: StateWatcherDependencies = {},
   ) {
     super();
+    this.ensureDir = dependencies.ensureDir ?? defaultEnsureDir;
     this.loadParcelWatcher = dependencies.loadParcelWatcher ?? (async () => (await import("@parcel/watcher")) as unknown as ParcelWatcherModule);
     this.watch = dependencies.watch ?? ((dir, options, listener) => fs.watch(dir, options, listener) as NodeWatcherHandle);
   }
@@ -103,8 +107,10 @@ export class StateWatcher extends EventEmitter {
     const generation = ++this.generation;
 
     try {
-      await ensureDir(this.paths.autopilotDir);
-      await this.replaySnapshot();
+      await this.ensureDir(this.paths.autopilotDir);
+      if (!this.isRuntimeCallbackActive(generation)) return;
+      await this.replaySnapshot(generation);
+      if (!this.isRuntimeCallbackActive(generation)) return;
 
       if (this.config.library === "node") {
         await this.startNodeWatchers(generation);
@@ -114,6 +120,7 @@ export class StateWatcher extends EventEmitter {
       try {
         await this.startParcelWatcher(generation);
       } catch (error) {
+        if (!this.isRuntimeCallbackActive(generation)) return;
         if (this.config.library === "parcel") {
           throw error;
         }
@@ -121,6 +128,7 @@ export class StateWatcher extends EventEmitter {
         await this.startNodeWatchers(generation);
       }
     } catch (error) {
+      if (!this.isGenerationCurrent(generation)) return;
       await this.rollbackFailedStart();
       throw error;
     }
@@ -160,6 +168,7 @@ export class StateWatcher extends EventEmitter {
 
   private async startParcelWatcher(generation: number): Promise<void> {
     const watcher = await this.loadParcelWatcher();
+    if (!this.isRuntimeCallbackActive(generation)) return;
     const subscription = await watcher.subscribe(
       this.paths.swarmRoot,
       (err, events) => {
@@ -175,17 +184,22 @@ export class StateWatcher extends EventEmitter {
         useFsEventsCoalescing: this.config.useFsEventsCoalescing,
       },
     );
+    if (!this.isRuntimeCallbackActive(generation)) {
+      await subscription.unsubscribe();
+      return;
+    }
     this.subscriptions.push(subscription);
     this.parcelActive = true;
   }
 
   private async startNodeWatchers(generation: number): Promise<void> {
     await Promise.all([
-      ensureDir(this.paths.swarmRoot),
-      ensureDir(this.paths.runsDir),
-      ensureDir(this.paths.specsDir),
-      ensureDir(this.paths.sessionsDir),
+      this.ensureDir(this.paths.swarmRoot),
+      this.ensureDir(this.paths.runsDir),
+      this.ensureDir(this.paths.specsDir),
+      this.ensureDir(this.paths.sessionsDir),
     ]);
+    if (!this.isRuntimeCallbackActive(generation)) return;
     const dirs = [this.paths.swarmRoot, this.paths.runsDir, this.paths.specsDir, this.paths.sessionsDir];
     const opened: NodeWatcherHandle[] = [];
     try {
@@ -194,6 +208,10 @@ export class StateWatcher extends EventEmitter {
           if (!this.isRuntimeCallbackActive(generation) || !fileName) return;
           this.pushRawEvents([{ type: eventType, path: path.join(dir, fileName.toString()) }]);
         });
+        if (!this.isRuntimeCallbackActive(generation)) {
+          watcher.close();
+          return;
+        }
         this.nodeWatchers.push(watcher);
         opened.push(watcher);
         watcher.on("error", (error) => {
@@ -211,12 +229,16 @@ export class StateWatcher extends EventEmitter {
     }
   }
 
-  private async replaySnapshot(): Promise<void> {
+  private async replaySnapshot(generation: number): Promise<void> {
     if (this.config.library === "node") return;
+    if (!this.isRuntimeCallbackActive(generation)) return;
     if (!(await this.isSnapshotFresh())) return;
+    if (!this.isRuntimeCallbackActive(generation)) return;
     try {
       const watcher = await this.loadParcelWatcher();
+      if (!this.isRuntimeCallbackActive(generation)) return;
       const events = await watcher.getEventsSince?.(this.paths.swarmRoot, this.paths.autopilotWatcherSnapshotPath);
+      if (!this.isRuntimeCallbackActive(generation)) return;
       if (events && events.length > 0) {
         this.pushRawEvents(events);
       }
@@ -256,7 +278,11 @@ export class StateWatcher extends EventEmitter {
   }
 
   private isRuntimeCallbackActive(generation: number): boolean {
-    return this.started && this.generation === generation;
+    return this.started && this.isGenerationCurrent(generation);
+  }
+
+  private isGenerationCurrent(generation: number): boolean {
+    return this.generation === generation;
   }
 
   private clearPending(): void {
