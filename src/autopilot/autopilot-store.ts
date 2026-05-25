@@ -2,7 +2,16 @@ import fs from "node:fs/promises";
 import { resolveSwarmPluginConfig, type SwarmPluginConfig, type SwarmPluginConfigInput } from "../config.js";
 import { ensureDir, pathExists, readJsonFile, writeJsonFileAtomic } from "../lib/json-file.js";
 import { resolveSwarmPaths } from "../lib/paths.js";
-import { createDefaultAutopilotState, type AutopilotDecision, type AutopilotState } from "./types.js";
+import { mergeTickSourceCount } from "./metrics.js";
+import {
+  AUTOPILOT_TICK_SOURCES,
+  createDefaultAutopilotState,
+  isAutopilotTickSource,
+  type AutopilotDecision,
+  type AutopilotMetrics,
+  type AutopilotState,
+  type AutopilotTickSource,
+} from "./types.js";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -36,13 +45,11 @@ export class AutopilotStore {
     if (!state) {
       return null;
     }
+    const defaultState = this.getDefaultState(projectRoot);
     const normalized: AutopilotState = {
-      ...this.getDefaultState(projectRoot),
+      ...defaultState,
       ...state,
-      metrics: {
-        ...this.getDefaultState(projectRoot).metrics,
-        ...(state.metrics ?? {}),
-      },
+      metrics: this.normalizeMetrics(state.metrics, defaultState.metrics),
     };
     this.assertValidState(normalized);
     return normalized;
@@ -104,6 +111,7 @@ export class AutopilotStore {
     ]) {
       assert(typeof state.metrics[key] === "number" && state.metrics[key] >= 0, `autopilot metrics.${key} is invalid`);
     }
+    this.assertValidTickSourceCount(state.metrics.tickSourceCount, { requireAll: true });
     if (state.lastDecision !== undefined) {
       assert(isObject(state.lastDecision), "autopilot lastDecision must be an object");
       assert(typeof state.lastDecision.at === "string", "autopilot lastDecision.at is required");
@@ -115,6 +123,45 @@ export class AutopilotStore {
         "autopilot lastDecision.action is invalid",
       );
       assert(typeof state.lastDecision.summary === "string", "autopilot lastDecision.summary is required");
+      if (state.lastDecision.source !== undefined) {
+        assert(isAutopilotTickSource(state.lastDecision.source), "autopilot lastDecision.source is invalid");
+      }
+    }
+  }
+
+  private normalizeMetrics(metrics: unknown, defaultMetrics: AutopilotMetrics): AutopilotMetrics {
+    const rawMetrics = isObject(metrics) ? metrics : {};
+    const sourceCount = rawMetrics.tickSourceCount;
+    if (sourceCount !== undefined) {
+      this.assertValidTickSourceCount(sourceCount, { requireAll: false });
+    }
+
+    return {
+      ...defaultMetrics,
+      ...rawMetrics,
+      tickSourceCount: mergeTickSourceCount(
+        isObject(sourceCount) ? (sourceCount as Partial<Record<AutopilotTickSource, number>>) : undefined,
+      ),
+    } as AutopilotMetrics;
+  }
+
+  private assertValidTickSourceCount(
+    value: unknown,
+    options: { requireAll: boolean },
+  ): asserts value is Partial<Record<AutopilotTickSource, number>> {
+    assert(isObject(value), "autopilot metrics.tickSourceCount is invalid");
+    for (const key of Object.keys(value)) {
+      assert(isAutopilotTickSource(key), `autopilot metrics.tickSourceCount.${key} is invalid`);
+    }
+    for (const source of AUTOPILOT_TICK_SOURCES) {
+      if (!options.requireAll && value[source] === undefined) {
+        continue;
+      }
+      const count = value[source];
+      assert(
+        typeof count === "number" && Number.isFinite(count) && count >= 0,
+        `autopilot metrics.tickSourceCount.${source} is invalid`,
+      );
     }
   }
 }

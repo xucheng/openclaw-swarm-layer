@@ -1,10 +1,9 @@
 import type { SwarmPluginConfig } from "../config.js";
 import type { RunRecord } from "../types.js";
-import type { AutopilotState, AutopilotTickSource } from "./types.js";
+import { AUTOPILOT_TICK_SOURCES, type AutopilotState, type AutopilotTickSource } from "./types.js";
 
 const TERMINAL_RUN_STATUSES = new Set<RunRecord["status"]>(["completed", "failed", "timed_out", "cancelled"]);
 const FAILURE_RUN_STATUSES = new Set<RunRecord["status"]>(["failed", "timed_out", "cancelled"]);
-const AUTOPILOT_TICK_SOURCES: readonly AutopilotTickSource[] = ["manual", "polling", "watcher", "safety"];
 
 export type AutopilotHealthSummary = {
   terminalWindow: number;
