@@ -27,6 +27,7 @@ const releasePackage = {
   openclaw: basePackage.openclaw,
   dependencies: basePackage.dependencies,
   peerDependencies: basePackage.peerDependencies,
+  peerDependenciesMeta: basePackage.peerDependenciesMeta,
 };
 
 await rm(outputRoot, { recursive: true, force: true });

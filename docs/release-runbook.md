@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.5`
+- Current release line: `0.5.6`
 
 ## Preflight
 
@@ -60,22 +60,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.5`.
+Expected version for this release: `0.5.6`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.5
-git push origin v0.5.5
-gh release create v0.5.5 --title "v0.5.5" --notes-file docs/release-notes/v0.5.5.md
+git tag v0.5.6
+git push origin v0.5.6
+gh release create v0.5.6 --title "v0.5.6" --notes-file docs/release-notes/v0.5.6.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.5.md](release-notes/v0.5.5.md)
-- keep the `0.5.5` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.6.md](release-notes/v0.5.6.md)
+- keep the `0.5.6` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -93,11 +93,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.5 \
+  --version 0.5.6 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.5 \
+  --source-ref v0.5.6 \
   --source-commit <git-sha> \
-  --changelog "Fix npm 11 package installs by marking the OpenClaw peer dependency optional while preserving host peer linking."
+  --changelog "Include peer dependency metadata in the ClawHub package artifact so npm 11 installs preserve OpenClaw peer linking."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -116,8 +116,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.5 \
-  --changelog "Refresh the Swarm Layer skill for the npm 11 install-smoke hotfix and current release metadata."
+  --version 0.5.6 \
+  --changelog "Refresh the Swarm Layer skill for the ClawHub package artifact hotfix and current release metadata."
 ```
 
 Optional tags to keep aligned with the current listing:

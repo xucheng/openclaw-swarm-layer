@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.6 (2026-05-25)
+
+ClawHub package artifact hotfix for the npm 11 peer-link install path.
+
+- Included `peerDependenciesMeta` in the generated ClawHub package `package.json`, so ClawHub installs also avoid materializing a registry `node_modules/openclaw` copy
+- Kept the `0.5.5` npm package peer fix unchanged
+
+### Verification
+
+- `npm run release:check` green
+- `npm run smoke:autopilot-watcher` green
+- `SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher` green
+- Remote OpenClaw npm-pack install smoke loads `openclaw-swarm-layer@0.5.6` and creates an `openclaw` peer symlink
+
 ## 0.5.5 (2026-05-25)
 
 Remote install-smoke hotfix for OpenClaw package installs on npm 11.
