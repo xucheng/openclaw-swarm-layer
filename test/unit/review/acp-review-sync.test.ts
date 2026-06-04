@@ -43,7 +43,7 @@ describe("ACP review sync", () => {
     expect(next.reviewQueue).toEqual([]);
   });
 
-  it("keeps workflow planned when a no-review completion leaves more work", () => {
+  it("promotes downstream work when a no-review completion leaves more work", () => {
     const next = applyAcpRunStatusToWorkflow({
       ...makeWorkflow({ review: { required: false } }),
       lifecycle: "running",
@@ -80,6 +80,7 @@ describe("ACP review sync", () => {
 
     expect(next.lifecycle).toBe("planned");
     expect(next.tasks[0]?.status).toBe("done");
+    expect(next.tasks[1]?.status).toBe("ready");
   });
 
   it("sets task to running on accepted status", () => {

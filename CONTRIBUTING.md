@@ -12,7 +12,7 @@ npm run build
 npm test
 ```
 
-**Prerequisites:** Node.js >= 22, OpenClaw >= 2026.2.24
+**Prerequisites:** Node.js >= 22, OpenClaw >= 2026.3.22
 
 ## Code Standards
 
@@ -29,6 +29,7 @@ All changes must pass the full test suite:
 npm test          # unit + e2e
 npm run test:unit # unit only
 npm run test:e2e  # e2e only
+npm run check:docs-redaction # docs must not contain local machine paths
 ```
 
 Add tests for new features. Follow existing patterns in `test/unit/` and `test/e2e/`.
@@ -37,7 +38,7 @@ Add tests for new features. Follow existing patterns in `test/unit/` and `test/e
 
 1. Fork the repo and create a feature branch
 2. Make your changes with tests
-3. Run `npm run build && npm test` to verify
+3. Run `npm run build && npm test && npm run check:docs-redaction` to verify
 4. Submit a PR with a clear description of what changed and why
 
 ## Reporting Issues

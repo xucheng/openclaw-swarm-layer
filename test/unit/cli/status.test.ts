@@ -9,6 +9,28 @@ async function makeTempProject(): Promise<string> {
 }
 
 describe("swarm status cli", () => {
+  it("includes sync results when requested", async () => {
+    const projectRoot = await makeTempProject();
+    const stateStore = new StateStore();
+    await stateStore.initProject(projectRoot);
+    await stateStore.saveWorkflow(projectRoot, {
+      version: 1,
+      projectRoot,
+      activeSpecId: "spec-1",
+      lifecycle: "planned",
+      tasks: [],
+      reviewQueue: [],
+    });
+
+    const result = await runSwarmStatus({ project: projectRoot, sync: true }, { stateStore });
+
+    expect(result.sync).toEqual({
+      ok: true,
+      results: [],
+      message: "no active session-backed runs",
+    });
+  });
+
   it("returns runtime policy, last action, review queue, and recent runs", async () => {
     const projectRoot = await makeTempProject();
     const stateStore = new StateStore({

@@ -16,6 +16,7 @@ export async function runSwarmRun(
     runner?: "manual" | "acp";
     parallel?: number;
     allReady?: boolean;
+    syncActive?: boolean;
   },
   context?: SwarmCliContext,
 ): Promise<unknown> {
@@ -24,11 +25,14 @@ export async function runSwarmRun(
   const sessionAdapter = resolveSessionAdapter(context);
   const reportConfig = stateStore.config;
   const orchestrator = createOrchestrator({ stateStore, sessionStore, sessionAdapter });
+  const syncResult = options.syncActive
+    ? await orchestrator.syncActiveRuns({ projectRoot: options.project })
+    : undefined;
 
   const isBatch = options.parallel !== undefined || options.allReady === true;
 
   if (isBatch) {
-    return runSwarmRunBatch(options, stateStore, orchestrator, reportConfig);
+    return runSwarmRunBatch(options, stateStore, orchestrator, reportConfig, syncResult);
   }
 
   const result = await orchestrator.runOnce({
@@ -57,6 +61,7 @@ export async function runSwarmRun(
 
     return {
       ...result,
+      sync: syncResult,
       runtime: resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion }),
       localReportPath: report.localReportPath,
       obsidianReportPath: report.obsidianReportPath,
@@ -66,6 +71,7 @@ export async function runSwarmRun(
   const workflow = await stateStore.loadWorkflow(options.project);
   return {
     ...result,
+    sync: syncResult,
     runtime: resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion }),
   };
 }
@@ -81,6 +87,7 @@ async function runSwarmRunBatch(
   stateStore: import("../state/state-store.js").StateStore,
   orchestrator: import("../services/orchestrator.js").SwarmOrchestrator,
   reportConfig: import("../config.js").SwarmPluginConfig,
+  syncResult?: import("../services/orchestrator.js").SyncActiveRunsResult,
 ): Promise<unknown> {
   const batchResult: RunBatchResult = await orchestrator.runBatch({
     projectRoot: options.project,
@@ -111,6 +118,7 @@ async function runSwarmRunBatch(
 
     return {
       ...batchResult,
+      sync: syncResult,
       runtime: resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion }),
       localReportPath: report.localReportPath,
       obsidianReportPath: report.obsidianReportPath,
@@ -120,6 +128,7 @@ async function runSwarmRunBatch(
   const workflow = await stateStore.loadWorkflow(options.project);
   return {
     ...batchResult,
+    sync: syncResult,
     runtime: resolveRuntimePolicySnapshot(stateStore.config, workflow.runtime, { runtimeVersion: stateStore.runtimeVersion }),
   };
 }

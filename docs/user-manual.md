@@ -23,7 +23,7 @@
 - Node.js >= 22
 - OpenClaw >= 2026.3.22（ACP public control-plane 默认路径）
 
-当前测试基线：OpenClaw `2026.5.3-1`。`0.5.4` 发布前已完成启动工具契约、插件 doctor、runtime health、unit 回归、e2e 回归和 autopilot watcher smoke 检查。
+当前测试基线：OpenClaw package baseline `2026.5.3-1`；本机 mini smoke 使用 `2026.6.1`。`0.5.7` 发布前验证覆盖启动工具契约、插件 doctor、runtime health、unit/e2e 回归、文档脱敏检查、autopilot watcher smoke，以及 Daily Papers 风格的本机 mini smoke。
 
 ### 安装插件
 
@@ -201,11 +201,22 @@ openclaw swarm init --project .
 openclaw swarm plan --project . --spec SPEC.md
 ```
 
+需要同一阶段并发时，在 phase 标题后添加 `[parallel]`；未声明时保持顺序执行：
+
+```markdown
+## Phases
+### Read Papers [parallel]
+- Read paper A
+- Read paper B
+### Synthesis
+- Merge notes
+```
+
 ### 4.2 执行前检查
 
 ```bash
 openclaw swarm doctor --json
-openclaw swarm status --project .
+openclaw swarm status --project . --sync
 ```
 
 重点看：
@@ -219,16 +230,19 @@ openclaw swarm status --project .
 
 ```bash
 # 用当前 install 上解析出来的默认 runner 预览
-openclaw swarm run --project . --dry-run
+openclaw swarm run --project . --sync-active --dry-run
 
 # 按默认解析执行
-openclaw swarm run --project .
+openclaw swarm run --project . --sync-active
 
 # 显式指定 manual
-openclaw swarm run --project . --runner manual
+openclaw swarm run --project . --sync-active --runner manual
 
 # 显式指定 ACP
-openclaw swarm run --project . --runner acp
+openclaw swarm run --project . --sync-active --runner acp
+
+# 批量调度所有 ready/queued 任务，受 acp.maxConcurrent 保护
+openclaw swarm run --project . --sync-active --all-ready --parallel 4
 ```
 
 ### 4.4 审批与报告
@@ -355,9 +369,9 @@ openclaw swarm doctor --json
 | 命令 | 用途 |
 |------|------|
 | `swarm doctor` | 诊断 ACP readiness、默认 runner 解析和 bridge-exit 状态 |
-| `swarm status` | 查看 workflow 状态、运行姿态和推荐动作 |
+| `swarm status --sync` | 同步 active runs 后查看 workflow 状态、运行姿态和推荐动作 |
 | `swarm plan` | 导入 spec 并生成任务图 |
-| `swarm run` | 执行下一个可运行任务 |
+| `swarm run --sync-active` | 同步 active runs 后执行下一个可运行或已排队任务 |
 | `swarm review` | 审批任务结果 |
 | `swarm report` | 生成 workflow 报告 |
 | `swarm session ...` | 管理会话、轮询状态、follow-up、steer |

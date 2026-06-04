@@ -664,7 +664,7 @@ import { resolveSwarmPaths } from "../../../src/lib/paths.js";
 
 describe("StateWatcher", () => {
   it("maps raw state paths to normalized event kinds", () => {
-    const paths = resolveSwarmPaths("/tmp/project", {});
+    const paths = resolveSwarmPaths("<TEMP_DIR>/project", {});
     expect(StateWatcher.classifyPath(paths, paths.workflowStatePath)).toBe("workflow");
     expect(StateWatcher.classifyPath(paths, paths.autopilotStatePath)).toBe("autopilot");
     expect(StateWatcher.classifyPath(paths, paths.progressFilePath)).toBe("progress");
@@ -676,7 +676,7 @@ describe("StateWatcher", () => {
 
   it("debounces raw events into one normalized change", async () => {
     vi.useFakeTimers();
-    const paths = resolveSwarmPaths("/tmp/project", {});
+    const paths = resolveSwarmPaths("<TEMP_DIR>/project", {});
     const watcher = new StateWatcher(paths, {
       debounceMs: 100,
       safetyResyncMs: 3600000,
@@ -1683,7 +1683,7 @@ it("creates watcher mode service loops with configured mode", async () => {
   );
 
   await service.start({
-    workspaceDir: "/tmp/project",
+    workspaceDir: "<TEMP_DIR>/project",
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
   } as any);
 
@@ -1696,7 +1696,7 @@ it("creates watcher mode service loops with configured mode", async () => {
       safetyTickMs: 120000,
     }),
   }));
-  expect(start).toHaveBeenCalledWith("/tmp/project");
+  expect(start).toHaveBeenCalledWith("<TEMP_DIR>/project");
 });
 ```
 

@@ -32,6 +32,9 @@ describe("swarm cli", () => {
 
     const runCommand = swarm?.commands.find((command) => command.name() === "run");
     expect(runCommand?.options.some((option) => option.long === "--runner")).toBe(true);
+    expect(runCommand?.options.some((option) => option.long === "--sync-active")).toBe(true);
+    const statusCommand = swarm?.commands.find((command) => command.name() === "status");
+    expect(statusCommand?.options.some((option) => option.long === "--sync")).toBe(true);
     const autopilotCommand = swarm?.commands.find((command) => command.name() === "autopilot");
     expect(autopilotCommand?.commands.map((command) => command.name())).toEqual([
       "status",

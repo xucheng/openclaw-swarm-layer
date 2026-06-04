@@ -66,6 +66,7 @@ describe("review gate", () => {
     const approved = applyReviewDecision(queued, "task-1", "approve");
 
     expect(approved.workflow.lifecycle).toBe("planned");
+    expect(approved.workflow.tasks[1]?.status).toBe("ready");
   });
 
   it("reject without options preserves existing blocked behavior", () => {

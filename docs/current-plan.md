@@ -84,8 +84,8 @@ Most recently closed milestone families:
 Status note:
 
 - `M6` and `M7` milestone families are complete as of 2026-04-08.
-- Current release-prep baseline for `0.5.4`: 62 unit test files / 421 unit tests, 20 e2e files / 26 e2e tests, node/parcel autopilot watcher smoke, and `npm pack --dry-run` green.
-- Additional 2026-05-25 verification on OpenClaw 2026.5.3-1: plugin startup contracts, `openclaw-swarm-layer` doctor checks, runtime health smoke, and remote staging watcher smoke passed on upgraded hosts.
+- Current release-prep baseline for `0.5.7`: 62 unit test files / 428 unit tests, 20 e2e files / 26 e2e tests, docs redaction, node/parcel autopilot watcher smoke, Daily Papers-style local mini smoke on OpenClaw 2026.6.1, and `npm pack --dry-run` green.
+- Additional 2026-05-25 verification on OpenClaw 2026.5.3-1: plugin startup contracts, `openclaw-swarm-layer` doctor checks, runtime health smoke, remote staging watcher smoke, npm 11 peer optional packaging, and ClawHub package artifact metadata checks passed on upgraded hosts.
 - Additional M7 verification on 2026-04-08: `openclaw plugins install -l .` passed on OpenClaw 2026.4.8, `child_process` is absent from source and fresh `dist/`, and the local ACP control-plane smoke completed through review/report/autopilot tick.
 - No follow-on milestone family is opened yet.
 

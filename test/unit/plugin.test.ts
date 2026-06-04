@@ -20,6 +20,7 @@ describe("plugin registration", () => {
 
     expect(api.registerCli).toHaveBeenCalledTimes(1);
     expect(api.registerCli.mock.calls[0][1]).toEqual({
+      commands: ["swarm"],
       descriptors: [{ name: "swarm", description: "Swarm workflow commands", hasSubcommands: true }],
     });
     expect(api.registerTool).toHaveBeenCalledTimes(8);

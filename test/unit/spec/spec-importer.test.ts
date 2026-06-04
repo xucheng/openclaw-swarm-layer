@@ -26,4 +26,16 @@ describe("spec importer", () => {
 
     expect(spec.projectRoot).toBe(path.join("/tmp", "project-root"));
   });
+
+  it("parses explicit phase execution suffixes", () => {
+    const spec = importSpecFromContent(
+      `# Daily Papers\n\n## Phases\n### Read Papers [parallel]\n- Read A\n- Read B\n### Synthesis [sequential]\n- Merge notes\n`,
+      "/tmp/daily-papers.md",
+    );
+
+    expect(spec.phases).toEqual([
+      { phaseId: "read-papers", title: "Read Papers", execution: "parallel", tasks: ["Read A", "Read B"] },
+      { phaseId: "synthesis", title: "Synthesis", execution: "sequential", tasks: ["Merge notes"] },
+    ]);
+  });
 });

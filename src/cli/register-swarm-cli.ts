@@ -23,6 +23,13 @@ import { runSwarmAutopilotStatus } from "./swarm-autopilot-status.js";
 import { runSwarmAutopilotTick } from "./swarm-autopilot-tick.js";
 
 type CommandAction = (options: any) => Promise<unknown>;
+type SwarmCliRegistrationOptions = NonNullable<Parameters<OpenClawPluginApi["registerCli"]>[1]> & {
+  descriptors?: Array<{
+    name: string;
+    description: string;
+    hasSubcommands?: boolean;
+  }>;
+};
 
 function bindCommand(command: any, action: CommandAction): void {
   command.action(async (options: any) => {
@@ -34,6 +41,17 @@ function bindCommand(command: any, action: CommandAction): void {
 }
 
 export function registerSwarmCli(api: OpenClawPluginApi): void {
+  const cliOptions: SwarmCliRegistrationOptions = {
+    commands: ["swarm"],
+    descriptors: [
+      {
+        name: "swarm",
+        description: "Swarm workflow commands",
+        hasSubcommands: true,
+      },
+    ],
+  };
+
   api.registerCli(
     (ctx) => {
       registerSwarmCliCommands(ctx, {
@@ -42,15 +60,7 @@ export function registerSwarmCli(api: OpenClawPluginApi): void {
         runtime: api.runtime,
       });
     },
-    {
-      descriptors: [
-        {
-          name: "swarm",
-          description: "Swarm workflow commands",
-          hasSubcommands: true,
-        },
-      ],
-    },
+    cliOptions,
   );
 }
 
@@ -63,8 +73,8 @@ export function registerSwarmCliCommands(
   const init = swarm.command("init").requiredOption("--project <path>").option("--json");
   bindCommand(init, (options) => runSwarmInit({ project: options.project }, cliContext));
 
-  const status = swarm.command("status").requiredOption("--project <path>").option("--json");
-  bindCommand(status, (options) => runSwarmStatus({ project: options.project }, cliContext));
+  const status = swarm.command("status").requiredOption("--project <path>").option("--sync").option("--json");
+  bindCommand(status, (options) => runSwarmStatus({ project: options.project, sync: options.sync }, cliContext));
 
   const plan = swarm
     .command("plan")
@@ -81,6 +91,7 @@ export function registerSwarmCliCommands(
     .option("--runner <kind>")
     .option("--parallel <N>")
     .option("--all-ready")
+    .option("--sync-active")
     .option("--json");
   bindCommand(run, (options) =>
     runSwarmRun(
@@ -91,6 +102,7 @@ export function registerSwarmCliCommands(
         runner: options.runner,
         parallel: options.parallel ? Number(options.parallel) : undefined,
         allReady: options.allReady,
+        syncActive: options.syncActive,
       },
       cliContext,
     ),

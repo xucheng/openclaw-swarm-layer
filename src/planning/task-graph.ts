@@ -62,7 +62,15 @@ export function getRunnableTasks(tasks: TaskNode[]): TaskNode[] {
 }
 
 export function getQueuedTasks(tasks: TaskNode[]): TaskNode[] {
-  return tasks.filter((task) => task.status === "queued");
+  const taskStatus = new Map(tasks.map((task) => [task.taskId, task.status]));
+  return tasks.filter((task) => (
+    task.status === "queued" &&
+    task.deps.every((dep) => taskStatus.get(dep) === "done")
+  ));
+}
+
+export function getDispatchableTasks(tasks: TaskNode[]): TaskNode[] {
+  return [...getQueuedTasks(tasks), ...getRunnableTasks(tasks)];
 }
 
 export function upsertTaskStatuses(tasks: TaskNode[]): TaskNode[] {

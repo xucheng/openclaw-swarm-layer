@@ -5,7 +5,8 @@ import { describeAcpExecutionPosture, resolveRuntimePolicySnapshot } from "../co
 import { buildAcpBridgeExitGate, formatAcpBridgeExitGateNotes, type AcpBridgeExitGate } from "../runtime/acp-bridge-exit-gate.js";
 import { buildAttentionItems, buildOperatorHighlights, buildRecommendedActions, buildReviewQueueItems } from "../reporting/operator-summary.js";
 import { summarizeSessionReuseForTask } from "../session/session-selector.js";
-import { resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
+import { createOrchestrator, type SyncActiveRunsResult } from "../services/orchestrator.js";
+import { resolveSessionAdapter, resolveSessionStore, resolveStateStore, type SwarmCliContext } from "./context.js";
 import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
 
 export type SwarmStatusResult = {
@@ -63,6 +64,7 @@ export type SwarmStatusResult = {
     recommendedAction: string;
   }>;
   recommendedActions: string[];
+  sync?: SyncActiveRunsResult;
   sessions: {
     total: number;
     active: number;
@@ -139,11 +141,18 @@ export type SwarmStatusResult = {
 };
 
 export async function runSwarmStatus(
-  options: { project: string },
+  options: { project: string; sync?: boolean },
   context?: SwarmCliContext,
 ): Promise<SwarmStatusResult> {
   const stateStore = resolveStateStore(context);
   const sessionStore = resolveSessionStore(context);
+  const syncResult = options.sync
+    ? await createOrchestrator({
+        stateStore,
+        sessionStore,
+        sessionAdapter: resolveSessionAdapter(context),
+      }).syncActiveRuns({ projectRoot: options.project })
+    : undefined;
   const workflow = await stateStore.loadWorkflow(options.project);
   const runs = await stateStore.loadRuns(options.project);
   const sessions = await sessionStore.listSessions(options.project);
@@ -175,6 +184,7 @@ export async function runSwarmStatus(
     attention: buildAttentionItems(workflow, runs),
     highlights: buildOperatorHighlights(runs),
     recommendedActions: buildRecommendedActions(workflow, runs),
+    sync: syncResult,
     sessions: {
       total: sessions.length,
       active: sessions.filter((session) => session.state === "active").length,

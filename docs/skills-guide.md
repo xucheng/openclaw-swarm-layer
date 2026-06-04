@@ -51,7 +51,8 @@ Skill 根据用户意图自动路由到对应模块：
 ```bash
 openclaw swarm init --project .
 openclaw swarm plan --project . --spec SPEC.md
-openclaw swarm run --project . --runner acp
+openclaw swarm status --project . --sync
+openclaw swarm run --project . --sync-active --runner acp
 openclaw swarm session status --project . --run <id>
 openclaw swarm review --project . --task <id> --approve
 openclaw swarm report --project .
@@ -106,12 +107,12 @@ doctor → severity?
 | "安装 swarm layer" | Setup: 环境检查 → 插件安装 → 验证 |
 | "初始化这个项目" | `swarm init --project .` |
 | "用这个 spec 规划" | `swarm plan --project . --spec <path>` |
-| "跑下一个任务" | `swarm status` → `swarm run` |
-| "用 ACP 跑" | `swarm run --runner acp` |
-| "先预览不要真跑" | `swarm run --dry-run` |
+| "跑下一个任务" | `swarm status --sync` → `swarm run --sync-active` |
+| "用 ACP 跑" | `swarm run --sync-active --runner acp` |
+| "先预览不要真跑" | `swarm run --sync-active --dry-run` |
 | "跑完了吗" | `swarm session status --run <id>` |
 | "批准" | `swarm review --task <id> --approve` |
-| "当前进度" | `swarm status` |
+| "当前进度" | `swarm status --sync` |
 | "生成报告" | `swarm report` |
 | "任务卡住了" | Diagnose: `doctor` → `status` → 排查 |
 | "清理超时 session" | `swarm session cleanup` |

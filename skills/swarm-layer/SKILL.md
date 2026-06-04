@@ -7,11 +7,11 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-
 
 Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
-Current release baseline: `openclaw-swarm-layer@0.5.6`, validated on `OpenClaw 2026.5.3-1` with startup tool contracts, plugin doctor checks, runtime health smoke, autopilot watcher smoke, and remote package-install smoke.
+Current release baseline: `openclaw-swarm-layer@0.5.7`, validated on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` with startup tool contracts, plugin doctor checks, runtime health smoke, autopilot watcher smoke, Daily Papers-style local smoke, and remote package-install smoke.
 
 ## What It Does
 
-- **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph
+- **Spec-driven planning** — Write a Markdown spec with goals and phased tasks → generates a dependency-ordered task graph, including explicit `[parallel]` phase barriers
 - **Multi-runner execution** — Manual (operator-driven safe fallback) and ACP (default-capable automation path)
 - **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
 - **Review gates** — Tasks require explicit approve/reject; structured quality rubrics for weighted multi-dimension scoring
@@ -21,7 +21,7 @@ Current release baseline: `openclaw-swarm-layer@0.5.6`, validated on `OpenClaw 2
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking for exhausted tasks
 - **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
 - **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
-- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
+- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware queued-task drain
 - **Autopilot control plane** — Supervised `status/start/pause/resume/stop/tick` flows with lease-backed decisions, optional watcher-driven ticks, and degraded-mode holds
 - **Operator reports** — Status snapshots, run logs, review logs, spec archives, completion summaries → local + Obsidian sync
 
@@ -64,10 +64,10 @@ After install, verify: `openclaw plugins info openclaw-swarm-layer` should show 
 
 ```bash
 # 1. Initialize
-openclaw swarm init --project /tmp/my-project
+openclaw swarm init --project <TEMP_DIR>/my-project
 
 # 2. Write a spec
-cat > /tmp/my-project/SPEC.md << 'EOF'
+cat > <TEMP_DIR>/my-project/SPEC.md << 'EOF'
 # Feature Build
 ## Goals
 - Implement and test the new feature
@@ -79,25 +79,25 @@ cat > /tmp/my-project/SPEC.md << 'EOF'
 EOF
 
 # 3. Plan
-openclaw swarm plan --project /tmp/my-project --spec /tmp/my-project/SPEC.md
+openclaw swarm plan --project <TEMP_DIR>/my-project --spec <TEMP_DIR>/my-project/SPEC.md
 # → specId: feature-build, taskCount: 2
 
 # 4. Execute first task
-openclaw swarm run --project /tmp/my-project --runner acp
+openclaw swarm run --project <TEMP_DIR>/my-project --runner acp
 # → action: dispatched, runId: implement-task-1-run-...
 
 # 5. Poll until complete
-openclaw swarm session status --project /tmp/my-project --run <runId>
+openclaw swarm session status --project <TEMP_DIR>/my-project --run <runId>
 # → status: completed
 
 # 6. Approve
-openclaw swarm review --project /tmp/my-project --task <taskId> --approve
+openclaw swarm review --project <TEMP_DIR>/my-project --task <taskId> --approve
 # → status: done
 
 # 7. Execute next task, repeat steps 4-6
 
 # 8. View report
-openclaw swarm report --project /tmp/my-project
+openclaw swarm report --project <TEMP_DIR>/my-project
 ```
 
 ## Links
@@ -139,7 +139,7 @@ node --version     # >= 22
 openclaw --version # >= 2026.3.22
 ```
 
-The `0.5.6` release was smoke-tested on `OpenClaw 2026.5.3-1`.
+The `0.5.7` release was smoke-tested on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1`.
 
 ### 2. Install Plugin
 ```bash
@@ -219,11 +219,11 @@ Write Spec → Plan → Status → Run → Poll Session → Review → Repeat
 ### Plan → Run → Review
 ```bash
 openclaw swarm plan --project . --spec SPEC.md      # Import and generate tasks
-openclaw swarm status --project .                     # See what's ready
-openclaw swarm run --project . --dry-run              # Preview
-openclaw swarm run --project . --runner acp           # Execute (acp/manual)
-openclaw swarm run --project . --parallel 3           # Dispatch up to 3 ready tasks
-openclaw swarm run --project . --all-ready             # Fill all available concurrency slots
+openclaw swarm status --project . --sync              # Sync active runs, then see what's ready
+openclaw swarm run --project . --sync-active --dry-run # Preview after active-run sync
+openclaw swarm run --project . --sync-active --runner acp # Execute (acp/manual)
+openclaw swarm run --project . --sync-active --parallel 3 # Dispatch up to 3 ready/queued tasks
+openclaw swarm run --project . --sync-active --all-ready # Fill all available concurrency slots
 openclaw swarm session status --project . --run <id>  # Poll until complete
 openclaw swarm review --project . --task <id> --approve
 openclaw swarm review --project . --task <id> --reject --retry-now  # Reject and force retry
@@ -426,9 +426,9 @@ For AI tool calling. All tools accept `--json` for structured output.
 
 | Tool | Parameters | Purpose |
 |------|-----------|---------|
-| `swarm_status` | `project` | Workflow status with attention items |
+| `swarm_status` | `project`, `sync?` | Workflow status with optional active-run sync and attention items |
 | `swarm_task_plan` | `project`, `spec` | Import spec, generate task graph |
-| `swarm_run` | `project`, `task?`, `dryRun?`, `parallel?`, `allReady?` | Dispatch runnable tasks (single or batch) |
+| `swarm_run` | `project`, `task?`, `dryRun?`, `parallel?`, `allReady?`, `syncActive?` | Sync active runs when requested, then dispatch runnable or queued tasks |
 | `swarm_review_gate` | `project`, `task`, `approve?`, `reject?`, `note?` | Approve/reject review (reject returns to ready by default) |
 | `swarm_session_status` | `project`, `run` | Poll session status |
 | `swarm_session_cancel` | `project`, `run`, `reason?` | Cancel session |

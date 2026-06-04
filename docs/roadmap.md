@@ -222,6 +222,10 @@ Release `0.5.3` refresh (2026-05-04): OpenClaw 2026.5.3-1 compatibility validate
 
 Release `0.5.4` refresh (2026-05-25): autopilot filesystem watcher mode validated with 62 unit test files / 421 unit tests, 20 e2e files / 26 e2e tests, node/parcel watcher smoke, npm pack dry-run, and remote staging watcher smoke.
 
+Release `0.5.5` and `0.5.6` refreshes (2026-05-25): npm 11 peer optional install behavior and ClawHub package peer metadata validated for OpenClaw package installs.
+
+Release `0.5.7` refresh (2026-06-04): Daily Papers-style cron reliability updated with explicit parallel phase barriers, queued-task drain, active-run sync command options, downstream ready promotion, docs redaction CI, release package metadata, and local mini smoke validation.
+
 ## Assessment Timeline
 
 - `M1` complete (2026-03-22): orchestration foundation shipped in the initial release baseline

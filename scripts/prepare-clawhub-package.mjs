@@ -28,6 +28,7 @@ const releasePackage = {
   dependencies: basePackage.dependencies,
   peerDependencies: basePackage.peerDependencies,
   peerDependenciesMeta: basePackage.peerDependenciesMeta,
+  optionalDependencies: basePackage.optionalDependencies,
 };
 
 await rm(outputRoot, { recursive: true, force: true });

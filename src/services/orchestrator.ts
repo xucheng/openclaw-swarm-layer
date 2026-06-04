@@ -6,7 +6,7 @@ import type {
 } from "openclaw/plugin-sdk/core";
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot, resolveSwarmPluginConfig } from "../config.js";
-import { getQueuedTasks, getRunnableTasks } from "../planning/task-graph.js";
+import { getDispatchableTasks, getQueuedTasks, getRunnableTasks, upsertTaskStatuses } from "../planning/task-graph.js";
 import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
 import { applyAcpRunStatusToWorkflow, deriveWorkflowLifecycle, enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
@@ -206,8 +206,8 @@ export class SwarmOrchestrator {
 
     const workflow = await this.stateStore.loadWorkflow(input.projectRoot);
     const runtime = resolveRuntimePolicySnapshot(this.stateStore.config, workflow.runtime, { runtimeVersion: this.stateStore.runtimeVersion });
-    const runnableTasks = getRunnableTasks(workflow.tasks);
-    const task = pickTask(runnableTasks, input.taskId);
+    const dispatchableTasks = getDispatchableTasks(workflow.tasks);
+    const task = pickTask(dispatchableTasks, input.taskId);
 
     if (!task) {
       return {
@@ -342,7 +342,7 @@ export class SwarmOrchestrator {
     };
 
     const reusedLabel = reusedSession ? ` (reused session ${reusedSession.sessionId})` : "";
-    const nextTasks = workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry));
+    const nextTasks = upsertTaskStatuses(workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry)));
     const nextReviewQueue =
       result.nextTaskStatus === "review_required"
         ? [...workflow.reviewQueue, ...(workflow.reviewQueue.includes(task.taskId) ? [] : [task.taskId])]
@@ -650,7 +650,7 @@ export class SwarmOrchestrator {
       results.push(result);
     }
 
-    if (toQueue.length > 0) {
+    if (!input.dryRun && toQueue.length > 0) {
       const currentWorkflow = await this.stateStore.loadWorkflow(input.projectRoot);
       const updatedTasks = currentWorkflow.tasks.map((t) => {
         if (toQueue.some((q) => q.taskId === t.taskId) && (t.status === "ready" || t.status === "planned")) {

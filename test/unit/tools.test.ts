@@ -23,5 +23,9 @@ describe("swarm tools", () => {
       "swarm_session_cancel",
       "swarm_session_close",
     ]);
+    const statusTool = registerTool.mock.calls.find((call) => call[0].name === "swarm_status")?.[0];
+    const runTool = registerTool.mock.calls.find((call) => call[0].name === "swarm_run")?.[0];
+    expect(statusTool.parameters.properties.sync).toBeDefined();
+    expect(runTool.parameters.properties.syncActive).toBeDefined();
   });
 });

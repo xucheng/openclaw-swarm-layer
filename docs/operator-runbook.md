@@ -36,7 +36,7 @@ The bridge-exit gate fixes the bridge-free ACP floor at OpenClaw `>=2026.3.22`.
 Use these operator surfaces:
 
 - `openclaw swarm doctor --json`
-- `openclaw swarm status --project <path> --json`
+- `openclaw swarm status --project <path> --sync --json`
 - `openclaw swarm report --project <path> --json`
 
 Read them as follows:
@@ -53,8 +53,8 @@ Read them as follows:
 openclaw swarm doctor --json
 openclaw swarm init --project <path>
 openclaw swarm plan --project <path> --spec <spec> --json
-openclaw swarm status --project <path> --json
-openclaw swarm run --project <path> --dry-run --json
+openclaw swarm status --project <path> --sync --json
+openclaw swarm run --project <path> --sync-active --dry-run --json
 ```
 
 Expect:
@@ -64,19 +64,19 @@ Expect:
 - status shows configured default, resolved default, and gate notes
 - dry-run selects ACP when ACP is actually available on the install
 
-Release `0.5.4` was validated on OpenClaw `2026.5.3-1` with plugin startup, tool-contract manifest, plugin doctor, runtime health checks, full unit/e2e regression, and autopilot watcher smoke. The previous full manual and live ACP workflow smoke remains covered by the `0.5.2` release validation.
+Release `0.5.7` was validated on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` with plugin startup, tool-contract manifest, plugin doctor, runtime health checks, full unit/e2e regression, docs redaction, autopilot watcher smoke, and Daily Papers-style local mini smoke. The previous full manual and live ACP workflow smoke remains covered by the `0.5.2` release validation.
 
 ## Full Live Smoke Matrix
 
 Run these before claiming bridge-free ACP readiness:
 
-1. `~/.openclaw/scripts/openclaw-acp-post-upgrade-smoke.sh`
+1. `<OPENCLAW_HOME>/scripts/openclaw-acp-post-upgrade-smoke.sh`
 2. `openclaw swarm doctor --json`
 3. `openclaw swarm init --project <path>`
 4. `openclaw swarm plan --project <path> --spec <spec> --json`
-5. `openclaw swarm status --project <path> --json`
-6. `openclaw swarm run --project <path> --dry-run --json`
-7. `openclaw swarm run --project <path> --json`
+5. `openclaw swarm status --project <path> --sync --json`
+6. `openclaw swarm run --project <path> --sync-active --dry-run --json`
+7. `openclaw swarm run --project <path> --sync-active --json`
 8. `openclaw swarm session status --project <path> --run <runId> --json` or `openclaw swarm autopilot tick --project <path> --json`
 9. `openclaw swarm review --project <path> --task <taskId> --approve --json`
 10. `openclaw swarm report --project <path> --json`

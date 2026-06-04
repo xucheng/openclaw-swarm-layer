@@ -19,12 +19,14 @@ function jsonResult(payload: unknown) {
 }
 
 type ProjectParams = { project: string };
+type StatusParams = ProjectParams & { sync?: boolean };
 type PlanParams = ProjectParams & { spec: string };
 type RunParams = ProjectParams & {
   task?: string;
   dryRun?: boolean;
   parallel?: number;
   allReady?: boolean;
+  syncActive?: boolean;
 };
 type ReviewParams = ProjectParams & {
   task: string;
@@ -50,10 +52,11 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
       description: "Show current swarm workflow status for a project.",
       parameters: Type.Object({
         project: Type.String(),
+        sync: Type.Optional(Type.Boolean()),
       }),
       async execute(_toolCallId, params) {
-        const input = toolParams<ProjectParams>(params);
-        return jsonResult(await runSwarmStatus({ project: input.project }, toolContext));
+        const input = toolParams<StatusParams>(params);
+        return jsonResult(await runSwarmStatus({ project: input.project, sync: input.sync }, toolContext));
       },
     },
     { optional: true },
@@ -103,6 +106,7 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
         dryRun: Type.Optional(Type.Boolean()),
         parallel: Type.Optional(Type.Integer({ minimum: 1 })),
         allReady: Type.Optional(Type.Boolean()),
+        syncActive: Type.Optional(Type.Boolean()),
       }),
       async execute(_toolCallId, params) {
         const input = toolParams<RunParams>(params);
@@ -114,6 +118,7 @@ export function registerSwarmTools(api: OpenClawPluginApi): void {
               dryRun: input.dryRun,
               parallel: input.parallel,
               allReady: input.allReady,
+              syncActive: input.syncActive,
             },
             toolContext,
           ),

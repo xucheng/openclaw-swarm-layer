@@ -17,19 +17,27 @@ export function planTasksFromSpec(
   const resolvedConfig = resolveSwarmPluginConfig(config);
   const defaultRunner = resolveWorkflowDefaultRunner(resolvedConfig, hints);
   const tasks: TaskNode[] = [];
+  let previousPhaseLeafTaskIds: string[] = [];
 
   for (const phase of spec.phases) {
     const phaseTasks = phase.tasks.length > 0 ? phase.tasks : [`Execute ${phase.title}`];
+    const phaseTaskIds: string[] = [];
+    let previousTaskInPhase: TaskNode | undefined;
     phaseTasks.forEach((taskTitle, index) => {
-      const previousTask = tasks[tasks.length - 1];
-      tasks.push({
+      const deps =
+        phase.execution === "parallel"
+          ? previousPhaseLeafTaskIds
+          : previousTaskInPhase
+            ? [previousTaskInPhase.taskId]
+            : previousPhaseLeafTaskIds;
+      const task: TaskNode = {
         taskId: taskIdForPhase(phase.phaseId, index),
         specId: spec.specId,
         phaseId: phase.phaseId,
         title: taskTitle,
         description: taskTitle,
         kind: "coding",
-        deps: previousTask ? [previousTask.taskId] : [],
+        deps: [...deps],
         status: "planned",
         workspace: {
           mode: resolvedConfig.defaultWorkspaceMode,
@@ -40,8 +48,14 @@ export function planTasksFromSpec(
         review: {
           required: resolvedConfig.reviewRequiredByDefault,
         },
-      });
+      };
+      tasks.push(task);
+      phaseTaskIds.push(task.taskId);
+      previousTaskInPhase = task;
     });
+    previousPhaseLeafTaskIds = phase.execution === "parallel"
+      ? phaseTaskIds
+      : phaseTaskIds.slice(-1);
   }
 
   if (spec.acceptanceCriteria.length > 0 && tasks.length > 0) {

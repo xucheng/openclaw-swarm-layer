@@ -1,7 +1,7 @@
 {
   "name": "openclaw-swarm-layer",
   "displayName": "OpenClaw Swarm Layer",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "license": "MIT",
   "author": "Xu Cheng",
@@ -28,7 +28,8 @@
     "dist/src",
     "scripts",
     "skills",
-    "openclaw.plugin.json"
+    "openclaw.plugin.json",
+    "CHANGELOG.md"
   ],
   "openclaw": {
     "extensions": [
@@ -48,9 +49,10 @@
     "test:e2e": "vitest run test/e2e",
     "test:watch": "vitest",
     "smoke:autopilot-watcher": "npm run build && node ./scripts/autopilot-fs-watcher-smoke.mjs",
-    "release:check": "npm run build && npm test && npm pack --dry-run && npm run prepare:clawhub:package",
+    "check:docs-redaction": "node ./scripts/check-doc-redaction.mjs",
+    "release:check": "npm run build && npm test && npm run check:docs-redaction && npm pack --dry-run && npm run prepare:clawhub:package",
     "prepare:clawhub:package": "npm run build && node ./scripts/prepare-clawhub-package.mjs",
-    "prepublishOnly": "npm run build && npm run test:unit"
+    "prepublishOnly": "npm run build && npm run test:unit && npm run check:docs-redaction"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.41",

@@ -50,12 +50,18 @@ function readPhases(lines: string[]): SpecDoc["phases"] {
       break;
     }
     if (/^###\s+/.test(line)) {
-      const title = line.replace(/^###\s+/, "").trim();
+      const rawTitle = line.replace(/^###\s+/, "").trim();
+      const executionMatch = rawTitle.match(/\[(parallel|sequential)\]\s*$/i);
+      const execution = executionMatch?.[1]?.toLowerCase() as SpecDoc["phases"][number]["execution"] | undefined;
+      const title = executionMatch ? rawTitle.replace(/\s*\[(parallel|sequential)\]\s*$/i, "").trim() : rawTitle;
       current = {
         phaseId: slugify(title) || `phase-${phases.length + 1}`,
         title,
         tasks: [],
       };
+      if (execution) {
+        current.execution = execution;
+      }
       phases.push(current);
       continue;
     }

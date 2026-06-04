@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.5.7 (2026-06-04)
+
+Daily Papers-style cron reliability release based on the published `0.5.6` package line.
+
+- Added explicit phase execution syntax in specs: `### Phase Title [parallel]` or `[sequential]`
+- Kept old specs sequential by default while allowing parallel phase tasks to fan out and later phases to depend on the full previous barrier
+- Fixed queued-task drain so `swarm run --all-ready --parallel N` can dispatch dependency-satisfied queued tasks even when there are no newly runnable tasks
+- Prevented dry-run batch dispatch from mutating overflow tasks into `queued`
+- Added `swarm run --sync-active` and `swarm status --sync` so cron and operator paths can poll active ACP sessions before deciding what is runnable
+- Promoted downstream tasks to `ready` after no-review run completion, ACP completion sync, and review approvals
+- Added a docs-redaction gate to CI, `release:check`, and `prepublishOnly` so release docs cannot ship local user, home, or temp paths
+- Included `CHANGELOG.md` in the npm package file list
+- Updated the Swarm Layer skill, README, release runbook, and release notes for `openclaw-swarm-layer@0.5.7`
+
+### Verification
+
+- `npm run build` green
+- `npm run test:unit` green: 62 files / 428 tests
+- `npm run test:e2e` green: 20 files / 26 tests
+- `npm run check:docs-redaction` green: 43 source markdown files scanned
+- `npm run smoke:autopilot-watcher` green with the node watcher
+- `SWARM_WATCHER_LIBRARY=parcel npm run smoke:autopilot-watcher` green with `@parcel/watcher`
+- Local mini smoke on `OpenClaw 2026.6.1` green: linked current source, loaded `openclaw-swarm-layer@0.5.7`, ran a Daily Papers-style `[parallel]` read phase, promoted synthesis to ready, and completed the workflow
+- `npm run release:check` green: build, full regression, docs redaction, npm pack dry-run, and ClawHub package staging
+- `npm run prepublishOnly` green
+
 ## 0.5.6 (2026-05-25)
 
 ClawHub package artifact hotfix for the npm 11 peer-link install path.

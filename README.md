@@ -6,11 +6,11 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.6-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.7-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-421%20unit%20%7C%2026%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-428%20unit%20%7C%2026%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -20,7 +20,7 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 
 ## Features
 
-- **Spec-driven planning** — Markdown spec with goals and phased tasks → dependency-ordered task graph
+- **Spec-driven planning** — Markdown spec with goals and phased tasks → dependency-ordered task graph, including explicit `[parallel]` phase barriers
 - **ACP-first execution** — ACP is the only default-capable automated runner; capability-aware `auto` resolution
 - **Supervised autopilot** — Deterministic control-plane ticks, optional watcher-driven service loop, and operator-visible start/pause/resume/stop controls
 - **Persistent sessions** — Reuse, thread binding, follow-up, steer, cancel, and close flows
@@ -30,14 +30,14 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking and signal-based auto-retry
 - **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)
 - **Reject-retry workflow** — Review rejections return tasks to ready for re-run; configurable retry limits
-- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware slot management
+- **Parallel dispatch** — `--parallel N` and `--all-ready` batch dispatch with concurrency-aware queued-task drain
 - **Operator reporting** — Status snapshots, run/review logs, spec archives, completion summaries → local + Obsidian sync
 - **Runtime diagnostics** — `swarm doctor`, `swarm status`, and workflow reports surface ACP bridge-exit gate directly
 
 ## Prerequisites
 
 - **Node.js** >= 22
-- **OpenClaw** >= 2026.3.22 (tested against `2026.5.3-1`)
+- **OpenClaw** >= 2026.3.22 (dev dependency baseline `2026.5.3-1`; local mini smoke `2026.6.1`)
 
 ## Installation
 
@@ -80,13 +80,13 @@ openclaw swarm plan --project /path/to/your/project --spec SPEC.md
 
 # 3. Inspect runtime posture before execution
 openclaw swarm doctor --json
-openclaw swarm status --project /path/to/your/project --json
+openclaw swarm status --project /path/to/your/project --sync --json
 
 # 4. Dry-run with the resolved default runner
-openclaw swarm run --project /path/to/your/project --dry-run --json
+openclaw swarm run --project /path/to/your/project --sync-active --dry-run --json
 
 # 5. Execute
-openclaw swarm run --project /path/to/your/project --json
+openclaw swarm run --project /path/to/your/project --sync-active --json
 
 # 6. Review and report
 openclaw swarm review --project /path/to/your/project --task <taskId> --approve --json
@@ -101,10 +101,10 @@ openclaw swarm report --project /path/to/your/project --json
 |---------|-------------|
 | `swarm init --project <path>` | Initialize swarm state for a project |
 | `swarm plan --project <path> --spec <path>` | Import a spec and build task graph |
-| `swarm run --project <path> [--runner acp\|manual] [--dry-run] [--parallel N] [--all-ready]` | Execute runnable tasks (single or batch) |
+| `swarm run --project <path> [--runner acp\|manual] [--dry-run] [--parallel N] [--all-ready] [--sync-active]` | Sync active runs when requested, then execute runnable or queued tasks (single or batch) |
 | `swarm review --project <path> --task <id> --approve\|--reject [--retry-now]` | Approve or reject a task |
 | `swarm report --project <path>` | Generate a workflow report |
-| `swarm status --project <path>` | Show workflow status, runtime posture, and bridge-exit gate |
+| `swarm status --project <path> [--sync]` | Optionally sync active runs, then show workflow status, runtime posture, and bridge-exit gate |
 | `swarm doctor` | Diagnose ACP readiness and bridge-exit gate status |
 | `swarm autopilot status --project <path>` | Inspect autopilot health, lease state, and last decision |
 | `swarm autopilot start/pause/resume/stop --project <path>` | Control the supervised autopilot service state |
@@ -157,13 +157,14 @@ Use `watcherMode: "watch"` for event-driven operation, `hybrid` for watcher even
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (421 tests, 62 files)
+npm run test:unit      # Unit tests only (428 tests, 62 files)
 npm run test:e2e       # E2E tests only (26 tests, 20 files)
 npm run test:watch     # Watch mode
-npm run release:check  # Build + full regression + npm pack dry-run + ClawHub package prep
+npm run check:docs-redaction  # Verify docs do not contain local machine paths
+npm run release:check         # Build + full regression + docs redaction + npm pack dry-run + ClawHub package prep
 ```
 
-Current release validation also includes OpenClaw `2026.5.3-1` smoke coverage on local and remote staging environments: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, and node/parcel autopilot watcher smoke.
+Current release validation also includes OpenClaw `2026.5.3-1` package-baseline coverage and local mini `2026.6.1` smoke coverage: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, node/parcel autopilot watcher smoke, and Daily Papers-style parallel workflow completion.
 
 ## Documentation
 

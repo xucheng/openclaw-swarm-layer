@@ -5,6 +5,7 @@
 - every implementation task adds or updates unit coverage
 - every milestone-sized slice reruns e2e regression
 - ACP bridge-exit work is not complete until the live smoke matrix is evaluated on a supported install
+- release docs must pass local-path redaction before CI, npm publish, or ClawHub packaging
 
 ## Unit Coverage
 
@@ -23,8 +24,8 @@ Must cover:
 
 Current baseline:
 
-- `npm run test:unit`: 59 files / 359 tests
-- `npm run test:e2e`: 19 files / 25 tests
+- `npm run test:unit`: 62 files / 428 tests
+- `npm run test:e2e`: 20 files / 26 tests
 - init -> plan -> status
 - run -> review -> report
 - ACP dry-run scaffold
@@ -53,7 +54,7 @@ Minimum artifact expectations:
 
 A smoke run can be partial by stage. The full journal shape appears only after the corresponding lifecycle step has executed.
 
-Release `0.5.4` validation on OpenClaw `2026.5.3-1` covers startup tool-contract manifest checks, plugin doctor health, full unit regression, full e2e regression, and autopilot watcher smoke.
+Release `0.5.7` validation on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` covers startup tool-contract manifest checks, plugin doctor health, docs redaction, full unit regression, full e2e regression, autopilot watcher smoke, and Daily Papers-style local mini smoke.
 
 ## Regression Rule
 
@@ -62,5 +63,6 @@ Before marking any milestone done:
 ```bash
 ./node_modules/.bin/vitest run test/unit
 ./node_modules/.bin/vitest run test/e2e
+npm run check:docs-redaction
 npm run build
 ```

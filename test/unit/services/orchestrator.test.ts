@@ -154,6 +154,35 @@ describe("SwarmOrchestrator", () => {
     expect(workflow.tasks[0]?.status).toBe("done");
   });
 
+  it("promotes downstream tasks after a no-review run completes", async () => {
+    const projectRoot = await makeTempProject();
+    const stateStore = new StateStore();
+    const spec = {
+      ...makeSpec(projectRoot),
+      phases: [{ phaseId: "phase-1", title: "Build", tasks: ["First", "Second"] }],
+    };
+    const tasks = planTasksFromSpec(spec, {
+      defaultRunner: "manual",
+      reviewRequiredByDefault: false,
+    });
+    await stateStore.initProject(projectRoot);
+    await stateStore.saveWorkflow(projectRoot, {
+      version: 1,
+      projectRoot,
+      activeSpecId: spec.specId,
+      lifecycle: "planned",
+      tasks,
+      reviewQueue: [],
+    });
+
+    const orchestrator = createOrchestrator({ stateStore });
+    await orchestrator.runOnce({ projectRoot });
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+
+    expect(workflow.tasks.map((task) => task.status)).toEqual(["done", "ready"]);
+    expect(workflow.lifecycle).toBe("planned");
+  });
+
   it("persists session record for ACP runs", async () => {
     const { projectRoot, stateStore } = await setupProject();
     const sessionStore = new SessionStore(stateStore.config);
@@ -700,6 +729,24 @@ describe("SwarmOrchestrator.runBatch", () => {
     expect(result.results).toHaveLength(4);
   });
 
+  it("drains dependency-satisfied queued tasks when no new tasks are runnable", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({
+      taskCount: 2,
+      taskOverrides: { status: "queued" },
+    });
+    const orchestrator = createOrchestrator({ stateStore });
+
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.stats.dispatchRequested).toBe(2);
+    expect(result.stats.dispatchAdmitted).toBe(2);
+    expect(result.results.map((entry) => entry.taskIds?.[0])).toEqual(["task-1", "task-2"]);
+
+    const finalWorkflow = await stateStore.loadWorkflow(projectRoot);
+    expect(finalWorkflow.tasks.map((task) => task.status)).toEqual(["done", "done"]);
+  });
+
   it("queues tasks that exceed maxConcurrent", async () => {
     const { projectRoot, stateStore } = await setupBatchProject({
       taskCount: 5,
@@ -722,6 +769,29 @@ describe("SwarmOrchestrator.runBatch", () => {
     const finalWorkflow = await stateStore.loadWorkflow(projectRoot);
     const queuedCount = finalWorkflow.tasks.filter((t) => t.status === "queued").length;
     expect(queuedCount).toBe(3);
+  });
+
+  it("does not persist queued overflow during dry-run batches", async () => {
+    const { projectRoot, stateStore } = await setupBatchProject({
+      taskCount: 5,
+      acpMaxConcurrent: 2,
+    });
+
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+    const updatedTasks = workflow.tasks.map((t, i) =>
+      i < 2 ? { ...t, status: "running" as const, runner: { type: "acp" as const } } : t,
+    );
+    await stateStore.saveWorkflow(projectRoot, { ...workflow, tasks: updatedTasks });
+
+    const orchestrator = createOrchestrator({ stateStore });
+    const result = await orchestrator.runBatch({ projectRoot, allReady: true, dryRun: true });
+
+    expect(result.stats.dispatchAdmitted).toBe(0);
+    expect(result.stats.dispatchQueued).toBe(3);
+
+    const finalWorkflow = await stateStore.loadWorkflow(projectRoot);
+    expect(finalWorkflow.tasks.filter((t) => t.status === "queued")).toHaveLength(0);
+    expect(finalWorkflow.tasks.filter((t) => t.status === "ready")).toHaveLength(3);
   });
 
   it("returns noop when no runnable tasks", async () => {

@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.6`
+- Current release line: `0.5.7`
 
 ## Preflight
 
@@ -37,6 +37,7 @@ That covers:
 
 - `npm run build`
 - `npm test`
+- `npm run check:docs-redaction`
 - `npm pack --dry-run`
 - `npm run prepare:clawhub:package`
 
@@ -60,22 +61,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.6`.
+Expected version for this release: `0.5.7`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.6
-git push origin v0.5.6
-gh release create v0.5.6 --title "v0.5.6" --notes-file docs/release-notes/v0.5.6.md
+git tag v0.5.7
+git push origin v0.5.7
+gh release create v0.5.7 --title "v0.5.7" --notes-file docs/release-notes/v0.5.7.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.6.md](release-notes/v0.5.6.md)
-- keep the `0.5.6` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.7.md](release-notes/v0.5.7.md)
+- keep the `0.5.7` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -93,11 +94,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.6 \
+  --version 0.5.7 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.6 \
+  --source-ref v0.5.7 \
   --source-commit <git-sha> \
-  --changelog "Include peer dependency metadata in the ClawHub package artifact so npm 11 installs preserve OpenClaw peer linking."
+  --changelog "Improve Daily Papers-style cron reliability with explicit parallel phase barriers, queued-task drain, active-run sync options, downstream ready promotion, and docs-redaction release gates."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -116,8 +117,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.6 \
-  --changelog "Refresh the Swarm Layer skill for the ClawHub package artifact hotfix and current release metadata."
+  --version 0.5.7 \
+  --changelog "Refresh the Swarm Layer skill for Daily Papers-style cron reliability, sync-aware run/status commands, and current release metadata."
 ```
 
 Optional tags to keep aligned with the current listing:

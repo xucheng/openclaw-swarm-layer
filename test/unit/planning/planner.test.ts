@@ -1,5 +1,5 @@
 import { planTasksFromSpec } from "../../../src/planning/planner.js";
-import { getQueuedTasks, getRunnableTasks, upsertTaskStatuses, validateTaskGraph } from "../../../src/planning/task-graph.js";
+import { getDispatchableTasks, getQueuedTasks, getRunnableTasks, upsertTaskStatuses, validateTaskGraph } from "../../../src/planning/task-graph.js";
 import type { SpecDoc, TaskNode } from "../../../src/types.js";
 
 const spec: SpecDoc = {
@@ -24,6 +24,23 @@ describe("planner", () => {
     expect(tasks[0].status).toBe("ready");
     expect(tasks[1].deps).toEqual([tasks[0].taskId]);
     expect(tasks[2].deps).toEqual([tasks[1].taskId]);
+  });
+
+  it("supports explicit parallel phases without serializing independent tasks", () => {
+    const tasks = planTasksFromSpec({
+      ...spec,
+      phases: [
+        { phaseId: "read", title: "Read Papers", execution: "parallel", tasks: ["Paper A", "Paper B"] },
+        { phaseId: "synthesize", title: "Synthesize", tasks: ["Write summary", "Polish summary"] },
+      ],
+    });
+
+    expect(tasks.map((task) => ({ id: task.taskId, deps: task.deps, status: task.status }))).toEqual([
+      { id: "read-task-1", deps: [], status: "ready" },
+      { id: "read-task-2", deps: [], status: "ready" },
+      { id: "synthesize-task-1", deps: ["read-task-1", "read-task-2"], status: "planned" },
+      { id: "synthesize-task-2", deps: ["synthesize-task-1"], status: "planned" },
+    ]);
   });
 
   it("resolves auto default runner to ACP when the runtime supports the public ACP path", () => {
@@ -153,14 +170,31 @@ describe("planner", () => {
     expect(runnable.every((t) => t.status !== "queued")).toBe(true);
   });
 
-  it("getQueuedTasks returns only queued tasks", () => {
+  it("getQueuedTasks returns only dependency-satisfied queued tasks", () => {
     const tasks = planTasksFromSpec(spec);
     const withQueued = tasks.map((t, i) =>
-      i === 0 ? { ...t, status: "queued" as const } : t,
+      i < 2 ? { ...t, status: "queued" as const } : t,
     );
     const queued = getQueuedTasks(withQueued);
     expect(queued).toHaveLength(1);
     expect(queued[0]!.taskId).toBe(tasks[0]!.taskId);
+  });
+
+  it("getDispatchableTasks prioritizes dependency-satisfied queued tasks before new runnable tasks", () => {
+    const tasks = planTasksFromSpec(spec);
+    const withMixedStatuses = tasks.map((t, i) => {
+      if (i === 0) {
+        return { ...t, status: "done" as const };
+      }
+      if (i === 1) {
+        return { ...t, status: "queued" as const };
+      }
+      return t;
+    });
+
+    expect(getDispatchableTasks(withMixedStatuses).map((task) => task.taskId)).toEqual([
+      tasks[1]!.taskId,
+    ]);
   });
 
   it("getQueuedTasks returns empty when no tasks are queued", () => {

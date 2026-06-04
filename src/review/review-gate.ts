@@ -1,4 +1,5 @@
 import type { QualityRubric, RubricResult, RubricScore, RunRecord, TaskNode, WorkflowLifecycle, WorkflowState } from "../types.js";
+import { upsertTaskStatuses } from "../planning/task-graph.js";
 import { rubricToDecision, scoreRubric } from "./quality-rubric.js";
 
 export type ReviewDecision = "approve" | "reject";
@@ -96,7 +97,7 @@ export function applyAcpRunStatusToWorkflow(
         status: task.review.required ? "pending" : task.review.status,
       },
     };
-    const nextTasks = workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry));
+    const nextTasks = upsertTaskStatuses(workflow.tasks.map((entry) => (entry.taskId === task.taskId ? nextTask : entry)));
     const nextReviewQueue = task.review.required
       ? [...workflow.reviewQueue, ...(workflow.reviewQueue.includes(task.taskId) ? [] : [task.taskId])]
       : workflow.reviewQueue.filter((entry) => entry !== task.taskId);
@@ -223,7 +224,9 @@ export function applyReviewDecision(
     },
   };
 
-  const nextTasks = workflow.tasks.map((entry) => (entry.taskId === taskId ? updatedTask : entry));
+  const nextTasks = decision === "approve"
+    ? upsertTaskStatuses(workflow.tasks.map((entry) => (entry.taskId === taskId ? updatedTask : entry)))
+    : workflow.tasks.map((entry) => (entry.taskId === taskId ? updatedTask : entry));
   const nextReviewQueue = workflow.reviewQueue.filter((entry) => entry !== taskId);
 
   const nextWorkflow: WorkflowState = {

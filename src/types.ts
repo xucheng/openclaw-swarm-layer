@@ -87,6 +87,7 @@ export type SpecDoc = {
   phases: Array<{
     phaseId: string;
     title: string;
+    execution?: "sequential" | "parallel";
     tasks: string[];
   }>;
   metadata?: Record<string, unknown>;

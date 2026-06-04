@@ -40,7 +40,7 @@ After `M5.4b`:
 Command:
 
 ```bash
-~/.openclaw/scripts/openclaw-acp-post-upgrade-smoke.sh
+<OPENCLAW_HOME>/scripts/openclaw-acp-post-upgrade-smoke.sh
 ```
 
 Purpose:
