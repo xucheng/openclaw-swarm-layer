@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.10 (2026-06-05)
+
+ACP runtime-mode and ClawHub skill alignment hotfix.
+
+- Applied Codex ACP runtime mode `auto` after session initialization and before the first turn, preventing workflow tasks from inheriting the upstream default `read-only` mode
+- Captured asynchronous ACP `runTurn` failures so accepted sessions no longer leak unhandled promise rejections back into the OpenClaw CLI process
+- Enriched generic upstream `Internal error` session statuses with diagnostics from the Codex ACP wrapper stderr, including quota and usage-limit failures
+- Added `acp.defaultRuntimeMode` to Swarm Layer config and OpenClaw manifest schema for explicit operator control
+- Added a release consistency gate to `release:check` and `prepublishOnly` so npm package metadata, OpenClaw manifest, README badge, release runbook, release notes, and `skills/swarm-layer/SKILL.md` stay aligned
+- Bumped the aligned release line to `openclaw-swarm-layer@0.5.10` so ClawHub package and skill can be republished with the corrected skill body after the `0.5.9` skill-content mismatch
+
+### Verification
+
+- `npm run build` green
+- `npx vitest run test/unit/runtime/real-openclaw-session-adapter.test.ts test/unit/config.test.ts` green
+- `npm run check:release-consistency` green
+- `npm run check:docs-redaction` green
+- `npm run release:check` green: build, full regression, docs redaction, release consistency, npm pack dry-run, and ClawHub package staging for `0.5.10`
+- Full regression inside `release:check` green: 62 unit files / 435 tests and 20 e2e files / 26 tests
+
 ## 0.5.9 (2026-06-05)
 
 ACP backend discovery hotfix for OpenClaw installs that place `acpx` under the state npm-project cache instead of the legacy extension install path.

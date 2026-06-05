@@ -20,6 +20,7 @@ export type SwarmAcpConfig = {
   defaultAgentId?: string;
   allowedAgents: string[];
   defaultMode: "run" | "session";
+  defaultRuntimeMode?: string;
   allowThreadBinding: boolean;
   defaultTimeoutSeconds?: number;
   experimentalControlPlaneAdapter: boolean;
@@ -159,6 +160,7 @@ export const defaultSwarmPluginConfig: SwarmPluginConfig = {
     defaultAgentId: undefined,
     allowedAgents: [],
     defaultMode: "run",
+    defaultRuntimeMode: undefined,
     allowThreadBinding: false,
     experimentalControlPlaneAdapter: false,
     maxConcurrent: 6,
@@ -384,6 +386,12 @@ export const swarmPluginConfigJsonSchema = {
         defaultAgentId: { type: "string" },
         allowedAgents: { type: "array", items: { type: "string" }, default: [] },
         defaultMode: { type: "string", enum: ["run", "session"], default: "run" },
+        defaultRuntimeMode: {
+          type: "string",
+          minLength: 1,
+          description:
+            "ACP runtime mode applied after session initialization. Codex supports read-only, auto, and full-access; when unset, Codex sessions default to auto.",
+        },
         allowThreadBinding: { type: "boolean", default: false },
         defaultTimeoutSeconds: { type: "integer", minimum: 1 },
         experimentalControlPlaneAdapter: { type: "boolean", default: false },
@@ -543,6 +551,7 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
           "defaultAgentId",
           "allowedAgents",
           "defaultMode",
+          "defaultRuntimeMode",
           "allowThreadBinding",
           "defaultTimeoutSeconds",
           "experimentalControlPlaneAdapter",
@@ -572,6 +581,12 @@ export const swarmPluginConfigSchema: OpenClawPluginConfigSchema = {
         }
         if (acp.defaultMode !== undefined && acp.defaultMode !== "run" && acp.defaultMode !== "session") {
           errors.push('acp.defaultMode must be one of: "run", "session"');
+        }
+        if (
+          acp.defaultRuntimeMode !== undefined &&
+          (typeof acp.defaultRuntimeMode !== "string" || acp.defaultRuntimeMode.trim().length === 0)
+        ) {
+          errors.push("acp.defaultRuntimeMode must be a non-empty string");
         }
         if (acp.allowThreadBinding !== undefined && typeof acp.allowThreadBinding !== "boolean") {
           errors.push("acp.allowThreadBinding must be a boolean");
@@ -941,6 +956,10 @@ export function resolveSwarmPluginConfig(rawConfig: unknown): SwarmPluginConfig 
         isObject(input.acp) && input.acp.defaultMode === "session"
           ? "session"
           : defaultSwarmPluginConfig.acp.defaultMode,
+      defaultRuntimeMode:
+        isObject(input.acp) && typeof input.acp.defaultRuntimeMode === "string" && input.acp.defaultRuntimeMode.trim().length > 0
+          ? input.acp.defaultRuntimeMode.trim()
+          : defaultSwarmPluginConfig.acp.defaultRuntimeMode,
       allowThreadBinding:
         isObject(input.acp) && typeof input.acp.allowThreadBinding === "boolean"
           ? input.acp.allowThreadBinding

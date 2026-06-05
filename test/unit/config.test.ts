@@ -170,6 +170,7 @@ describe("swarm plugin config", () => {
         defaultAgentId: "codex",
         allowedAgents: ["codex", "claude"],
         defaultMode: "run",
+        defaultRuntimeMode: "auto",
         allowThreadBinding: false,
         defaultTimeoutSeconds: 900,
         experimentalControlPlaneAdapter: true,
@@ -182,6 +183,7 @@ describe("swarm plugin config", () => {
       defaultAgentId: "codex",
       allowedAgents: ["codex", "claude"],
       defaultMode: "run",
+      defaultRuntimeMode: "auto",
       allowThreadBinding: false,
       defaultTimeoutSeconds: 900,
       experimentalControlPlaneAdapter: true,
@@ -362,6 +364,20 @@ describe("swarm plugin config", () => {
       acp: { retryOnSignal: ["SIGTERM", "SIGKILL"] },
     });
     expect(resolved.acp.retryOnSignal).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("trims custom acp.defaultRuntimeMode", () => {
+    const resolved = resolveSwarmPluginConfig({
+      acp: { defaultRuntimeMode: " auto " },
+    });
+    expect(resolved.acp.defaultRuntimeMode).toBe("auto");
+  });
+
+  it("validates acp.defaultRuntimeMode must be non-empty when provided", () => {
+    const result = swarmPluginConfigSchema.validate?.({
+      acp: { defaultRuntimeMode: " " },
+    });
+    expect(result).toEqual({ ok: false, errors: ["acp.defaultRuntimeMode must be a non-empty string"] });
   });
 
   it("resolves review defaults", () => {

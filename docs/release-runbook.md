@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.9`
+- Current release line: `0.5.10`
 
 ## Preflight
 
@@ -38,6 +38,7 @@ That covers:
 - `npm run build`
 - `npm test`
 - `npm run check:docs-redaction`
+- `npm run check:release-consistency`
 - `npm pack --dry-run`
 - `npm run prepare:clawhub:package`
 
@@ -61,22 +62,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.9`.
+Expected version for this release: `0.5.10`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.9
-git push origin v0.5.9
-gh release create v0.5.9 --title "v0.5.9" --notes-file docs/release-notes/v0.5.9.md
+git tag v0.5.10
+git push origin v0.5.10
+gh release create v0.5.10 --title "v0.5.10" --notes-file docs/release-notes/v0.5.10.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.9.md](release-notes/v0.5.9.md)
-- keep the `0.5.9` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.10.md](release-notes/v0.5.10.md)
+- keep the `0.5.10` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -94,11 +95,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.9 \
+  --version 0.5.10 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.9 \
+  --source-ref v0.5.10 \
   --source-commit <git-sha> \
-  --changelog "Fix ACP backend discovery for OpenClaw installs that keep acpx in the state npm-project cache, including dist/index.js service-module resolution."
+  --changelog "Fix Codex ACP runtime-mode startup and surface upstream ACP diagnostics, with release consistency checks for ClawHub skill/package alignment."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -117,8 +118,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.9 \
-  --changelog "Refresh the Swarm Layer skill for npm-project acpx backend discovery and current 0.5.9 release metadata."
+  --version 0.5.10 \
+  --changelog "Refresh the Swarm Layer skill for ACP runtime-mode diagnostics and current 0.5.10 release metadata."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -136,6 +137,7 @@ Verify the published artifacts resolve correctly:
 ```bash
 clawhub package inspect openclaw-swarm-layer
 clawhub inspect swarm-layer
+clawhub inspect swarm-layer --version 0.5.10 --file SKILL.md | rg 'Current release baseline: `openclaw-swarm-layer@0.5.10`'
 openclaw --profile release-smoke plugins install clawhub:openclaw-swarm-layer
 openclaw --profile release-smoke skills install swarm-layer
 ```

@@ -190,6 +190,239 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     expect(ensureBackendRegistered).toHaveBeenCalledWith(expect.any(String), { acp: { enabled: true } });
   });
 
+  it("applies the default Codex ACP runtime mode before starting the turn", async () => {
+    const calls: string[] = [];
+    const initializeSession = vi.fn(async ({ sessionKey }) => {
+      calls.push("initialize");
+      return { handle: { sessionKey, backend: "acpx" } };
+    });
+    const setSessionRuntimeMode = vi.fn(async () => {
+      calls.push("set-mode");
+    });
+    const runTurn = vi.fn(async () => {
+      calls.push("run-turn");
+    });
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          setSessionRuntimeMode,
+          runTurn,
+          getSessionStatus: vi.fn(),
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      async () => undefined,
+    );
+
+    const accepted = await adapter.spawnAcpSession({
+      task: "Run tests",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+    });
+
+    expect(setSessionRuntimeMode).toHaveBeenCalledWith({
+      cfg: { acp: { enabled: true } },
+      sessionKey: accepted.sessionKey,
+      runtimeMode: "auto",
+    });
+    expect(calls).toEqual(["initialize", "set-mode", "run-turn"]);
+  });
+
+  it("captures asynchronous turn failures without surfacing an unhandled rejection", async () => {
+    const initializeSession = vi.fn(async ({ sessionKey }) => ({
+      handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1" },
+    }));
+    const runTurn = vi.fn(async () => {
+      throw new Error("Quota exceeded. Some(UsageLimitExceeded)");
+    });
+    const getSessionStatus = vi.fn(async ({ sessionKey }) => ({
+      sessionKey,
+      backend: "acpx",
+      state: "error" as const,
+      runtimeStatus: { backendSessionId: "backend-1", summary: "AcpRuntimeError [ACP_TURN_FAILED]: Internal error" },
+    }));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          runTurn,
+          getSessionStatus,
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      async () => undefined,
+    );
+
+    const accepted = await adapter.spawnAcpSession({
+      task: "Run tests",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+    });
+
+    await vi.waitFor(async () => {
+      const status = await adapter.getAcpSessionStatus(accepted.sessionKey);
+      expect(status.message).toBe(
+        "AcpRuntimeError [ACP_TURN_FAILED]: Internal error (diagnostic: Quota exceeded. Some(UsageLimitExceeded))",
+      );
+    });
+  });
+
+  it("enriches generic ACP failures from persisted wrapper stderr", async () => {
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = mkdtempSync(path.join(tmpdir(), "swarm-layer-openclaw-state-"));
+    const wrapperDir = path.join(stateDir, "workspace", ".openclaw-bridge-state", "acpx");
+    const sessionsDir = path.join(stateDir, "workspace", "state", "sessions");
+    mkdirSync(wrapperDir, { recursive: true });
+    mkdirSync(sessionsDir, { recursive: true });
+    process.env.OPENCLAW_STATE_DIR = stateDir;
+
+    const initializeSession = vi.fn(async ({ sessionKey }) => ({
+      handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1" },
+    }));
+    const runTurn = vi.fn(async () => undefined);
+    const getSessionStatus = vi.fn(async ({ sessionKey }) => ({
+      sessionKey,
+      backend: "acpx",
+      state: "error" as const,
+      runtimeStatus: { backendSessionId: "backend-1", summary: "AcpRuntimeError [ACP_TURN_FAILED]: Internal error" },
+    }));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          runTurn,
+          getSessionStatus,
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      async () => undefined,
+    );
+
+    try {
+      const accepted = await adapter.spawnAcpSession({
+        task: "Run tests",
+        runtime: "acp",
+        agentId: "codex",
+        mode: "run",
+        thread: false,
+      });
+      const wrapperPath = path.join(wrapperDir, "codex-acp-wrapper.mjs");
+      writeFileSync(
+        path.join(sessionsDir, `${encodeURIComponent(accepted.sessionKey)}%3Aoneshot%3Atest.json`),
+        JSON.stringify({
+          pid: 1234,
+          agent_command: `"node" "${wrapperPath}"`,
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        path.join(wrapperDir, "codex-acp-wrapper.stderr.pid-1234.log"),
+        "2026-06-05T03:14:36.366498Z ERROR codex_acp::thread: Unhandled error during turn: Quota exceeded. Check your plan and billing details. Some(UsageLimitExceeded)\n",
+        "utf8",
+      );
+
+      const status = await adapter.getAcpSessionStatus(accepted.sessionKey);
+
+      expect(status.message).toBe(
+        "AcpRuntimeError [ACP_TURN_FAILED]: Internal error (diagnostic: Quota exceeded. Check your plan and billing details. Some(UsageLimitExceeded))",
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+      rmSync(stateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips empty newer wrapper stderr files when enriching ACP failures", async () => {
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = mkdtempSync(path.join(tmpdir(), "swarm-layer-openclaw-state-"));
+    const wrapperDir = path.join(stateDir, "workspace", ".openclaw-bridge-state", "acpx");
+    const sessionsDir = path.join(stateDir, "workspace", "state", "sessions");
+    mkdirSync(wrapperDir, { recursive: true });
+    mkdirSync(sessionsDir, { recursive: true });
+    process.env.OPENCLAW_STATE_DIR = stateDir;
+
+    const initializeSession = vi.fn(async ({ sessionKey }) => ({
+      handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1" },
+    }));
+    const runTurn = vi.fn(async () => undefined);
+    const getSessionStatus = vi.fn(async ({ sessionKey }) => ({
+      sessionKey,
+      backend: "acpx",
+      state: "error" as const,
+      runtimeStatus: { backendSessionId: "backend-1", summary: "AcpRuntimeError [ACP_TURN_FAILED]: Internal error" },
+    }));
+    const adapter = new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession,
+          runTurn,
+          getSessionStatus,
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      async () => undefined,
+    );
+
+    try {
+      const accepted = await adapter.spawnAcpSession({
+        task: "Run tests",
+        runtime: "acp",
+        agentId: "codex",
+        mode: "run",
+        thread: false,
+      });
+      const wrapperPath = path.join(wrapperDir, "codex-acp-wrapper.mjs");
+      writeFileSync(
+        path.join(sessionsDir, `${encodeURIComponent(accepted.sessionKey)}%3Aoneshot%3Atest.json`),
+        JSON.stringify({
+          pid: 1234,
+          agent_command: `"node" "${wrapperPath}"`,
+        }),
+        "utf8",
+      );
+      writeFileSync(path.join(wrapperDir, "codex-acp-wrapper.stderr.pid-1234.log"), "", "utf8");
+      writeFileSync(
+        path.join(wrapperDir, "codex-acp-wrapper.stderr.pid-1222.log"),
+        "2026-06-05T03:14:36.366498Z ERROR codex_acp::thread: Unhandled error during turn: Quota exceeded. Some(UsageLimitExceeded)\n",
+        "utf8",
+      );
+
+      const status = await adapter.getAcpSessionStatus(accepted.sessionKey);
+
+      expect(status.message).toBe(
+        "AcpRuntimeError [ACP_TURN_FAILED]: Internal error (diagnostic: Quota exceeded. Some(UsageLimitExceeded))",
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+      rmSync(stateDir, { recursive: true, force: true });
+    }
+  });
+
   it("prefers the current runtime config snapshot when available", async () => {
     const ensureBackendRegistered = vi.fn(async () => undefined);
     const current = vi.fn(() => ({ acp: { enabled: true }, marker: "current" }));

@@ -1,7 +1,7 @@
 {
   "id": "openclaw-swarm-layer",
   "name": "OpenClaw Swarm Layer",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "description": "Spec-driven workflow orchestrator for OpenClaw.",
   "skills": [
     "skills"
@@ -178,6 +178,11 @@
             "type": "string",
             "enum": ["run", "session"],
             "default": "run"
+          },
+          "defaultRuntimeMode": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ACP runtime mode applied after session initialization. Codex supports read-only, auto, and full-access; when unset, Codex sessions default to auto."
           },
           "allowThreadBinding": {
             "type": "boolean",

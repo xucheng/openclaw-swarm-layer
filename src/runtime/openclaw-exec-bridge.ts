@@ -268,7 +268,7 @@ export function resolveAcpRuntimeRegistryModulePath(openclawRoot: string): strin
   return path.join(openclawRoot, "dist", "plugin-sdk", "index.js");
 }
 
-function resolveOpenClawStateDir(): string {
+export function resolveOpenClawStateDir(): string {
   const envStateDir = process.env.OPENCLAW_STATE_DIR?.trim();
   if (envStateDir) {
     return path.resolve(envStateDir);
