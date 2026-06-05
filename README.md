@@ -6,11 +6,11 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.10-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.11-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
-[![Tests](https://img.shields.io/badge/Tests-428%20unit%20%7C%2026%20e2e-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/Tests-435%20unit%20%7C%2026%20e2e-brightgreen.svg)](#development)
 
 [Quick Start](#quick-start) · [Installation](#installation) · [CLI Reference](#cli-commands) · [Configuration](docs/configuration.md) · [Docs](#documentation)
 
@@ -157,7 +157,7 @@ Use `watcherMode: "watch"` for event-driven operation, `hybrid` for watcher even
 ```bash
 npm run build          # TypeScript -> dist/
 npm test               # Unit + e2e tests
-npm run test:unit      # Unit tests only (428 tests, 62 files)
+npm run test:unit      # Unit tests only (435 tests, 62 files)
 npm run test:e2e       # E2E tests only (26 tests, 20 files)
 npm run test:watch     # Watch mode
 npm run check:docs-redaction  # Verify docs do not contain local machine paths

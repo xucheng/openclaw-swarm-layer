@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.11 (2026-06-05)
+
+ClawHub skill/package alignment recovery release.
+
+- Added `npm run release:commands` to generate GitHub and ClawHub publish commands from a clean release commit, including exact `SOURCE_COMMIT` metadata from `git rev-parse HEAD`
+- Switched the documented ClawHub package publish path to the absolute staged package path, avoiding accidental workspace fallback during publication
+- Switched the documented ClawHub skill publish command to `clawhub --workdir "$REPO_ROOT" skill publish "$REPO_ROOT/skills/swarm-layer"` so the published `SKILL.md` body is read from this repository
+- Extended release consistency checks to require the generated command script, source-commit guardrails, explicit ClawHub skill workdir, absolute package path, and package-embedded skill body verification
+- Bumped npm, OpenClaw manifest, README badge, ClawHub skill baseline, release runbook, and release notes to `openclaw-swarm-layer@0.5.11`
+- Recorded the `0.5.10` publication mismatch as non-overwritable: the ClawHub package source-commit metadata and standalone skill body must be corrected by publishing the next aligned version
+
+### Verification
+
+- `npm run release:check` green: build, full regression, docs redaction, release consistency, npm pack dry-run, and ClawHub package staging for `0.5.11`
+- Full regression inside `release:check` green: 62 unit files / 435 tests and 20 e2e files / 26 tests
+
 ## 0.5.10 (2026-06-05)
 
 ACP runtime-mode and ClawHub skill alignment hotfix.

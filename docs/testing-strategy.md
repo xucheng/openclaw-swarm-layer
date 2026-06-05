@@ -24,7 +24,7 @@ Must cover:
 
 Current baseline:
 
-- `npm run test:unit`: 62 files / 428 tests
+- `npm run test:unit`: 62 files / 435 tests
 - `npm run test:e2e`: 20 files / 26 tests
 - init -> plan -> status
 - run -> review -> report
