@@ -6,7 +6,7 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.7-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.9-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
@@ -164,7 +164,7 @@ npm run check:docs-redaction  # Verify docs do not contain local machine paths
 npm run release:check         # Build + full regression + docs redaction + npm pack dry-run + ClawHub package prep
 ```
 
-Current release validation also includes OpenClaw `2026.5.3-1` package-baseline coverage and local mini `2026.6.1` smoke coverage: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, node/parcel autopilot watcher smoke, and Daily Papers-style parallel workflow completion.
+Current release validation also includes OpenClaw `2026.5.3-1` package-baseline coverage and local mini `2026.6.1` smoke coverage: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, node/parcel autopilot watcher smoke, Daily Papers-style parallel workflow completion, and npm-project `acpx` backend discovery.
 
 ## Documentation
 

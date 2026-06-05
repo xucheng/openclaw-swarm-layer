@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.7`
+- Current release line: `0.5.9`
 
 ## Preflight
 
@@ -61,22 +61,22 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.7`.
+Expected version for this release: `0.5.9`.
 
 ## GitHub Release
 
 After the release commit is on the target branch:
 
 ```bash
-git tag v0.5.7
-git push origin v0.5.7
-gh release create v0.5.7 --title "v0.5.7" --notes-file docs/release-notes/v0.5.7.md
+git tag v0.5.9
+git push origin v0.5.9
+gh release create v0.5.9 --title "v0.5.9" --notes-file docs/release-notes/v0.5.9.md
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.7.md](release-notes/v0.5.7.md)
-- keep the `0.5.7` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.9.md](release-notes/v0.5.9.md)
+- keep the `0.5.9` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish
@@ -94,11 +94,11 @@ clawhub package publish .clawhub-package/openclaw-swarm-layer \
   --family code-plugin \
   --name openclaw-swarm-layer \
   --display-name "OpenClaw Swarm Layer" \
-  --version 0.5.7 \
+  --version 0.5.9 \
   --source-repo xucheng/openclaw-swarm-layer \
-  --source-ref v0.5.7 \
+  --source-ref v0.5.9 \
   --source-commit <git-sha> \
-  --changelog "Improve Daily Papers-style cron reliability with explicit parallel phase barriers, queued-task drain, active-run sync options, downstream ready promotion, and docs-redaction release gates."
+  --changelog "Fix ACP backend discovery for OpenClaw installs that keep acpx in the state npm-project cache, including dist/index.js service-module resolution."
 ```
 
 Optional tags to keep aligned with the current listing:
@@ -117,8 +117,8 @@ Publish the repository skill directly from `skills/swarm-layer`:
 clawhub publish skills/swarm-layer \
   --slug swarm-layer \
   --name "Swarm Layer" \
-  --version 0.5.7 \
-  --changelog "Refresh the Swarm Layer skill for Daily Papers-style cron reliability, sync-aware run/status commands, and current release metadata."
+  --version 0.5.9 \
+  --changelog "Refresh the Swarm Layer skill for npm-project acpx backend discovery and current 0.5.9 release metadata."
 ```
 
 Optional tags to keep aligned with the current listing:

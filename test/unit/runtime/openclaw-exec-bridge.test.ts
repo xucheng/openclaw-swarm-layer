@@ -84,6 +84,35 @@ describe("openclaw exec bridge", () => {
     }
   });
 
+  it("falls back to the npm-project acpx package when OpenClaw records no installPath", () => {
+    const tmpStateDir = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-acpx-npm-project-"));
+    const npmAcpxPath = path.join(
+      tmpStateDir,
+      "npm",
+      "projects",
+      "openclaw-acpx-abc123",
+      "node_modules",
+      "@openclaw",
+      "acpx",
+    );
+    fs.mkdirSync(path.join(npmAcpxPath, "dist"), { recursive: true });
+    fs.writeFileSync(path.join(npmAcpxPath, "dist", "index.js"), "export {};\n");
+
+    const previousStateDir = process.env.OPENCLAW_STATE_DIR;
+    process.env.OPENCLAW_STATE_DIR = tmpStateDir;
+    try {
+      expect(resolveAcpxServiceModulePath("/opt/openclaw", { plugins: { entries: { acpx: { enabled: true } } } })).toBe(
+        path.join(npmAcpxPath, "dist", "index.js"),
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENCLAW_STATE_DIR;
+      } else {
+        process.env.OPENCLAW_STATE_DIR = previousStateDir;
+      }
+    }
+  });
+
   it("falls back to the bundled dist/extensions acpx directory when no global install exists", () => {
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-acpx-bundled-"));
     const bundledExtensionPath = path.join(tmpRoot, "dist", "extensions", "acpx");

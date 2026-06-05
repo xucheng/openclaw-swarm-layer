@@ -7,7 +7,7 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-
 
 Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
-Current release baseline: `openclaw-swarm-layer@0.5.7`, validated on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` with startup tool contracts, plugin doctor checks, runtime health smoke, autopilot watcher smoke, Daily Papers-style local smoke, and remote package-install smoke.
+Current release baseline: `openclaw-swarm-layer@0.5.9`, validated on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` with startup tool contracts, plugin doctor checks, runtime health smoke, autopilot watcher smoke, Daily Papers-style local smoke, npm-project `acpx` backend discovery, and remote package-install smoke.
 
 ## What It Does
 
@@ -139,7 +139,7 @@ node --version     # >= 22
 openclaw --version # >= 2026.3.22
 ```
 
-The `0.5.7` release was smoke-tested on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1`.
+The `0.5.9` release was smoke-tested on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1`.
 
 ### 2. Install Plugin
 ```bash

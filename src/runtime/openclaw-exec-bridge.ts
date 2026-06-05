@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, readdirSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -284,6 +284,7 @@ export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): st
   const serviceRelativeCandidates = [
     path.join("src", "service.ts"),
     path.join("dist", "service.js"),
+    path.join("dist", "index.js"),
     "service.js",
     "index.js",
   ];
@@ -298,6 +299,21 @@ export function resolveAcpxServiceModulePath(openclawRoot: string, cfg: any): st
   const globalExtensionRoot = path.join(resolveOpenClawStateDir(), "extensions", "acpx");
   for (const relativePath of serviceRelativeCandidates) {
     candidates.push(path.join(globalExtensionRoot, relativePath));
+  }
+
+  const npmProjectsRoot = path.join(resolveOpenClawStateDir(), "npm", "projects");
+  try {
+    for (const entry of readdirSync(npmProjectsRoot)) {
+      if (!entry.startsWith("openclaw-acpx-")) {
+        continue;
+      }
+      const npmAcpxRoot = path.join(npmProjectsRoot, entry, "node_modules", "@openclaw", "acpx");
+      for (const relativePath of serviceRelativeCandidates) {
+        candidates.push(path.join(npmAcpxRoot, relativePath));
+      }
+    }
+  } catch {
+    // Optional install-root discovery; keep falling through to bundled paths.
   }
 
   const bundledExtensionRoots = [

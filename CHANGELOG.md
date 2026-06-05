@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.9 (2026-06-05)
+
+ACP backend discovery hotfix for OpenClaw installs that place `acpx` under the state npm-project cache instead of the legacy extension install path.
+
+- Fixed Swarm Layer ACP bootstrap to discover `@openclaw/acpx` under `npm/projects/openclaw-acpx-*/node_modules/@openclaw/acpx`
+- Added `dist/index.js` as a valid `acpx` service module candidate, matching current npm-project package layout
+- Added a regression test for npm-project `acpx` service discovery when OpenClaw does not expose `plugins.installs.acpx.installPath`
+- Synced npm package metadata, plugin manifest metadata, README, release runbook, ClawHub package commands, ClawHub skill baseline, and release notes to `openclaw-swarm-layer@0.5.9`
+
+### Verification
+
+- `npm run build` green
+- `npx vitest run test/unit/runtime/openclaw-exec-bridge.test.ts` green: 22 tests
+- `npm run test:unit` green: 62 files / 429 tests
+- `npm run test:e2e` green: 20 files / 26 tests
+- `npm run check:docs-redaction` green: 47 source markdown files scanned
+- `npm run release:check` green: build, full regression, docs redaction, npm pack dry-run, and ClawHub package staging for `0.5.9`
+- `npm run prepublishOnly` green
+- Local mini smoke on `OpenClaw 2026.6.1` verified the installed `openclaw-swarm-layer@0.5.7` hot patch could resolve the npm-project `acpx` backend and that Daily Papers 2026-06-05 closed 10/10 after artifact verification
+
+## 0.5.8 (2026-06-05)
+
+ClawHub skill metadata alignment release.
+
+- Recorded the already-published ClawHub `swarm-layer` skill version `0.5.8`
+- No npm package, GitHub release, or ClawHub code-plugin package was cut for this version
+- Reserved `0.5.9` as the next fully aligned release across npm, GitHub, ClawHub package, and ClawHub skill
+
 ## 0.5.7 (2026-06-04)
 
 Daily Papers-style cron reliability release based on the published `0.5.6` package line.
