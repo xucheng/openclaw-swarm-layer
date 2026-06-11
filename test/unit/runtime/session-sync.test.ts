@@ -45,6 +45,59 @@ describe("session sync", () => {
     expect(result.runRecord.resultSummary).toBe("Completed: ACP session finished");
   });
 
+  it("maps failed status and preserves upstream failure metadata", () => {
+    const result = syncAcpRunRecord(baseRun, {
+      sessionKey: "agent:codex:acp:1",
+      state: "failed",
+      checkedAt: "2026-03-20T00:02:30.000Z",
+      message: "This operation was aborted",
+      backendSessionId: "backend-1",
+      failure: {
+        source: "openclaw-embedded",
+        message: "This operation was aborted",
+        upstreamState: "idle",
+      },
+    });
+
+    expect(result.runRecord.status).toBe("failed");
+    expect(result.runRecord.failure).toEqual({
+      source: "openclaw-embedded",
+      message: "This operation was aborted",
+      upstreamState: "idle",
+      sessionKey: "agent:codex:acp:1",
+      backendSessionId: "backend-1",
+    });
+    expect(result.runRecord.resultSummary).toBe("Failed: This operation was aborted");
+    expect(result.runRecord.events?.map((event) => event.type)).toContain("error");
+  });
+
+  it("synthesizes failure metadata when the upstream status only carries a message", () => {
+    const result = syncAcpRunRecord(baseRun, {
+      sessionKey: "agent:codex:acp:1",
+      state: "failed",
+      checkedAt: "2026-03-20T00:02:30.000Z",
+      message: "EmbeddedAttemptSessionTakeoverError: This operation was aborted",
+    });
+
+    expect(result.runRecord.failure).toEqual({
+      source: "acp-session",
+      message: "EmbeddedAttemptSessionTakeoverError: This operation was aborted",
+      sessionKey: "agent:codex:acp:1",
+      backendSessionId: undefined,
+    });
+  });
+
+  it("does not attach failure metadata to completed runs", () => {
+    const result = syncAcpRunRecord(baseRun, {
+      sessionKey: "agent:codex:acp:1",
+      state: "completed",
+      checkedAt: "2026-03-20T00:02:00.000Z",
+      message: "done",
+    });
+
+    expect(result.runRecord.failure).toBeUndefined();
+  });
+
   it("maps timed out status and appends timeout event", () => {
     const result = syncAcpRunRecord(baseRun, {
       sessionKey: "agent:codex:acp:1",

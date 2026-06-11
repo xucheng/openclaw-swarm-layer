@@ -6,7 +6,7 @@
 
 Turn Markdown specs into executable task graphs. Dispatch through ACP automation or manual fallback. Supervise progress with a control plane. Track with persistent sessions. Gate with review approval.
 
-[![Version](https://img.shields.io/badge/version-0.5.11-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.5.12-blue.svg)](CHANGELOG.md)
 [![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-green.svg)](https://nodejs.org)
 [![OpenClaw](https://img.shields.io/badge/OpenClaw-%3E%3D2026.3.22-purple.svg)](https://openclaw.dev)
@@ -26,6 +26,7 @@ Turn Markdown specs into executable task graphs. Dispatch through ACP automation
 - **Persistent sessions** — Reuse, thread binding, follow-up, steer, cancel, and close flows
 - **Review gates** — Explicit approve/reject with structured quality rubrics (weighted multi-dimension scoring)
 - **Sprint contracts** — Verifiable acceptance criteria per task with GAN-inspired evaluator injection
+- **Artifact acceptance** — Optional `expectedArtifacts` (paths/globs) per task; completed ACP runs with missing artifacts are downgraded to failed instead of done
 - **Cross-session continuity** — Progress synthesis, bootstrap startup sequence, harness assumption tracking
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking and signal-based auto-retry
 - **Concurrency protection** — ACP session concurrency limits with queued task scheduling (FIFO)

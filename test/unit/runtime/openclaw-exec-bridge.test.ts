@@ -194,6 +194,40 @@ describe("openclaw exec bridge", () => {
     expect(factory?.({ pluginConfig: { permissionMode: "approve-all" } })).toEqual({ start });
   });
 
+  it("provides a keyed state store to register-hook acpx plugins that read api.runtime.state", async () => {
+    const start = vi.fn();
+    let capturedOpenKeyedStore: ((options: { namespace: string; maxEntries?: number }) => unknown) | undefined;
+    const factory = resolveAcpxRuntimeServiceFactory({
+      default: {
+        register(api: {
+          runtime?: { state: { openKeyedStore: (options: { namespace: string; maxEntries?: number }) => unknown } };
+          registerService: (service: { start: typeof start }) => void;
+          on: (event: string, handler: unknown) => void;
+        }) {
+          // Mirrors the upstream acpx entry: the store accessor is captured at
+          // register time and only dereferenced later during service startup.
+          capturedOpenKeyedStore = (options) => api.runtime!.state.openKeyedStore(options);
+          api.registerService({ start });
+        },
+      },
+    });
+
+    expect(factory?.({})).toEqual({ start });
+    const store = capturedOpenKeyedStore?.({ namespace: "gateway-instance", maxEntries: 1 }) as {
+      lookup(key: string): Promise<unknown>;
+      register(key: string, value: unknown): Promise<void>;
+      delete(key: string): Promise<void>;
+      entries(): Promise<Array<{ key: string; value: unknown }>>;
+    };
+
+    expect(await store.lookup("current")).toBeUndefined();
+    await store.register("current", { instanceId: "instance-1", createdAt: 1 });
+    expect(await store.lookup("current")).toEqual({ instanceId: "instance-1", createdAt: 1 });
+    expect(await store.entries()).toEqual([{ key: "current", value: { instanceId: "instance-1", createdAt: 1 } }]);
+    await store.delete("current");
+    expect(await store.entries()).toEqual([]);
+  });
+
   it("detects the host openclaw install root from the node executable prefix", () => {
     const tmpPrefix = fs.mkdtempSync(path.join(os.tmpdir(), "swarm-openclaw-prefix-"));
     const nodeBinDir = path.join(tmpPrefix, "bin");

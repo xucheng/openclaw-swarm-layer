@@ -449,18 +449,63 @@ type AcpxRuntimeService = {
   start(ctx: { config: unknown; workspaceDir?: string; stateDir: string; logger: any }): Promise<void> | void;
 };
 
+export type KeyedStateStore = {
+  lookup(key: string): Promise<unknown>;
+  register(key: string, value: unknown): Promise<void>;
+  delete(key: string): Promise<void>;
+  entries(): Promise<Array<{ key: string; value: unknown }>>;
+};
+
+export type OpenKeyedStore = (options: { namespace: string; maxEntries?: number }) => KeyedStateStore;
+
+type AcpxRuntimeServiceFactoryParams = {
+  pluginConfig?: unknown;
+  openKeyedStore?: OpenKeyedStore;
+};
+
+// In the gateway process the host provides api.runtime.state.openKeyedStore
+// (a SQLite-backed plugin-state sidecar). When the swarm CLI bootstraps the
+// acpx backend in its own process there is no host store, so we provide an
+// in-memory one: gateway-instance-id and process leases then live for the CLI
+// process lifetime only, which matches the pre-keyed-store acpx behaviour.
+export function createInMemoryKeyedStore(): OpenKeyedStore {
+  const namespaces = new Map<string, Map<string, unknown>>();
+  return (options) => {
+    const existing = namespaces.get(options.namespace);
+    const records = existing ?? new Map<string, unknown>();
+    if (!existing) {
+      namespaces.set(options.namespace, records);
+    }
+    return {
+      async lookup(key) {
+        return records.get(key);
+      },
+      async register(key, value) {
+        records.set(key, value);
+      },
+      async delete(key) {
+        records.delete(key);
+      },
+      async entries() {
+        return [...records.entries()].map(([key, value]) => ({ key, value }));
+      },
+    };
+  };
+}
+
 export function resolveAcpxRuntimeServiceFactory(
   mod: Record<string, unknown>,
-): ((params?: { pluginConfig?: unknown }) => AcpxRuntimeService) | null {
+): ((params?: AcpxRuntimeServiceFactoryParams) => AcpxRuntimeService) | null {
   const exportedFactory = mod.createAcpxRuntimeService;
   if (typeof exportedFactory === "function") {
-    return exportedFactory as (params?: { pluginConfig?: unknown }) => AcpxRuntimeService;
+    return exportedFactory as (params?: AcpxRuntimeServiceFactoryParams) => AcpxRuntimeService;
   }
 
   const plugin = mod.default as
     | {
         register?: (api: {
           pluginConfig?: unknown;
+          runtime?: { state: { openKeyedStore: OpenKeyedStore } };
           registerService: (service: AcpxRuntimeService) => void;
           on?: (event: string, handler: unknown) => void;
         }) => void;
@@ -471,10 +516,12 @@ export function resolveAcpxRuntimeServiceFactory(
     return null;
   }
 
-  return (params?: { pluginConfig?: unknown }) => {
+  return (params?: AcpxRuntimeServiceFactoryParams) => {
     let registeredService: AcpxRuntimeService | null = null;
+    const openKeyedStore = params?.openKeyedStore ?? createInMemoryKeyedStore();
     register({
       pluginConfig: params?.pluginConfig,
+      runtime: { state: { openKeyedStore } },
       registerService(service) {
         registeredService = service;
       },
@@ -515,7 +562,10 @@ export async function ensureAcpxBackendRegistered(openclawRoot: string, cfg: any
   }
 
   const workspaceDir = cfg?.agents?.defaults?.workspace ?? cfg?.workspace ?? path.join(openclawRoot, ".bridge-workspace");
-  const service = createAcpxRuntimeService({ pluginConfig: cfg?.plugins?.entries?.acpx?.config });
+  const service = createAcpxRuntimeService({
+    pluginConfig: cfg?.plugins?.entries?.acpx?.config,
+    openKeyedStore: createInMemoryKeyedStore(),
+  });
   await service.start({
     config: cfg,
     workspaceDir,

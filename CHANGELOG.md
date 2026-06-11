@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.12 (2026-06-11)
+
+ACP false-completion fix and artifact acceptance release (2026-06-11 Daily Papers incident).
+
+- Made ACP terminal-state mapping conservative: `lastError`, captured turn errors, and upstream summaries containing abort/takeover signals (`This operation was aborted`, `EmbeddedAttemptSessionTakeoverError`, `promptError`, `status=error`, abort/failed/error text) now map a non-running terminal session to `failed` instead of `completed`
+- Persisted upstream failure metadata on failed runs as `failure: { source, message, upstreamState, sessionKey, backendSessionId }` in the run ledger
+- Added first-class artifact acceptance: tasks may declare `expectedArtifacts` (absolute paths or `**`/`*`/`?` globs, relative patterns resolved against the project root); a completed ACP run with missing artifacts is downgraded to `failed` with `failure.source: "artifact-validation"` and the task moves to `review_required` instead of `done`, while matched files are recorded into the run `artifacts`
+- Added an `artifact_missing` attention item to `swarm status` for completed runs with empty artifacts on tasks that declared `expectedArtifacts` or are artifact-producing tasks mentioning an absolute output path
+- Fixed acpx backend bootstrap against newer acpx builds that require `api.runtime.state.openKeyedStore`: the CLI bootstrap stub now provides an in-memory keyed store, resolving `Cannot read properties of undefined (reading 'state')` during `swarm run --runner acp`
+- Synced `run/task/workflow-state` JSON schemas with `types.ts` (`failure`, `expectedArtifacts`, `timed_out`, `queued`, `dead_letter`, retry/budget/rubric/contract/session fields) and added an AJV schema regression suite
+- Added regression tests for conservative status mapping, failure metadata propagation, artifact acceptance, unique per-run session keys, and keyed-store-dependent acpx bootstrap
+- Bumped npm, OpenClaw manifest, README badge, ClawHub skill baseline, release runbook, and release notes to `openclaw-swarm-layer@0.5.12`
+
+### Verification
+
+- `npm run release:check` green: build, full regression, docs redaction, release consistency, npm pack dry-run, and ClawHub package staging for `0.5.12`
+- Full regression green: 65 unit files / 459 tests and 20 e2e files / 26 tests
+- Live smoke on OpenClaw `2026.6.5` with a real ACP backend: positive note-producing task completed with validated artifacts; negative task finishing without its declared artifact was downgraded to `failed` (`artifact-validation`) and surfaced in `swarm status` attention; unique per-run session keys and parallel admission confirmed
+
 ## 0.5.11 (2026-06-05)
 
 ClawHub skill/package alignment recovery release.

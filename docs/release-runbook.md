@@ -7,7 +7,7 @@ This runbook covers the full `openclaw-swarm-layer` publication flow for npm, Gi
 - Package: `openclaw-swarm-layer`
 - Runtime ID: `openclaw-swarm-layer`
 - Skill slug: `swarm-layer`
-- Current release line: `0.5.11`
+- Current release line: `0.5.12`
 
 ## Safety Guardrails
 
@@ -44,7 +44,7 @@ Set release variables from the repository root:
 
 ```bash
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-RELEASE_VERSION="0.5.11"
+RELEASE_VERSION="0.5.12"
 SOURCE_COMMIT="$(git rev-parse HEAD)"
 git -C "$REPO_ROOT" status --short
 ```
@@ -96,7 +96,7 @@ Post-publish verification:
 npm view openclaw-swarm-layer version
 ```
 
-Expected version for this release: `0.5.11`.
+Expected version for this release: `0.5.12`.
 
 ## GitHub Release
 
@@ -105,13 +105,13 @@ After npm is published and the release commit is on the target branch:
 ```bash
 git tag "v$RELEASE_VERSION"
 git push origin "v$RELEASE_VERSION"
-gh release create "v$RELEASE_VERSION" --title "v$RELEASE_VERSION" --notes-file "$REPO_ROOT/docs/release-notes/v0.5.11.md"
+gh release create "v$RELEASE_VERSION" --title "v$RELEASE_VERSION" --notes-file "$REPO_ROOT/docs/release-notes/v0.5.12.md"
 ```
 
 Recommended release notes source:
 
-- use [docs/release-notes/v0.5.11.md](release-notes/v0.5.11.md)
-- keep the `0.5.11` section in [CHANGELOG.md](../CHANGELOG.md) aligned
+- use [docs/release-notes/v0.5.12.md](release-notes/v0.5.12.md)
+- keep the `0.5.12` section in [CHANGELOG.md](../CHANGELOG.md) aligned
 - keep the title aligned with the tag
 
 ## ClawHub Code Plugin Publish

@@ -147,6 +147,7 @@ export type TaskNode = {
     preferredSessionId?: string;
   };
   contract?: SprintContract;
+  expectedArtifacts?: string[];
   retryCount?: number;
   lastRejectReason?: string;
 };
@@ -155,6 +156,14 @@ export type RunEvent = {
   at: string;
   type: string;
   detail?: Record<string, unknown>;
+};
+
+export type RunFailure = {
+  source: "openclaw-embedded" | "acp-session" | "artifact-validation" | string;
+  message: string;
+  upstreamState?: string;
+  sessionKey?: string;
+  backendSessionId?: string;
 };
 
 export type RunRecord = {
@@ -180,6 +189,7 @@ export type RunRecord = {
     threadId?: string;
   };
   events?: RunEvent[];
+  failure?: RunFailure;
   retryHistory?: RetryHistoryEntry[];
   budgetUsage?: BudgetUsage;
   lastSignal?: string;

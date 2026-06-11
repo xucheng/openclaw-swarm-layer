@@ -50,7 +50,7 @@ process.stdout.write(
     `--source-repo xucheng/openclaw-swarm-layer`,
     `--source-ref "v$RELEASE_VERSION"`,
     `--source-commit "$SOURCE_COMMIT"`,
-    `--changelog "Recover ClawHub skill/package alignment with explicit-workdir publishing and verified source metadata."`,
+    `--changelog "Fix ACP false completion: conservative failure mapping, failure metadata, expectedArtifacts acceptance, and acpx keyed-store compatibility."`,
   ].join(" \\\n  "),
 );
 process.stdout.write(`\n\n`);
@@ -61,7 +61,7 @@ process.stdout.write(
     `--name "Swarm Layer"`,
     `--version "$RELEASE_VERSION"`,
     `--tags latest,openclaw,swarm,workflow,orchestration,harness`,
-    `--changelog "Republish the Swarm Layer skill with explicit workdir and current $RELEASE_VERSION SKILL.md content."`,
+    `--changelog "Document artifact acceptance (expectedArtifacts) and the $RELEASE_VERSION conservative ACP failure-mapping baseline."`,
   ].join(" \\\n  "),
 );
 process.stdout.write(`\n\n`);

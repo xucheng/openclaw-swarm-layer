@@ -41,6 +41,23 @@
           "items": { "type": "string", "minLength": 1 }
         }
       }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "category", "description", "createdAt"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": { "type": "string", "enum": ["model_capability", "environment", "tooling", "workflow_structure"] },
+          "description": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "validatedAt": { "type": "string", "format": "date-time" },
+          "valid": { "type": "boolean" },
+          "invalidationReason": { "type": "string" }
+        }
+      }
     }
   }
 }

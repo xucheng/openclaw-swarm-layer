@@ -8,7 +8,7 @@
     "runId": { "type": "string", "minLength": 1 },
     "taskId": { "type": "string", "minLength": 1 },
     "attempt": { "type": "integer", "minimum": 1 },
-    "status": { "type": "string", "enum": ["planned", "accepted", "completed", "failed", "cancelled"] },
+    "status": { "type": "string", "enum": ["planned", "accepted", "running", "completed", "failed", "cancelled", "timed_out"] },
     "runner": {
       "type": "object",
       "additionalProperties": false,
@@ -31,7 +31,8 @@
         "sessionKey": { "type": "string" },
         "backend": { "type": "string" },
         "backendSessionId": { "type": "string" },
-        "agentSessionId": { "type": "string" }
+        "agentSessionId": { "type": "string" },
+        "threadId": { "type": "string" }
       }
     },
     "events": {
@@ -46,6 +47,44 @@
           "detail": { "type": "object", "additionalProperties": true }
         }
       }
-    }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "message"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "message": { "type": "string" },
+        "upstreamState": { "type": "string" },
+        "sessionKey": { "type": "string" },
+        "backendSessionId": { "type": "string" }
+      }
+    },
+    "retryHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "runId", "status", "at"],
+        "properties": {
+          "attempt": { "type": "integer", "minimum": 1 },
+          "runId": { "type": "string", "minLength": 1 },
+          "status": { "type": "string" },
+          "at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "budgetUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exceeded"],
+      "properties": {
+        "durationSeconds": { "type": "number" },
+        "retriesUsed": { "type": "number" },
+        "exceeded": { "type": "boolean" },
+        "exceededReason": { "type": "string" }
+      }
+    },
+    "lastSignal": { "type": "string" }
   }
 }

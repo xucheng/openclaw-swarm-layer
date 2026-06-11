@@ -7,6 +7,7 @@ import type {
 import type { RunnerType, RuntimePolicySnapshot, SwarmPluginConfig, SwarmPluginConfigInput } from "../config.js";
 import { resolvePluginConfigFromApi, resolveRuntimePolicySnapshot, resolveSwarmPluginConfig } from "../config.js";
 import { getDispatchableTasks, getQueuedTasks, getRunnableTasks, upsertTaskStatuses } from "../planning/task-graph.js";
+import { checkExpectedArtifacts } from "../runtime/artifact-acceptance.js";
 import { checkConcurrencySlot } from "../runtime/concurrency-gate.js";
 import { applyAcpRunStatusToWorkflow, deriveWorkflowLifecycle, enqueueReview } from "../review/review-gate.js";
 import { AcpRunner } from "../runtime/acp-runner.js";
@@ -177,6 +178,57 @@ function canUseLocalClosedRunFallback(error: unknown, runRecord: RunRecord): boo
 function resolveCancelledAt(result: { cancelledAt?: string } | { killedAt?: string }): string | undefined {
   const normalized = result as { cancelledAt?: string; killedAt?: string };
   return normalized.cancelledAt ?? normalized.killedAt;
+}
+
+// Process success is not task success for artifact-producing tasks: a run may
+// only stay "completed" if every declared expected artifact exists on disk.
+async function applyArtifactAcceptance(
+  task: TaskNode,
+  runRecord: RunRecord,
+  projectRoot: string,
+  checkedAt?: string,
+): Promise<RunRecord> {
+  const expectedArtifacts = task.expectedArtifacts ?? [];
+  if (runRecord.status !== "completed" || expectedArtifacts.length === 0) {
+    return runRecord;
+  }
+
+  const acceptance = await checkExpectedArtifacts(expectedArtifacts, projectRoot);
+  const at = checkedAt ?? new Date().toISOString();
+  if (acceptance.ok) {
+    const artifacts = [...new Set([...runRecord.artifacts, ...acceptance.matched])];
+    return {
+      ...runRecord,
+      artifacts,
+      events: [
+        ...(runRecord.events ?? []),
+        { at, type: "artifact_validation_passed", detail: { matched: acceptance.matched } },
+      ],
+    };
+  }
+
+  const message = `artifact validation failed: missing ${acceptance.missing.join(", ")}`;
+  return {
+    ...runRecord,
+    status: "failed",
+    artifacts: [...new Set([...runRecord.artifacts, ...acceptance.matched])],
+    resultSummary: `Failed: ${message}`,
+    failure: {
+      source: "artifact-validation",
+      message,
+      sessionKey: runRecord.sessionRef?.sessionKey,
+      backendSessionId: runRecord.sessionRef?.backendSessionId,
+    },
+    events: [
+      ...(runRecord.events ?? []),
+      {
+        at,
+        type: "artifact_validation_failed",
+        detail: { missing: acceptance.missing, matched: acceptance.matched },
+      },
+      { at, type: "error", detail: { message } },
+    ],
+  };
 }
 
 export class SwarmOrchestrator {
@@ -724,6 +776,11 @@ export class SwarmOrchestrator {
         remoteState: runRecord.status === "cancelled" ? "cancelled" : "completed",
       };
     }
+
+    synced = {
+      ...synced,
+      runRecord: await applyArtifactAcceptance(task, synced.runRecord, workflow.projectRoot, synced.checkedAt),
+    };
 
     await this.stateStore.writeRun(projectRoot, synced.runRecord);
 

@@ -77,6 +77,19 @@ const GENERIC_ACP_ERROR_PATTERNS = [
   /ACP turn failed before completion/i,
   /Could not initialize ACP session runtime/i,
 ];
+// Upstream OpenClaw embedded aborts surface as text inside lastError/summary while
+// the session state still reads as a clean terminal value. Treat any of these
+// signals as a failed run instead of trusting the optimistic terminal state.
+const UPSTREAM_FAILURE_SIGNAL_PATTERNS = [
+  /This operation was aborted/i,
+  /EmbeddedAttemptSessionTakeoverError/i,
+  /\bpromptError\b/i,
+  /\bstatus=error\b/i,
+  /\bstate=error\b/i,
+  /\babort(?:ed)?\b/i,
+  /\bfail(?:ed|ure)\b/i,
+  /\berror\b/i,
+];
 
 function defaultImportModule(specifier: string): Promise<SdkLike> {
   return import(specifier) as Promise<SdkLike>;
@@ -162,14 +175,47 @@ function shouldUsePublicSessionAdapter(
   return Boolean(config.acp.experimentalControlPlaneAdapter);
 }
 
-function mapManagerState(status: Awaited<ReturnType<AcpManager["getSessionStatus"]>>): AcpSessionStatus["state"] {
+function detectUpstreamFailureSignal(text: string | undefined): string | undefined {
+  if (!text) {
+    return undefined;
+  }
+  return UPSTREAM_FAILURE_SIGNAL_PATTERNS.some((pattern) => pattern.test(text)) ? text.trim() : undefined;
+}
+
+function mapManagerState(
+  status: Awaited<ReturnType<AcpManager["getSessionStatus"]>>,
+  caughtTurnError?: string,
+): { state: AcpSessionStatus["state"]; failure?: AcpSessionStatus["failure"] } {
   if (status.state === "running") {
-    return "running";
+    return { state: "running" };
   }
   if (status.state === "error") {
-    return "failed";
+    return {
+      state: "failed",
+      failure: {
+        source: "openclaw-embedded",
+        message:
+          status.lastError ?? caughtTurnError ?? status.runtimeStatus?.summary ?? "ACP session reported error state",
+        upstreamState: status.state,
+      },
+    };
   }
-  return "completed";
+  // A non-running, non-error terminal state is only a success when no upstream
+  // failure evidence is attached to it (e.g. embedded prompt aborts keep state
+  // "idle" while recording the abort in lastError/summary).
+  const failureMessage =
+    status.lastError?.trim() || caughtTurnError || detectUpstreamFailureSignal(status.runtimeStatus?.summary);
+  if (failureMessage) {
+    return {
+      state: "failed",
+      failure: {
+        source: "openclaw-embedded",
+        message: failureMessage,
+        upstreamState: status.state,
+      },
+    };
+  }
+  return { state: "completed" };
 }
 
 function normalizeErrorMessage(error: unknown): string {
@@ -538,12 +584,13 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
   async getAcpSessionStatus(sessionKey: string): Promise<AcpSessionStatus> {
     const { manager, cfg } = await this.getManager();
     const status = await manager.getSessionStatus({ cfg, sessionKey });
-    const state = mapManagerState(status);
+    const caughtTurnError = this.turnErrorsBySession.get(sessionKey);
+    const { state, failure } = mapManagerState(status, caughtTurnError);
     const message = await resolveAcpStatusMessage({
       sessionKey,
       state,
       upstreamMessage: status.lastError ?? status.runtimeStatus?.summary,
-      caughtTurnError: this.turnErrorsBySession.get(sessionKey),
+      caughtTurnError,
     });
     return {
       sessionKey,
@@ -553,6 +600,7 @@ export class ExperimentalRealOpenClawSessionAdapter implements OpenClawSessionAd
       agentSessionId: status.runtimeStatus?.agentSessionId ?? status.identity?.agentSessionId,
       checkedAt: new Date().toISOString(),
       message,
+      failure,
     };
   }
 

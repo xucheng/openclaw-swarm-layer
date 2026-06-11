@@ -19,6 +19,11 @@ export type AcpSessionStatus = {
   checkedAt?: string;
   message?: string;
   outputText?: string;
+  failure?: {
+    source: string;
+    message: string;
+    upstreamState?: string;
+  };
 };
 
 export interface OpenClawSessionAdapter {

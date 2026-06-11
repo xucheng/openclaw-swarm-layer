@@ -461,6 +461,103 @@ describe("ExperimentalRealOpenClawSessionAdapter", () => {
     });
   });
 
+  function makeAdapterWithStatus(status: {
+    state: "idle" | "running" | "error";
+    lastError?: string;
+    runtimeStatus?: { backendSessionId?: string; summary?: string };
+  }): ExperimentalRealOpenClawSessionAdapter {
+    return new ExperimentalRealOpenClawSessionAdapter(
+      runtime,
+      config as any,
+      async () => ({
+        getAcpSessionManager: () => ({
+          initializeSession: vi.fn(async ({ sessionKey }) => ({
+            handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1" },
+          })),
+          runTurn: vi.fn(async () => undefined),
+          getSessionStatus: vi.fn(async ({ sessionKey }) => ({ sessionKey, backend: "acpx", ...status })),
+          cancelSession: vi.fn(),
+          closeSession: vi.fn(),
+        }),
+      }),
+      async () => undefined,
+    );
+  }
+
+  async function spawnAndGetStatus(adapter: ExperimentalRealOpenClawSessionAdapter) {
+    const accepted = await adapter.spawnAcpSession({
+      task: "Write the note",
+      runtime: "acp",
+      agentId: "codex",
+      mode: "run",
+      thread: false,
+    });
+    return adapter.getAcpSessionStatus(accepted.sessionKey);
+  }
+
+  it("maps terminal idle sessions with a recorded lastError to failed", async () => {
+    const adapter = makeAdapterWithStatus({
+      state: "idle",
+      lastError: "This operation was aborted",
+    });
+
+    const status = await spawnAndGetStatus(adapter);
+
+    expect(status.state).toBe("failed");
+    expect(status.message).toBe("This operation was aborted");
+    expect(status.failure).toEqual({
+      source: "openclaw-embedded",
+      message: "This operation was aborted",
+      upstreamState: "idle",
+    });
+  });
+
+  it("maps terminal idle sessions whose summary records an embedded abort to failed", async () => {
+    const summary =
+      "embedded attempt cleanup detected session takeover after prompt failure; promptError=This operation was aborted (EmbeddedAttemptSessionTakeoverError)";
+    const adapter = makeAdapterWithStatus({
+      state: "idle",
+      runtimeStatus: { backendSessionId: "backend-1", summary },
+    });
+
+    const status = await spawnAndGetStatus(adapter);
+
+    expect(status.state).toBe("failed");
+    expect(status.failure?.source).toBe("openclaw-embedded");
+    expect(status.failure?.message).toContain("EmbeddedAttemptSessionTakeoverError");
+    expect(status.failure?.upstreamState).toBe("idle");
+  });
+
+  it("keeps clean terminal idle sessions mapped to completed", async () => {
+    const adapter = makeAdapterWithStatus({
+      state: "idle",
+      runtimeStatus: { backendSessionId: "backend-1", summary: "status=ok pid=123" },
+    });
+
+    const status = await spawnAndGetStatus(adapter);
+
+    expect(status.state).toBe("completed");
+    expect(status.failure).toBeUndefined();
+  });
+
+  it("issues a unique session key per spawned run", async () => {
+    const adapter = makeAdapterWithStatus({ state: "running" });
+    const spawnParams = {
+      task: "Write the note",
+      runtime: "acp" as const,
+      agentId: "codex",
+      mode: "run" as const,
+      thread: false,
+    };
+
+    const first = await adapter.spawnAcpSession(spawnParams);
+    const second = await adapter.spawnAcpSession(spawnParams);
+
+    expect(first.sessionKey).toMatch(/^agent:codex:acp:/);
+    expect(second.sessionKey).toMatch(/^agent:codex:acp:/);
+    expect(first.sessionKey).not.toBe(second.sessionKey);
+  });
+
   it("spawns and queries ACP sessions through the manager", async () => {
     const initializeSession = vi.fn(async ({ sessionKey }) => ({
       handle: { sessionKey, backend: "acpx", backendSessionId: "backend-1", agentSessionId: "agent-1" },

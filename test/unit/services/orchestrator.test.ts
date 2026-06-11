@@ -253,6 +253,82 @@ describe("SwarmOrchestrator", () => {
     expect(sessions[0]?.state).toBe("closed");
   });
 
+  function makeCompletedSyncAdapter(sessionKey: string): OpenClawSessionAdapter {
+    return {
+      async spawnAcpSession() {
+        return { sessionKey, backend: "acpx" };
+      },
+      async getAcpSessionStatus() {
+        return {
+          sessionKey,
+          state: "completed",
+          checkedAt: "2026-06-11T00:05:00.000Z",
+          message: "done",
+        };
+      },
+      async cancelAcpSession() {
+        return { sessionKey };
+      },
+      async closeAcpSession() {
+        return { sessionKey };
+      },
+    };
+  }
+
+  async function setupExpectedArtifactProject(expectedArtifacts: string[]) {
+    const { projectRoot, stateStore } = await setupProject({
+      taskOverrides: { status: "running", runner: { type: "acp" }, expectedArtifacts },
+    });
+    const taskId = (await stateStore.loadWorkflow(projectRoot)).tasks[0]!.taskId;
+    await stateStore.writeRun(projectRoot, {
+      runId: "run-artifact-check",
+      taskId,
+      attempt: 1,
+      status: "accepted",
+      runner: { type: "acp" },
+      workspacePath: projectRoot,
+      startedAt: "2026-06-11T00:00:00.000Z",
+      artifacts: [],
+      sessionRef: { runtime: "acp", sessionKey: "agent:codex:acp:artifact" },
+    });
+    const orchestrator = createOrchestrator({
+      stateStore,
+      sessionAdapter: makeCompletedSyncAdapter("agent:codex:acp:artifact"),
+    });
+    return { projectRoot, stateStore, orchestrator };
+  }
+
+  it("fails a completed ACP run when expected artifacts are missing", async () => {
+    const { projectRoot, stateStore, orchestrator } = await setupExpectedArtifactProject(["out/note.md"]);
+
+    const result = await orchestrator.syncActiveRuns({ projectRoot });
+    const run = await stateStore.loadRun(projectRoot, "run-artifact-check");
+    const workflow = await stateStore.loadWorkflow(projectRoot);
+
+    expect(result.results[0]?.status).toBe("failed");
+    expect(run?.status).toBe("failed");
+    expect(run?.failure?.source).toBe("artifact-validation");
+    expect(run?.failure?.message).toContain("out/note.md");
+    expect(run?.events?.map((event) => event.type)).toContain("artifact_validation_failed");
+    expect(workflow.tasks[0]?.status).not.toBe("done");
+    expect(workflow.tasks[0]?.status).toBe("review_required");
+  });
+
+  it("keeps a completed ACP run completed and records matched expected artifacts", async () => {
+    const { projectRoot, stateStore, orchestrator } = await setupExpectedArtifactProject(["out/note.md"]);
+    await fs.mkdir(path.join(projectRoot, "out"), { recursive: true });
+    await fs.writeFile(path.join(projectRoot, "out", "note.md"), "# note", "utf8");
+
+    const result = await orchestrator.syncActiveRuns({ projectRoot });
+    const run = await stateStore.loadRun(projectRoot, "run-artifact-check");
+
+    expect(result.results[0]?.status).toBe("completed");
+    expect(run?.status).toBe("completed");
+    expect(run?.failure).toBeUndefined();
+    expect(run?.artifacts).toEqual([path.join(projectRoot, "out", "note.md")]);
+    expect(run?.events?.map((event) => event.type)).toContain("artifact_validation_passed");
+  });
+
   it("cancels a stuck ACP run into timed_out and updates workflow/session state", async () => {
     const { projectRoot, stateStore } = await setupProject({
       taskOverrides: { status: "running", runner: { type: "acp" } },

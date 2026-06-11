@@ -7,7 +7,7 @@ description: "OpenClaw Swarm Layer: spec-driven workflow orchestration with ACP-
 
 Turn workflow specifications into executable task graphs. Dispatch tasks through manual fallback or ACP automation. Supervise execution through an optional autopilot control plane. Track execution via persistent sessions with reuse and thread binding. Gate completion with review approval. Auto-retry on failure. Generate reports to local disk and Obsidian.
 
-Current release baseline: `openclaw-swarm-layer@0.5.11`, validated on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1` with startup tool contracts, plugin doctor checks, runtime health smoke, autopilot watcher smoke, Daily Papers-style local smoke, npm-project `acpx` backend discovery, ACP runtime-mode smoke, explicit-workdir ClawHub skill publish checks, and remote package-install smoke.
+Current release baseline: `openclaw-swarm-layer@0.5.12`, validated on OpenClaw local mini `2026.6.5` with startup tool contracts, plugin doctor checks, conservative ACP failure mapping, artifact-acceptance smoke (positive note-producing task plus negative missing-artifact task on a live ACP backend), unique-bridge-session smoke, parallel admission checks, and the full unit/e2e regression suite.
 
 ## What It Does
 
@@ -16,6 +16,7 @@ Current release baseline: `openclaw-swarm-layer@0.5.11`, validated on OpenClaw p
 - **Session management** — Persistent sessions with binding-key reuse, thread-bound follow-up, and steering messages
 - **Review gates** — Tasks require explicit approve/reject; structured quality rubrics for weighted multi-dimension scoring
 - **Sprint contracts** — Negotiated verifiable acceptance criteria per task with automated evaluator injection (GAN-inspired pattern)
+- **Artifact acceptance** — Optional `expectedArtifacts` (absolute paths or globs) per task; a completed ACP run with missing artifacts is downgraded to `failed` with `failure.source: "artifact-validation"` instead of reaching `done`
 - **Cross-session continuity** — Progress summary synthesis, bootstrap startup sequence, harness assumption tracking
 - **Protective guardrails** — Task field immutability guard, session budget control (duration + retries)
 - **Automatic retry** — Configurable per-task retry policy with dead letter tracking for exhausted tasks
@@ -139,7 +140,7 @@ node --version     # >= 22
 openclaw --version # >= 2026.3.22
 ```
 
-The `0.5.11` release was smoke-tested on OpenClaw package baseline `2026.5.3-1` and local mini `2026.6.1`.
+The `0.5.12` release was smoke-tested on OpenClaw local mini `2026.6.5` with a Daily Papers-style live ACP workload.
 
 ### 2. Install Plugin
 ```bash

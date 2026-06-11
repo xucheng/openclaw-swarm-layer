@@ -10,9 +10,9 @@
     "phaseId": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },
-    "kind": { "type": "string", "enum": ["coding", "review", "research", "ops", "docs"] },
+    "kind": { "type": "string", "enum": ["coding", "review", "research", "ops", "docs", "evaluate"] },
     "deps": { "type": "array", "items": { "type": "string" } },
-    "status": { "type": "string", "enum": ["planned", "ready", "running", "review_required", "blocked", "done", "failed"] },
+    "status": { "type": "string", "enum": ["planned", "ready", "queued", "running", "review_required", "blocked", "done", "failed", "dead_letter"] },
     "workspace": {
       "type": "object",
       "additionalProperties": false,
@@ -32,7 +32,28 @@
         "mode": { "type": "string", "enum": ["run", "session"] },
         "timeoutSeconds": { "type": "number" },
         "threadRequested": { "type": "boolean" },
-        "persistentSession": { "type": "boolean" }
+        "persistentSession": { "type": "boolean" },
+        "retryPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxAttempts", "backoffSeconds", "retryOn"],
+          "properties": {
+            "maxAttempts": { "type": "integer", "minimum": 1 },
+            "backoffSeconds": { "type": "number", "minimum": 0 },
+            "retryOn": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["failed", "timed_out"] }
+            }
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxDurationSeconds": { "type": "number" },
+            "maxRetries": { "type": "number" }
+          }
+        }
       }
     },
     "review": {
@@ -41,8 +62,92 @@
       "required": ["required"],
       "properties": {
         "required": { "type": "boolean" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "rubric": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dimensions", "passingThreshold"],
+          "properties": {
+            "dimensions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "weight"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "weight": { "type": "number" },
+                  "description": { "type": "string" }
+                }
+              }
+            },
+            "passingThreshold": { "type": "number" }
+          }
+        },
+        "rubricResult": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scores", "weightedTotal", "passing", "evaluatedAt"],
+          "properties": {
+            "scores": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["dimension", "score"],
+                "properties": {
+                  "dimension": { "type": "string", "minLength": 1 },
+                  "score": { "type": "number" },
+                  "note": { "type": "string" }
+                }
+              }
+            },
+            "weightedTotal": { "type": "number" },
+            "passing": { "type": "boolean" },
+            "evaluatedAt": { "type": "string", "format": "date-time" }
+          }
+        }
       }
-    }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy"],
+      "properties": {
+        "policy": { "type": "string", "enum": ["none", "create_persistent", "reuse_if_available", "require_existing"] },
+        "bindingKey": { "type": "string" },
+        "preferredSessionId": { "type": "string" }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskId", "negotiatedAt", "criteria", "frozen"],
+      "properties": {
+        "taskId": { "type": "string", "minLength": 1 },
+        "negotiatedAt": { "type": "string", "format": "date-time" },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "description", "kind"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "description": { "type": "string" },
+              "kind": { "type": "string", "enum": ["test_passes", "file_exists", "content_matches", "command_exits_zero", "manual_check"] },
+              "verifyCommand": { "type": "string" },
+              "verifyPattern": { "type": "string" },
+              "targetPath": { "type": "string" },
+              "passes": { "type": "boolean" }
+            }
+          }
+        },
+        "frozen": { "type": "boolean" }
+      }
+    },
+    "expectedArtifacts": { "type": "array", "items": { "type": "string" } },
+    "retryCount": { "type": "integer", "minimum": 0 },
+    "lastRejectReason": { "type": "string" }
   }
 }

@@ -130,6 +130,21 @@ function applyTerminalFields(runRecord: RunRecord, remoteStatus: SyncableRemoteS
   };
 }
 
+function buildRunFailure(remoteStatus: AcpSessionStatus): RunRecord["failure"] {
+  if (remoteStatus.state !== "failed") {
+    return undefined;
+  }
+  const failure = remoteStatus.failure ?? {
+    source: "acp-session",
+    message: remoteStatus.message ?? "ACP session failed without an upstream message",
+  };
+  return {
+    ...failure,
+    sessionKey: remoteStatus.sessionKey,
+    backendSessionId: remoteStatus.backendSessionId,
+  };
+}
+
 export function syncAcpRunRecord(runRecord: RunRecord, remoteStatus: AcpSessionStatus): SessionSyncResult<AcpSessionStatus> {
   if (runRecord.runner.type !== "acp") {
     throw new Error("Only ACP run records can be synced");
@@ -138,6 +153,7 @@ export function syncAcpRunRecord(runRecord: RunRecord, remoteStatus: AcpSessionS
   const synced: RunRecord = {
     ...applyTerminalFields(runRecord, remoteStatus, "acp"),
     resultSummary: buildAcpSummary(remoteStatus, runRecord.resultSummary),
+    failure: buildRunFailure(remoteStatus) ?? runRecord.failure,
     sessionRef: {
       ...runRecord.sessionRef,
       runtime: "acp",

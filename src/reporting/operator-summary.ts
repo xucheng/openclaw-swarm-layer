@@ -11,7 +11,7 @@ export type ReviewQueueItem = {
 };
 
 export type AttentionItem = {
-  kind: "review" | "blocked" | "running" | "dead_letter" | "queued";
+  kind: "review" | "blocked" | "running" | "dead_letter" | "queued" | "artifact_missing";
   taskId: string;
   title?: string;
   message: string;
@@ -131,7 +131,39 @@ export function buildAttentionItems(workflow: WorkflowState, runs: RunRecord[]):
     });
   }
 
+  for (const task of workflow.tasks) {
+    const latestRun = latestRunByTask.get(task.taskId);
+    if (!latestRun || latestRun.status !== "completed" || latestRun.artifacts.length > 0) {
+      continue;
+    }
+    if (!taskExpectsArtifacts(task)) {
+      continue;
+    }
+    items.push({
+      kind: "artifact_missing",
+      taskId: task.taskId,
+      title: task.title,
+      message: `Run completed without recorded artifacts for ${task.title}`,
+      latestRunId: latestRun.runId,
+      latestRunStatus: latestRun.status,
+      latestRunSummary: latestRun.resultSummary,
+      recommendedAction: "Verify the expected output files exist before approving; rerun the task if they are missing.",
+    });
+  }
+
   return items;
+}
+
+const ABSOLUTE_OUTPUT_PATH_PATTERN = /(?:^|[\s"'`(=])\/[^\s"'`)]+\/[^\s"'`)]+/;
+
+function taskExpectsArtifacts(task: TaskNode): boolean {
+  if ((task.expectedArtifacts?.length ?? 0) > 0) {
+    return true;
+  }
+  if (task.kind !== "coding" && task.kind !== "docs") {
+    return false;
+  }
+  return ABSOLUTE_OUTPUT_PATH_PATTERN.test(task.description ?? "");
 }
 
 export function buildOperatorHighlights(runs: RunRecord[]): OperatorHighlight[] {
