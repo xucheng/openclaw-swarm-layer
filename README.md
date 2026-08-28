@@ -1,3 +1,5 @@
+
+
 <div align="center">
 
 # OpenClaw Swarm Layer
@@ -162,7 +164,7 @@ npm run test:unit      # Unit tests only (435 tests, 62 files)
 npm run test:e2e       # E2E tests only (26 tests, 20 files)
 npm run test:watch     # Watch mode
 npm run check:docs-redaction  # Verify docs do not contain local machine paths
-npm run release:check         # Build + full regression + docs redaction + npm pack dry-run + ClawHub package prep
+npm run release:check         # Build + full regression + docs redaction + release consistency + npm pack dry-run + ClawHub package prep
 ```
 
 Current release validation also includes OpenClaw `2026.5.3-1` package-baseline coverage and local mini `2026.6.1` smoke coverage: plugin load, manifest contracts, `openclaw-swarm-layer` doctor checks, runtime health, node/parcel autopilot watcher smoke, Daily Papers-style parallel workflow completion, and npm-project `acpx` backend discovery.
